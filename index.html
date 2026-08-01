@@ -475,6 +475,16 @@ html[data-theme="light"] .avatar{ background:linear-gradient(160deg,#E3E7EE,#F3F
 .rovl-tag.normal{ color:var(--text-secondary); }
 
 /* Sector Trend -> ORB/DRB jump buttons */
+.sector-jump-wrap{ display:flex; flex-direction:column; gap:5px; align-items:flex-start; }
+.sector-jump-leads{ display:flex; flex-direction:column; gap:3px; }
+.sector-lead-chip{
+  display:inline-flex; align-items:center; gap:2px; font-family:var(--font-data);
+  font-size:10px; font-weight:700; letter-spacing:.01em; padding:1px 6px 1px 3px;
+  border-radius:5px; width:fit-content;
+}
+.sector-lead-chip.bull{ background:var(--bull-dim); color:var(--bull); }
+.sector-lead-chip.bear{ background:var(--bear-dim); color:var(--bear); }
+.sector-lead-chip i{ font-size:12px; }
 .sector-jump{ display:flex; gap:6px; }
 .sector-jump-btn{
   font-family:var(--font-data); font-size:11px; font-weight:700; letter-spacing:.02em;
@@ -837,39 +847,6 @@ html[data-theme="light"] .avatar{ background:linear-gradient(160deg,#E3E7EE,#F3F
   font-size:12.5px; color:var(--text-muted); padding:16px 4px; display:flex; align-items:center; gap:8px;
 }
 
-/* ---- AI chat (Gemini) ---- */
-.chart-ai{
-  padding:14px 22px 20px; border-top:1px solid var(--border-soft);
-  background:linear-gradient(180deg, var(--bg-raised), var(--bg-base));
-}
-.chart-ai-lbl{
-  display:flex; align-items:center; gap:8px; font-size:11px; font-weight:700; text-transform:uppercase;
-  letter-spacing:.05em; color:var(--text-muted); margin-bottom:10px;
-}
-.ai-msgs{ display:flex; flex-direction:column; gap:8px; }
-.ai-msg{
-  padding:9px 12px; border-radius:var(--radius-md); font-size:13px; line-height:1.5; max-width:92%;
-}
-.ai-msg.user{
-  align-self:flex-end; background:var(--brand-dim); color:var(--text-primary); border:1px solid rgba(76,141,255,.3);
-}
-.ai-msg.bot{
-  align-self:flex-start; background:var(--bg-surface); border:1px solid var(--border-soft); color:var(--text-primary);
-}
-.ai-msg.error{ align-self:flex-start; background:var(--bear-dim); border:1px solid rgba(239,68,68,.3); color:var(--bear); }
-.ai-msg.loading{ align-self:flex-start; background:var(--bg-surface); border:1px solid var(--border-soft); color:var(--text-muted); font-style:italic; }
-.ai-input-row{ display:flex; gap:8px; padding:10px 14px; border-top:1px solid var(--border-soft); flex-shrink:0; }
-.ai-input{
-  flex:1; background:var(--bg-surface); border:1px solid var(--border-med); border-radius:var(--radius-md);
-  padding:9px 12px; font-size:13px; color:var(--text-primary);
-}
-.ai-input:focus{ outline:none; border-color:var(--brand); }
-.ai-send-btn{
-  width:38px; height:38px; flex-shrink:0; border-radius:var(--radius-md); border:none;
-  background:var(--brand); color:#fff; display:flex; align-items:center; justify-content:center; font-size:14px;
-}
-.ai-send-btn:disabled{ opacity:.5; cursor:default; }
-.ai-disclaimer{ font-size:10.5px; color:var(--text-muted); padding:0 14px 12px; flex-shrink:0; }
 .chart-body-wrap{
   position:relative; flex:1; min-height:0; margin:14px 22px 20px;
   border:1px solid var(--border-soft); border-radius:var(--radius-md); overflow:hidden;
@@ -886,7 +863,7 @@ html[data-theme="light"] .avatar{ background:linear-gradient(160deg,#E3E7EE,#F3F
 .chart-msg i{ font-size:26px; color:var(--text-muted); }
 .chart-msg .msg-detail{ max-width:440px; line-height:1.55; font-size:12px; }
 
-/* News / Ask AI toggle buttons in the chart toolbar */
+/* News toggle button in the chart toolbar */
 .chart-popover-toggle{
   display:inline-flex; align-items:center; gap:6px; font-size:12.5px; font-weight:600;
   padding:6px 12px; border-radius:var(--radius-sm); border:1px solid var(--border-med);
@@ -897,7 +874,7 @@ html[data-theme="light"] .avatar{ background:linear-gradient(160deg,#E3E7EE,#F3F
 .chart-popover-toggle.loading i{ animation:spin .8s linear infinite; }
 @keyframes spin{ from{ transform:rotate(0deg); } to{ transform:rotate(360deg); } }
 
-/* News / Ask AI floating panels over the chart */
+/* News floating panel over the chart */
 .chart-popover{
   position:absolute; top:12px; right:12px; bottom:12px; width:360px; max-width:calc(100% - 24px);
   display:none; flex-direction:column;
@@ -1424,18 +1401,13 @@ html.breaklog-hidden .exp-card-breaklog{ display:none !important; }
     <div class="settings-divider"></div>
 
     <div class="modal-section-lbl">Scan Size</div>
-    <div style="font-size:11.5px; color:var(--text-muted); margin-bottom:10px;">Trades breadth for daily rebuild speed — switching triggers an immediate rebuild in the background</div>
-    <div class="scan-mode-toggle" id="scanModeSection">
-      <button type="button" class="scan-mode-btn" id="scanModeNifty500Btn" data-mode="nifty500">
+    <div style="font-size:11.5px; color:var(--text-muted); margin-bottom:10px;">Locked to the Nifty 500 universe — scanning beyond it breaks the ORB/DRB break-log cadence.</div>
+    <div class="scan-mode-toggle" id="scanModeSection" style="grid-template-columns:1fr;">
+      <button type="button" class="scan-mode-btn active" id="scanModeNifty500Btn" data-mode="nifty500" disabled style="pointer-events:none;">
         <div class="scan-mode-title">Nifty 500</div>
         <div class="scan-mode-sub" id="scanModeNifty500Sub">~500 stocks · ~3 min rebuild</div>
       </button>
-      <button type="button" class="scan-mode-btn" id="scanModeFullBtn" data-mode="full">
-        <div class="scan-mode-title">Full Market</div>
-        <div class="scan-mode-sub" id="scanModeFullSub">~4,500 stocks · ~20-25 min rebuild</div>
-      </button>
     </div>
-    <div id="scanModeNonAdminMsg" style="font-size:11.5px; color:var(--text-muted); display:none;">Contact your admin to change this.</div>
     <div id="scanModeMsg" style="font-size:11.5px; display:none; margin-top:8px;"></div>
 
     <div class="settings-divider"></div>
@@ -1764,7 +1736,6 @@ html.breaklog-hidden .exp-card-breaklog{ display:none !important; }
       </select>
       <button class="icon-btn" id="chartReloadBtn" title="Reload"><i class="bi bi-arrow-clockwise"></i></button>
       <button class="chart-popover-toggle" id="chartNewsToggleBtn" title="Latest news"><i class="bi bi-newspaper"></i> News</button>
-      <button class="chart-popover-toggle" id="chartAiToggleBtn" title="Ask AI about this stock"><i class="bi bi-stars"></i> Ask AI</button>
       <div class="chart-legend">
         <span class="lg-item"><i class="bi bi-arrow-up-short" style="color:var(--bull);"></i>Buy break</span>
         <span class="lg-item"><i class="bi bi-arrow-down-short" style="color:var(--bear);"></i>Sell break</span>
@@ -1795,20 +1766,6 @@ html.breaklog-hidden .exp-card-breaklog{ display:none !important; }
         <div class="chart-popover-body">
           <div class="news-scroll vertical" id="chartNewsList"></div>
         </div>
-      </div>
-      <div class="chart-popover" id="chartAi">
-        <div class="chart-popover-head">
-          <div class="chart-ai-lbl" style="margin:0;"><span class="news-lbl-icon"><i class="bi bi-stars"></i></span> Ask AI about this stock</div>
-          <button type="button" class="icon-btn" id="chartAiCloseBtn"><i class="bi bi-x-lg"></i></button>
-        </div>
-        <div class="chart-popover-body">
-          <div class="ai-msgs" id="aiMsgs"></div>
-        </div>
-        <div class="ai-input-row">
-          <input type="text" class="ai-input" id="aiInput" placeholder="e.g. Why is this showing BUY?" maxlength="500">
-          <button type="button" class="ai-send-btn" id="aiSendBtn"><i class="bi bi-send-fill"></i></button>
-        </div>
-        <div class="ai-disclaimer">AI answers are based only on this stock's current scanner data and news — not financial advice.</div>
       </div>
     </div>
   </div>
@@ -1885,8 +1842,6 @@ function showApp(session){
   document.getElementById("adminDivider").style.display = isAdmin ? "block" : "none";
   document.getElementById("adminSection").style.display = isAdmin ? "block" : "none";
   document.getElementById("liveDataSourceSection").style.display = isAdmin ? "block" : "none";
-  document.getElementById("scanModeSection").style.display = isAdmin ? "grid" : "none";
-  document.getElementById("scanModeNonAdminMsg").style.display = isAdmin ? "none" : "block";
   if(isAdmin) renderAdminList();
 
   const roleBadge = document.getElementById("roleBadge");
@@ -3217,10 +3172,13 @@ function renderSectorTrend(){
   });
   const breakInfo = (rows) => {
     const breaks = rows.filter(r => r.signal !== "WATCH");
-    if(!breaks.length) return { count: 0, dir: "bull" };
+    if(!breaks.length) return { count: 0, dir: "bull", lead: null };
     const buys = breaks.filter(r => r.signal === "BUY").length;
     const sells = breaks.length - buys;
-    return { count: breaks.length, dir: buys >= sells ? "bull" : "bear" };
+    // Lead symbol: the single stock driving the sector's break, picked by
+    // highest ROVL so the strongest mover surfaces, not just the first one.
+    const lead = breaks.slice().sort((a,b) => b.rovl - a.rovl)[0];
+    return { count: breaks.length, dir: buys >= sells ? "bull" : "bear", lead: lead.sym };
   };
   const sectorAgg = SECTORS.map(name => {
     const rows = bySector[name] || [];
@@ -3246,9 +3204,15 @@ function renderSectorTrend(){
       <td><span class="strength-txt ${sc.strength}">${sc.strength === 'moderate' ? 'Neutral' : sc.strength.charAt(0).toUpperCase()+sc.strength.slice(1)}</span></td>
       <td><span class="badge-status ${sc.status}"><span class="dot"></span>${label(sc.status)}</span></td>
       <td>
-        <div class="sector-jump">
-          <button type="button" class="sector-jump-btn orb ${sc.orbBreak.count > 0 ? 'has-break ' + sc.orbBreak.dir : ''}" onclick="openExplorer('ORB','all','${sc.name.replace(/'/g,"\\'")}')" title="ORB breakouts in ${sc.name}">ORB${sc.orbBreak.count > 0 ? `<span class="jump-break-badge">${sc.orbBreak.count}</span>` : ''}</button>
-          <button type="button" class="sector-jump-btn drb ${sc.drbBreak.count > 0 ? 'has-break ' + sc.drbBreak.dir : ''}" onclick="openExplorer('DRB','all','${sc.name.replace(/'/g,"\\'")}')" title="DRB breakouts in ${sc.name}">DRB${sc.drbBreak.count > 0 ? `<span class="jump-break-badge">${sc.drbBreak.count}</span>` : ''}</button>
+        <div class="sector-jump-wrap">
+          <div class="sector-jump-leads">
+            ${sc.orbBreak.lead ? `<span class="sector-lead-chip ${sc.orbBreak.dir}" title="${sc.orbBreak.lead} is leading ${sc.name}'s ORB break"><i class="bi bi-arrow-${sc.orbBreak.dir === 'bull' ? 'up' : 'down'}-short"></i>${sc.orbBreak.lead} ORB</span>` : ''}
+            ${sc.drbBreak.lead ? `<span class="sector-lead-chip ${sc.drbBreak.dir}" title="${sc.drbBreak.lead} is leading ${sc.name}'s DRB break"><i class="bi bi-arrow-${sc.drbBreak.dir === 'bull' ? 'up' : 'down'}-short"></i>${sc.drbBreak.lead} DRB</span>` : ''}
+          </div>
+          <div class="sector-jump">
+            <button type="button" class="sector-jump-btn orb ${sc.orbBreak.count > 0 ? 'has-break ' + sc.orbBreak.dir : ''}" onclick="openExplorer('ORB','all','${sc.name.replace(/'/g,"\\'")}')" title="ORB breakouts in ${sc.name}">ORB${sc.orbBreak.count > 0 ? `<span class="jump-break-badge">${sc.orbBreak.count}</span>` : ''}</button>
+            <button type="button" class="sector-jump-btn drb ${sc.drbBreak.count > 0 ? 'has-break ' + sc.drbBreak.dir : ''}" onclick="openExplorer('DRB','all','${sc.name.replace(/'/g,"\\'")}')" title="DRB breakouts in ${sc.name}">DRB${sc.drbBreak.count > 0 ? `<span class="jump-break-badge">${sc.drbBreak.count}</span>` : ''}</button>
+          </div>
         </div>
       </td>
     </tr>
@@ -3415,6 +3379,17 @@ function renderExplorer(){
   document.getElementById("explorerTable").classList.toggle("sector-hidden", sectorHidden);
   document.getElementById("explorerCards").classList.toggle("sector-hidden", sectorHidden);
 
+  // Header stat numbers reflect the current sector filter (all signals, ignoring
+  // search/quiet-floor so they read as a stable "how big is this slice" figure).
+  const statScope = sector === "all" ? explorerData : explorerData.filter(r => r.sector === sector);
+  const statBreakouts = statScope.filter(r => r.signal !== "WATCH");
+  document.getElementById("statTotal").textContent = statScope.length.toLocaleString("en-IN");
+  document.getElementById("statBreakouts").textContent = statBreakouts.length.toLocaleString("en-IN");
+  document.getElementById("statHotRovl").textContent = statBreakouts.filter(r => r.rovl > 1.2).length.toLocaleString("en-IN");
+  document.getElementById("explorerSub").textContent = sector === "all"
+    ? `${explorerData.length} symbols across ${SECTORS.length} sectors · sorted by ROVL · flat stocks (<0.5% move) hidden`
+    : `${statScope.length} symbols in ${sector} · sorted by ROVL · flat stocks (<0.5% move) hidden`;
+
   document.getElementById("explorerBody").innerHTML = rows.map(r => `
     <tr class="rail-${r.status}">
       <td><div class="sym sym-link" onclick="openChartModal('${r.sym}')">${r.sym} <i class="bi bi-graph-up"></i></div></td>
@@ -3491,19 +3466,17 @@ function openExplorer(strategy, initialSignal, initialSector){
   explorerSignal = initialSignal || "all";
   explorerSort = { key: "rovl", dir: -1 };
 
+  const validSector = initialSector && SECTORS.includes(initialSector) ? initialSector : "all";
+
   document.getElementById("explorerTitle").textContent = (isORB ? "ORB Breakout" : "DRB Breakout") + " — Trade Explorer" + (initialSector ? ` · ${initialSector}` : "");
-  document.getElementById("explorerSub").textContent = `${explorerData.length} symbols across ${SECTORS.length} sectors · sorted by ROVL · flat stocks (<0.5% move) hidden`;
   document.getElementById("explorerSearch").value = "";
-  explorerSectorFilter.value = (initialSector && SECTORS.includes(initialSector)) ? initialSector : "all";
+  explorerSectorFilter.value = validSector;
+  document.getElementById("statBreakoutsLbl").textContent = (isORB ? "ORB" : "DRB") + " Breakouts";
   document.querySelectorAll(".filter-chip").forEach(c => c.classList.toggle("active", c.dataset.signal === explorerSignal));
 
-  const breakouts = explorerData.filter(r => r.signal !== "WATCH");
-  const hotBreakouts = breakouts.filter(r => r.rovl > 1.2);
-  document.getElementById("statTotal").textContent = explorerData.length.toLocaleString("en-IN");
-  document.getElementById("statBreakoutsLbl").textContent = (isORB ? "ORB" : "DRB") + " Breakouts";
-  document.getElementById("statBreakouts").textContent = breakouts.length.toLocaleString("en-IN");
-  document.getElementById("statHotRovl").textContent = hotBreakouts.length.toLocaleString("en-IN");
-
+  // renderExplorer() fills in explorerSub and the stat numbers (statTotal,
+  // statBreakouts, statHotRovl), scoped to validSector via the sector filter
+  // set just above — keeps a single source of truth for those figures.
   renderExplorer();
   document.getElementById("explorerOverlay").classList.add("show");
 }
@@ -3774,83 +3747,6 @@ function renderChartLevels(row){
   panel.style.display = "flex";
 }
 
-/* ---------------- AI chat (Gemini) ---------------- */
-function buildAiContext(symbol, row){
-  if(!row) return `Symbol: ${symbol} (no live scanner data available for this stock right now).`;
-  const lines = [
-    `Symbol: ${row.sym} (${row.name || ""}), sector: ${row.sector || "—"}`,
-    `Strategy shown: ${row.strategy || "—"}`,
-    `Price: ₹${row.price} · % change today: ${row.chg}%`,
-    `ROVL (relative volume): ${row.rovl}`,
-    `Score: ${Math.round(row.score/10)}/10 · Signal: ${row.signal}`,
-    `Sector strength: ${sectorStrengthMap[row.sector] || "moderate"}`
-  ];
-  if(row.levelHigh != null && row.levelLow != null){
-    const lbl = row.strategy === "DRB" ? "Previous day" : "Opening range (ORB)";
-    lines.push(`${lbl} high/low: ₹${row.levelHigh} / ₹${row.levelLow}`);
-  }
-  if(row.breakLog && row.breakLog.length){
-    lines.push(`Break log today: ${row.breakLog.map(e => `${e.time} ${e.dir}${e.rvol ? ' ('+e.rvol+'x)' : ''}`).join(", ")}`);
-  }
-  if(currentChartNewsTitles.length){
-    lines.push(`Recent news headlines: ${currentChartNewsTitles.join(" | ")}`);
-  }
-  return lines.join("\n");
-}
-
-function resetAiChat(){
-  document.getElementById("aiMsgs").innerHTML = "";
-  document.getElementById("aiInput").value = "";
-}
-
-function addAiMsg(kind, text){
-  const wrap = document.getElementById("aiMsgs");
-  const div = document.createElement("div");
-  div.className = "ai-msg " + kind;
-  div.textContent = text;
-  wrap.appendChild(div);
-  wrap.scrollTop = wrap.scrollHeight;
-  return div;
-}
-
-async function sendAiMessage(){
-  const input = document.getElementById("aiInput");
-  const btn = document.getElementById("aiSendBtn");
-  const question = input.value.trim();
-  if(!question || !currentChartSymbol) return;
-
-  addAiMsg("user", question);
-  input.value = "";
-  btn.disabled = true;
-  const loadingEl = addAiMsg("loading", "Thinking…");
-
-  try {
-    const base = getBackendUrl();
-    const row = findRowForSymbol(currentChartSymbol);
-    const context = buildAiContext(currentChartSymbol, row);
-    const res = await fetch(base + "/ai/ask", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ question, context })
-    });
-    const data = await res.json();
-    loadingEl.remove();
-    if(data.error) addAiMsg("error", data.error);
-    else addAiMsg("bot", data.answer || "No answer returned.");
-  } catch(err){
-    loadingEl.remove();
-    addAiMsg("error", "Couldn't reach the AI right now — check the server is running.");
-  } finally {
-    btn.disabled = false;
-    input.focus();
-  }
-}
-
-document.getElementById("aiSendBtn").addEventListener("click", sendAiMessage);
-document.getElementById("aiInput").addEventListener("keydown", function(e){
-  if(e.key === "Enter") sendAiMessage();
-});
-
 function escapeHtml(str){
   const div = document.createElement("div");
   div.textContent = str == null ? "" : String(str);
@@ -3899,25 +3795,17 @@ async function loadChartNews(symbol){
 
 function toggleChartPopover(id){
   const panel = document.getElementById(id);
-  const btn = document.getElementById(id === "chartNews" ? "chartNewsToggleBtn" : "chartAiToggleBtn");
-  const otherId = id === "chartNews" ? "chartAi" : "chartNews";
-  const otherBtn = document.getElementById(otherId === "chartNews" ? "chartNewsToggleBtn" : "chartAiToggleBtn");
+  const btn = document.getElementById("chartNewsToggleBtn");
   const willShow = !panel.classList.contains("show");
-  document.getElementById(otherId).classList.remove("show");
-  otherBtn.classList.remove("active");
   panel.classList.toggle("show", willShow);
   btn.classList.toggle("active", willShow);
 }
 function closeChartPopovers(){
   document.getElementById("chartNews").classList.remove("show");
-  document.getElementById("chartAi").classList.remove("show");
   document.getElementById("chartNewsToggleBtn").classList.remove("active");
-  document.getElementById("chartAiToggleBtn").classList.remove("active");
 }
 document.getElementById("chartNewsToggleBtn").addEventListener("click", () => toggleChartPopover("chartNews"));
-document.getElementById("chartAiToggleBtn").addEventListener("click", () => toggleChartPopover("chartAi"));
 document.getElementById("chartNewsCloseBtn").addEventListener("click", closeChartPopovers);
-document.getElementById("chartAiCloseBtn").addEventListener("click", closeChartPopovers);
 
 function openChartModal(symbol){
   currentChartSymbol = symbol;
@@ -3929,7 +3817,6 @@ function openChartModal(symbol){
   document.getElementById("chartOpenTv").href = `https://www.tradingview.com/chart/?symbol=${encodeURIComponent(tvSymbol(symbol))}`;
   renderChartBreakSummary(row);
   renderChartLevels(row);
-  resetAiChat();
   closeChartPopovers();
   document.getElementById("chartOverlay").classList.add("show");
   showChartMsg("Loading chart…", "bi-hourglass-split");
@@ -3943,7 +3830,6 @@ function closeChartModal(){
   document.getElementById("tvChartContainer").innerHTML = "";
   document.getElementById("chartNewsList").innerHTML = "";
   closeChartPopovers();
-  resetAiChat();
   currentChartSymbol = null;
 }
 document.getElementById("chartClose").addEventListener("click", closeChartModal);
@@ -4107,16 +3993,7 @@ document.getElementById("saveWindowsBtn").addEventListener("click", async functi
   setTimeout(() => { msg.style.display = "none"; }, 3000);
 });
 
-/* ---------------- Scan Size (universe mode) ---------------- */
-let scanModePollTimer = null;
-
-function setScanModeButtonsState(mode, rebuilding){
-  document.querySelectorAll(".scan-mode-btn").forEach(btn => {
-    btn.classList.toggle("active", btn.dataset.mode === mode);
-    btn.classList.toggle("rebuilding", rebuilding);
-  });
-}
-
+/* ---------------- Scan Size (Nifty 500 — locked, read-only info) ---------------- */
 async function refreshScanModeUI(){
   const base = getBackendUrl();
   if(!base) return;
@@ -4126,60 +4003,12 @@ async function refreshScanModeUI(){
     const data = await res.json();
     const sizes = data.scan_mode_sizes || {};
     if(sizes.nifty500 != null) document.getElementById("scanModeNifty500Sub").textContent = `${sizes.nifty500.toLocaleString('en-IN')} stocks · ~3 min rebuild`;
-    if(sizes.full != null) document.getElementById("scanModeFullSub").textContent = `${sizes.full.toLocaleString('en-IN')} stocks · ~20-25 min rebuild`;
-
-    const rebuilding = data.universe_rebuild && data.universe_rebuild.state === "rebuilding";
-    setScanModeButtonsState(data.scan_mode, rebuilding);
-
-    const msg = document.getElementById("scanModeMsg");
-    if(rebuilding){
-      msg.textContent = `Rebuilding for "${data.universe_rebuild.mode === 'nifty500' ? 'Nifty 500' : 'Full Market'}" (started ${data.universe_rebuild.started_at}) — dashboard keeps serving today's existing data meanwhile.`;
-      msg.style.color = "var(--text-muted)";
-      msg.style.display = "block";
-      if(!scanModePollTimer) scanModePollTimer = setInterval(refreshScanModeUI, 15000);
-    } else {
-      if(scanModePollTimer){ clearInterval(scanModePollTimer); scanModePollTimer = null; }
-      msg.style.display = "none";
-    }
   } catch(err){
-    // silent — settings panel just won't show live sizes until reachable
+    // silent — settings panel just won't show the live size until reachable
   }
 }
 
-document.querySelectorAll(".scan-mode-btn").forEach(btn => {
-  btn.addEventListener("click", async function(){
-    const mode = this.dataset.mode;
-    const base = getBackendUrl();
-    const msg = document.getElementById("scanModeMsg");
-    if(!base){
-      msg.textContent = "Set your Live Data Source first.";
-      msg.style.color = "var(--bear)";
-      msg.style.display = "block";
-      return;
-    }
-    try {
-      const res = await fetch(base + "/config/scan-mode", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mode })
-      });
-      const data = await res.json();
-      if(data.error){
-        msg.textContent = data.error;
-        msg.style.color = "var(--bear)";
-        msg.style.display = "block";
-        return;
-      }
-      refreshScanModeUI();
-    } catch(err){
-      msg.textContent = "Couldn't reach the server to switch scan size.";
-      msg.style.color = "var(--bear)";
-      msg.style.display = "block";
-    }
-  });
-});
-
-// Refresh scan-mode state whenever Settings is opened
+// Refresh scan-mode info whenever Settings is opened
 document.getElementById("settingsBtn")?.addEventListener("click", refreshScanModeUI);
 
 
