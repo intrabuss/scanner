@@ -861,6 +861,34 @@ html[data-theme="light"] .avatar{ background:linear-gradient(160deg,#E3E7EE,#F3F
 .chart-msg i{ font-size:26px; color:var(--text-muted); }
 .chart-msg .msg-detail{ max-width:440px; line-height:1.55; font-size:12px; }
 
+/* Self-drawn 4-panel candle chart grid (5min / 15min / Hour / Daily) —
+   IntraBuss's own canvas-rendered candles, no TradingView branding. */
+#tvChartContainer.chart-quad-grid{
+  display:grid; grid-template-columns:1fr 1fr; grid-template-rows:1fr 1fr;
+  gap:14px; padding:14px; height:100%; overflow:auto;
+}
+@media (max-width:760px){
+  #tvChartContainer.chart-quad-grid{ grid-template-columns:1fr; grid-template-rows:none; overflow-y:auto; }
+}
+.chart-quad-panel{
+  display:flex; flex-direction:column; min-height:220px;
+  background:var(--bg-surface); border:1px solid var(--border-soft); border-radius:var(--radius-md);
+  box-shadow:var(--shadow-card); overflow:hidden;
+}
+.chart-quad-panel-head{
+  flex-shrink:0; text-align:center; padding:10px 10px 6px;
+  font-size:12.5px; font-weight:700; color:var(--text-secondary); letter-spacing:.01em;
+}
+.chart-quad-panel-canvas-wrap{ position:relative; flex:1; min-height:0; padding:0 10px 10px; }
+.chart-quad-panel canvas{ width:100%; height:100%; display:block; cursor:crosshair; }
+.chart-quad-tooltip{
+  position:absolute; pointer-events:none; z-index:5; display:none;
+  background:var(--bg-raised); border:1px solid var(--border-med); border-radius:var(--radius-sm);
+  padding:6px 9px; font-size:11px; font-family:var(--font-data); color:var(--text-primary);
+  box-shadow:0 6px 18px -6px rgba(0,0,0,.45); white-space:nowrap;
+}
+.chart-quad-tooltip .lbl{ color:var(--text-muted); margin-right:4px; }
+
 /* News toggle button in the chart toolbar */
 .chart-popover-toggle{
   display:inline-flex; align-items:center; gap:6px; font-size:12.5px; font-weight:600;
@@ -1717,7 +1745,7 @@ html.breaklog-hidden .exp-card-breaklog{ display:none !important; }
       <button class="icon-btn" id="chartClose"><i class="bi bi-x-lg"></i></button>
     </div>
     <div class="chart-toolbar">
-      <select class="explorer-select" id="chartIntervalSelect">
+      <select class="explorer-select" id="chartIntervalSelect" style="display:none;">
         <option value="1">1m</option>
         <option value="3">3m</option>
         <option value="5">5m</option>
@@ -3701,15 +3729,190 @@ function buildChartEmbedUrl(symbol, intervalMin){
   return `https://s.tradingview.com/widgetembed/?${params.toString()}`;
 }
 
-function loadChart(symbol){
-  hideChartMsg();
-  const intervalMin = document.getElementById("chartIntervalSelect").value;
+/* =====================================================================
+   IntraBuss QUAD CHART — self-drawn candlesticks on <canvas>, no
+   TradingView branding. Four panels (5min / 15min / Hour / Daily),
+   each with the day's ORB high/low as dashed break lines and a small
+   "buy"/"sell" bubble marker dropped where price actually confirmed
+   through the ORB level (from the backend break log).
+===================================================================== */
+const CHART_PANELS = [
+  { key: "5min",  label: "5min Chart",  showOrb: true  },
+  { key: "15min", label: "15min Chart", showOrb: true  },
+  { key: "60min", label: "Hour Chart",  showOrb: true  },
+  { key: "daily", label: "Daily Chart", showOrb: false },
+];
+
+function cssVar(name){
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+}
+
+function drawQuadPanel(canvas, candles, opts){
+  const wrap = canvas.parentElement;
+  const dpr = window.devicePixelRatio || 1;
+  const w = wrap.clientWidth, h = wrap.clientHeight;
+  canvas.width = w * dpr; canvas.height = h * dpr;
+  canvas.style.width = w + "px"; canvas.style.height = h + "px";
+  const ctx = canvas.getContext("2d");
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, w, h);
+  if(!candles || !candles.length) return;
+
+  const bull = cssVar("--bull") || "#22C55E";
+  const bear = cssVar("--bear") || "#EF4444";
+  const bullDim = cssVar("--bull-dim") || "rgba(34,197,94,.28)";
+  const bearDim = cssVar("--bear-dim") || "rgba(239,68,68,.28)";
+  const gridColor = cssVar("--border-soft") || "#1F2530";
+
+  const priceH = h * 0.68, volTop = priceH + 10, volH = h - volTop;
+  const orbHigh = opts.showOrb ? opts.orbHigh : null;
+  const orbLow = opts.showOrb ? opts.orbLow : null;
+
+  let lo = Math.min(...candles.map(c => c.l));
+  let hi = Math.max(...candles.map(c => c.h));
+  if(orbHigh != null) hi = Math.max(hi, orbHigh);
+  if(orbLow != null) lo = Math.min(lo, orbLow);
+  const pad = (hi - lo) * 0.08 || 1;
+  lo -= pad; hi += pad;
+  const maxVol = Math.max(...candles.map(c => c.v), 1);
+
+  const n = candles.length;
+  const slot = w / n;
+  const bodyW = Math.max(1.5, Math.min(9, slot * 0.62));
+  const y = v => priceH - ((v - lo) / (hi - lo)) * priceH;
+  const x = i => i * slot + slot / 2;
+
+  // divider between price area and volume area
+  ctx.strokeStyle = gridColor; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(0, priceH + 0.5); ctx.lineTo(w, priceH + 0.5); ctx.stroke();
+
+  // ORB dashed break lines
+  if(orbHigh != null){
+    ctx.save();
+    ctx.strokeStyle = bull; ctx.setLineDash([5, 4]); ctx.lineWidth = 1.25;
+    ctx.beginPath(); ctx.moveTo(0, y(orbHigh)); ctx.lineTo(w, y(orbHigh)); ctx.stroke();
+    ctx.restore();
+  }
+  if(orbLow != null){
+    ctx.save();
+    ctx.strokeStyle = bear; ctx.setLineDash([5, 4]); ctx.lineWidth = 1.25;
+    ctx.beginPath(); ctx.moveTo(0, y(orbLow)); ctx.lineTo(w, y(orbLow)); ctx.stroke();
+    ctx.restore();
+  }
+
+  // candles
+  candles.forEach((c, i) => {
+    const up = c.c >= c.o;
+    const color = up ? bull : bear;
+    const cx = x(i);
+    ctx.strokeStyle = color; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(cx, y(c.h)); ctx.lineTo(cx, y(c.l)); ctx.stroke();
+    ctx.fillStyle = color;
+    const yo = y(c.o), yc = y(c.c);
+    const top = Math.min(yo, yc), bh = Math.max(1, Math.abs(yc - yo));
+    ctx.fillRect(cx - bodyW / 2, top, bodyW, bh);
+
+    // volume bar
+    const vh = (c.v / maxVol) * (volH - 4);
+    ctx.fillStyle = up ? bullDim : bearDim;
+    ctx.fillRect(cx - bodyW / 2, h - vh, bodyW, vh);
+  });
+
+  // buy / sell bubbles from the ORB break log
+  if(opts.showOrb && opts.markers && opts.markers.length){
+    opts.markers.forEach(m => {
+      let idx = -1, best = Infinity;
+      candles.forEach((c, i) => {
+        const d = Math.abs(timeToMinutes(c.t) - timeToMinutes(m.time));
+        if(d < best){ best = d; idx = i; }
+      });
+      if(idx < 0) return;
+      const cx = x(idx);
+      const isBuy = m.dir === "up";
+      const by = isBuy ? y(candles[idx].l) + 14 : y(candles[idx].h) - 14;
+      ctx.save();
+      ctx.fillStyle = isBuy ? bull : bear;
+      ctx.beginPath(); ctx.arc(cx, by, 6, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = "#fff"; ctx.font = "bold 8px Inter, sans-serif";
+      ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.fillText(isBuy ? "B" : "S", cx, by + 0.5);
+      ctx.restore();
+    });
+  }
+
+  canvas._chartData = { candles, x, y, slot, opts };
+}
+
+function timeToMinutes(t){
+  if(/^\d{1,2}:\d{2}$/.test(t)){
+    const [hh, mm] = t.split(":").map(Number);
+    return hh * 60 + mm;
+  }
+  return 0; // daily labels ("dd Mon") don't need this — markers aren't drawn on the daily panel
+}
+
+function attachQuadTooltip(canvas, tooltip){
+  canvas.addEventListener("mousemove", e => {
+    const d = canvas._chartData;
+    if(!d || !d.candles.length) return;
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    let idx = Math.floor(mx / d.slot);
+    idx = Math.max(0, Math.min(d.candles.length - 1, idx));
+    const c = d.candles[idx];
+    tooltip.innerHTML = `<span class="lbl">${c.t}</span> O ${c.o} H ${c.h} L ${c.l} C ${c.c}`;
+    tooltip.style.display = "block";
+    tooltip.style.left = Math.min(mx + 12, canvas.clientWidth - tooltip.offsetWidth - 6) + "px";
+    tooltip.style.top = "6px";
+  });
+  canvas.addEventListener("mouseleave", () => { tooltip.style.display = "none"; });
+}
+
+function renderQuadChart(data){
   const container = document.getElementById("tvChartContainer");
+  container.classList.add("chart-quad-grid");
   container.innerHTML = "";
-  const iframe = document.createElement("iframe");
-  iframe.src = buildChartEmbedUrl(symbol, intervalMin);
-  iframe.allowFullscreen = true;
-  container.appendChild(iframe);
+
+  CHART_PANELS.forEach(panel => {
+    const candles = (data.timeframes && data.timeframes[panel.key]) || [];
+    const box = document.createElement("div");
+    box.className = "chart-quad-panel";
+    box.innerHTML = `
+      <div class="chart-quad-panel-head">${panel.label}</div>
+      <div class="chart-quad-panel-canvas-wrap">
+        <canvas></canvas>
+        <div class="chart-quad-tooltip"></div>
+      </div>`;
+    container.appendChild(box);
+    const canvas = box.querySelector("canvas");
+    const tooltip = box.querySelector(".chart-quad-tooltip");
+    const opts = { orbHigh: data.orb_high, orbLow: data.orb_low, markers: data.markers, showOrb: panel.showOrb };
+    const draw = () => drawQuadPanel(canvas, candles, opts);
+    draw();
+    attachQuadTooltip(canvas, tooltip);
+    window.addEventListener("resize", debounce(draw, 150));
+  });
+}
+
+async function loadChart(symbol){
+  showChartMsg("Loading chart…", "bi-hourglass-split");
+  const container = document.getElementById("tvChartContainer");
+  container.classList.add("chart-quad-grid");
+  container.innerHTML = "";
+  try{
+    const base = getBackendUrl();
+    const res = await fetch(base + "/candles/" + encodeURIComponent(symbol));
+    if(!res.ok) throw new Error("HTTP " + res.status);
+    const data = await res.json();
+    if(data.error){
+      showChartMsg(data.error === "not_logged_in" ? "Log in to Upstox to load charts." : "Couldn't load chart data for this symbol.", "bi-exclamation-triangle");
+      return;
+    }
+    renderQuadChart(data);
+    hideChartMsg();
+  } catch(err){
+    showChartMsg("Couldn't reach the chart data backend.", "bi-wifi-off");
+  }
 }
 
 function renderChartBreakSummary(row){
@@ -3812,11 +4015,8 @@ function openChartModal(symbol){
   renderChartLevels(row);
   closeChartPopovers();
   document.getElementById("chartOverlay").classList.add("show");
-  showChartMsg("Loading chart…", "bi-hourglass-split");
   loadChart(symbol);
   loadChartNews(symbol);
-  // The embed loads fast and silently; just clear the loading message shortly after.
-  setTimeout(hideChartMsg, 1200);
 }
 function closeChartModal(){
   document.getElementById("chartOverlay").classList.remove("show");
