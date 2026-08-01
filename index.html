@@ -474,17 +474,15 @@ html[data-theme="light"] .avatar{ background:linear-gradient(160deg,#E3E7EE,#F3F
 .rovl-tag.hot{ background:var(--bull-dim); color:var(--bull); }
 .rovl-tag.normal{ color:var(--text-secondary); }
 
-/* Sector Trend -> ORB/DRB jump buttons */
-.sector-jump-wrap{ display:flex; flex-direction:column; gap:5px; align-items:flex-start; }
-.sector-jump-leads{ display:flex; flex-direction:column; gap:3px; }
-.sector-lead-chip{
-  display:inline-flex; align-items:center; gap:2px; font-family:var(--font-data);
-  font-size:10px; font-weight:700; letter-spacing:.01em; padding:1px 6px 1px 3px;
-  border-radius:5px; width:fit-content;
+/* Sector Trend -> ORB/DRB break tag next to the sector name itself */
+.sector-break-tag{
+  display:inline-flex; align-items:center; gap:1px; font-family:var(--font-data);
+  font-size:9.5px; font-weight:800; letter-spacing:.02em; padding:1px 5px 1px 2px;
+  border-radius:5px; margin-left:6px; vertical-align:middle;
 }
-.sector-lead-chip.bull{ background:var(--bull-dim); color:var(--bull); }
-.sector-lead-chip.bear{ background:var(--bear-dim); color:var(--bear); }
-.sector-lead-chip i{ font-size:12px; }
+.sector-break-tag.bull{ background:var(--bull-dim); color:var(--bull); }
+.sector-break-tag.bear{ background:var(--bear-dim); color:var(--bear); }
+.sector-break-tag i{ font-size:11px; }
 .sector-jump{ display:flex; gap:6px; }
 .sector-jump-btn{
   font-family:var(--font-data); font-size:11px; font-weight:700; letter-spacing:.02em;
@@ -3172,13 +3170,10 @@ function renderSectorTrend(){
   });
   const breakInfo = (rows) => {
     const breaks = rows.filter(r => r.signal !== "WATCH");
-    if(!breaks.length) return { count: 0, dir: "bull", lead: null };
+    if(!breaks.length) return { count: 0, dir: "bull" };
     const buys = breaks.filter(r => r.signal === "BUY").length;
     const sells = breaks.length - buys;
-    // Lead symbol: the single stock driving the sector's break, picked by
-    // highest ROVL so the strongest mover surfaces, not just the first one.
-    const lead = breaks.slice().sort((a,b) => b.rovl - a.rovl)[0];
-    return { count: breaks.length, dir: buys >= sells ? "bull" : "bear", lead: lead.sym };
+    return { count: breaks.length, dir: buys >= sells ? "bull" : "bear" };
   };
   const sectorAgg = SECTORS.map(name => {
     const rows = bySector[name] || [];
@@ -3198,21 +3193,19 @@ function renderSectorTrend(){
   document.getElementById("sectorCount").textContent = sectorAgg.length + " sectors";
   document.querySelector("#sectorTable tbody").innerHTML = sectorAgg.map(sc => `
     <tr class="rail-${sc.status}">
-      <td style="font-weight:600;">${sc.name}</td>
+      <td style="font-weight:600;">
+        ${sc.name}
+        ${sc.orbBreak.count > 0 ? `<span class="sector-break-tag orb ${sc.orbBreak.dir}"><i class="bi bi-arrow-${sc.orbBreak.dir === 'bull' ? 'up' : 'down'}-short"></i>ORB</span>` : ''}
+        ${sc.drbBreak.count > 0 ? `<span class="sector-break-tag drb ${sc.drbBreak.dir}"><i class="bi bi-arrow-${sc.drbBreak.dir === 'bull' ? 'up' : 'down'}-short"></i>DRB</span>` : ''}
+      </td>
       <td><span class="rovl-tag ${sc.avgRovl > 1.2 ? 'hot' : 'normal'}">${sc.avgRovl.toFixed(2)}${sc.avgRovl > 1.2 ? ' 🔥' : ''}</span></td>
       <td><span class="chg-txt ${sc.avgChg >= 0 ? 'up' : 'down'}">${sc.avgChg >= 0 ? '+' : ''}${sc.avgChg.toFixed(2)}%</span></td>
       <td><span class="strength-txt ${sc.strength}">${sc.strength === 'moderate' ? 'Neutral' : sc.strength.charAt(0).toUpperCase()+sc.strength.slice(1)}</span></td>
       <td><span class="badge-status ${sc.status}"><span class="dot"></span>${label(sc.status)}</span></td>
       <td>
-        <div class="sector-jump-wrap">
-          <div class="sector-jump-leads">
-            ${sc.orbBreak.lead ? `<span class="sector-lead-chip ${sc.orbBreak.dir}" title="${sc.orbBreak.lead} is leading ${sc.name}'s ORB break"><i class="bi bi-arrow-${sc.orbBreak.dir === 'bull' ? 'up' : 'down'}-short"></i>${sc.orbBreak.lead} ORB</span>` : ''}
-            ${sc.drbBreak.lead ? `<span class="sector-lead-chip ${sc.drbBreak.dir}" title="${sc.drbBreak.lead} is leading ${sc.name}'s DRB break"><i class="bi bi-arrow-${sc.drbBreak.dir === 'bull' ? 'up' : 'down'}-short"></i>${sc.drbBreak.lead} DRB</span>` : ''}
-          </div>
-          <div class="sector-jump">
-            <button type="button" class="sector-jump-btn orb ${sc.orbBreak.count > 0 ? 'has-break ' + sc.orbBreak.dir : ''}" onclick="openExplorer('ORB','all','${sc.name.replace(/'/g,"\\'")}')" title="ORB breakouts in ${sc.name}">ORB${sc.orbBreak.count > 0 ? `<span class="jump-break-badge">${sc.orbBreak.count}</span>` : ''}</button>
-            <button type="button" class="sector-jump-btn drb ${sc.drbBreak.count > 0 ? 'has-break ' + sc.drbBreak.dir : ''}" onclick="openExplorer('DRB','all','${sc.name.replace(/'/g,"\\'")}')" title="DRB breakouts in ${sc.name}">DRB${sc.drbBreak.count > 0 ? `<span class="jump-break-badge">${sc.drbBreak.count}</span>` : ''}</button>
-          </div>
+        <div class="sector-jump">
+          <button type="button" class="sector-jump-btn orb ${sc.orbBreak.count > 0 ? 'has-break ' + sc.orbBreak.dir : ''}" onclick="openExplorer('ORB','all','${sc.name.replace(/'/g,"\\'")}')" title="ORB breakouts in ${sc.name}">ORB${sc.orbBreak.count > 0 ? `<span class="jump-break-badge">${sc.orbBreak.count}</span>` : ''}</button>
+          <button type="button" class="sector-jump-btn drb ${sc.drbBreak.count > 0 ? 'has-break ' + sc.drbBreak.dir : ''}" onclick="openExplorer('DRB','all','${sc.name.replace(/'/g,"\\'")}')" title="DRB breakouts in ${sc.name}">DRB${sc.drbBreak.count > 0 ? `<span class="jump-break-badge">${sc.drbBreak.count}</span>` : ''}</button>
         </div>
       </td>
     </tr>
