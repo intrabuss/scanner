@@ -4947,8 +4947,13 @@ async function refreshScanModeUI(){
     if(!res.ok) throw new Error("HTTP " + res.status);
     const data = await res.json();
     const sizes = data.scan_mode_sizes || {};
-    if(sizes.nifty500 != null) document.getElementById("scanModeNifty500Sub").textContent = `${sizes.nifty500.toLocaleString('en-IN')} stocks · ~3 min rebuild`;
-    if(sizes.full != null) document.getElementById("scanModeFullSub").textContent = `${sizes.full.toLocaleString('en-IN')} stocks · ~20-25 min rebuild`;
+    const activeLoaded = data.daily_cache_size;
+    const nifty500Sub = sizes.nifty500 != null ? `${sizes.nifty500.toLocaleString('en-IN')} stocks · ~3 min rebuild` : '';
+    const fullSub = sizes.full != null ? `${sizes.full.toLocaleString('en-IN')} stocks · ~20-25 min rebuild` : '';
+    document.getElementById("scanModeNifty500Sub").textContent =
+      (data.scan_mode === "nifty500" && activeLoaded != null) ? `${nifty500Sub} · ${activeLoaded.toLocaleString('en-IN')} loaded now` : nifty500Sub;
+    document.getElementById("scanModeFullSub").textContent =
+      (data.scan_mode === "full" && activeLoaded != null) ? `${fullSub} · ${activeLoaded.toLocaleString('en-IN')} loaded now` : fullSub;
 
     // Reflect whatever the admin actually has selected on the server —
     // not just a hardcoded default — so this stays accurate after a
