@@ -604,6 +604,12 @@ html[data-theme="light"] .avatar{ background:linear-gradient(160deg,#E3E7EE,#F3F
   font-size:12.5px; font-weight:600; transition:.15s ease;
 }
 .btn-view:hover{ background:var(--brand-dim); border-color:rgba(76,141,255,.4); color:var(--brand); }
+.btn-etf-refresh{
+  width:auto; padding:8px 16px; border-radius:var(--radius-sm);
+  background:var(--bg-raised); border:1px solid var(--border-med); color:var(--text-primary);
+  font-size:12.5px; font-weight:600; transition:.15s ease;
+}
+.btn-etf-refresh:hover{ background:var(--brand-dim); border-color:rgba(76,141,255,.4); color:var(--brand); }
 
 /* strength label */
 .strength-txt{ font-size:12px; font-weight:600; }
@@ -1106,6 +1112,7 @@ html.hide-drb #drbStrategyCard,
 html.hide-drb .sector-jump-btn.drb{ display:none !important; }
 html.hide-orb .sector-jump,
 html.hide-drb .sector-jump{ display:flex; }
+html.hide-etf #etfSwingSection{ display:none !important; }
 
 /* ---- Toggle switch (used for Break Log visibility, etc.) ---- */
 .toggle-row{
@@ -1418,36 +1425,44 @@ html.hide-drb .sector-jump{ display:flex; }
       </div>
     </div>
 
-    <div class="section-head">
-      <div class="section-title">ETF Swing Screener <span class="count" id="etfSwingCount">Most fallen · 20d / 3wk / 1mo</span></div>
-      <div style="display:flex; gap:8px; align-items:center;">
-        <select id="etfSwingSectorFilter" class="explorer-select"><option value="all">All Sectors</option></select>
-        <button class="btn-view" id="etfSwingRefreshBtn" style="width:auto; padding:8px 16px;"><i class="bi bi-arrow-clockwise"></i> Refresh</button>
+    <div id="etfSwingSection">
+      <div class="section-head">
+        <div class="section-title">ETF Swing Screener <span class="count" id="etfSwingCount">Most fallen · 20d / 3wk / 1mo</span></div>
+        <div style="display:flex; gap:8px; align-items:center;">
+          <select id="etfSwingSectorFilter" class="explorer-select"><option value="all">All Sectors</option></select>
+          <button class="btn-etf-refresh" id="etfSwingRefreshBtn"><i class="bi bi-arrow-clockwise"></i> Refresh</button>
+        </div>
       </div>
-    </div>
-    <div class="card-x" style="padding:0; overflow:hidden;">
-      <div style="padding:14px 18px; font-size:11.5px; color:var(--text-muted); border-bottom:1px solid var(--border-soft);">
-        Full NSE ETF universe from Upstox, not a hand-picked list — every listing with "ETF" in its Upstox instrument name. Sector is a best-effort label from the fund name (Upstox doesn't classify ETFs by sector) — treat it as a grouping hint, not ground truth. Score uses RSI(14), MACD, price vs 200-day average, ADX(14), and bounce-off-recent-low — informational only, not financial advice.
-      </div>
-      <div class="table-scroll">
-        <table class="data-grid" id="etfSwingTable">
-          <thead>
-            <tr>
-              <th class="sortable" data-key="symbol">ETF</th>
-              <th class="sortable" data-key="sector">Sector</th>
-              <th class="sortable" data-key="price">Price</th>
-              <th class="sortable" data-key="chg_20d">20d <span class="sort-arrow"><i class="bi bi-caret-down-fill"></i></span></th>
-              <th class="sortable" data-key="chg_3wk">3wk <span class="sort-arrow"><i class="bi bi-caret-down-fill"></i></span></th>
-              <th class="sortable" data-key="chg_1mo">1mo <span class="sort-arrow"><i class="bi bi-caret-down-fill"></i></span></th>
-              <th class="sortable" data-key="rvol">RVOL <span class="sort-arrow"><i class="bi bi-caret-down-fill"></i></span></th>
-              <th class="sortable" data-key="rsi14">RSI <span class="sort-arrow"><i class="bi bi-caret-down-fill"></i></span></th>
-              <th class="sortable" data-key="score">Score</th>
-            </tr>
-          </thead>
-          <tbody id="etfSwingBody"></tbody>
-        </table>
-        <div class="explorer-empty" id="etfSwingEmpty" style="display:none; padding:24px; text-align:center; color:var(--text-muted); font-size:13px;">
-          Click Refresh to load — this scans the full NSE ETF list (~1-3 min depending on how many are listed).
+      <div class="card-x" style="padding:0; overflow:hidden;">
+        <div style="padding:14px 18px; font-size:11.5px; color:var(--text-muted); border-bottom:1px solid var(--border-soft);">
+          Full NSE ETF universe, not a hand-picked list — every listing with "ETF" in its instrument name. Sector is a best-effort label from the fund name (your data source doesn't classify ETFs by sector) — treat it as a grouping hint, not ground truth. Score uses RSI(14), MACD, price vs 200-day average, ADX(14), and bounce-off-recent-low — informational only, not financial advice.
+        </div>
+        <div style="display:flex; gap:8px; padding:12px 18px; border-bottom:1px solid var(--border-soft);">
+          <button class="filter-chip active" data-signal="all" id="etfFilterAll">All</button>
+          <button class="filter-chip" data-signal="BUY" id="etfFilterBuy">Buy</button>
+          <button class="filter-chip" data-signal="SELL" id="etfFilterSell">Sell</button>
+          <button class="filter-chip" data-signal="WATCH" id="etfFilterWatch">Watch</button>
+        </div>
+        <div class="table-scroll">
+          <table class="data-grid" id="etfSwingTable">
+            <thead>
+              <tr>
+                <th class="sortable" data-key="symbol">ETF</th>
+                <th class="sortable" data-key="sector">Sector</th>
+                <th class="sortable" data-key="price">Price</th>
+                <th class="sortable" data-key="chg_20d">20d <span class="sort-arrow"><i class="bi bi-caret-down-fill"></i></span></th>
+                <th class="sortable" data-key="chg_3wk">3wk <span class="sort-arrow"><i class="bi bi-caret-down-fill"></i></span></th>
+                <th class="sortable" data-key="chg_1mo">1mo <span class="sort-arrow"><i class="bi bi-caret-down-fill"></i></span></th>
+                <th class="sortable" data-key="rvol">RVOL <span class="sort-arrow"><i class="bi bi-caret-down-fill"></i></span></th>
+                <th class="sortable" data-key="rsi14">RSI <span class="sort-arrow"><i class="bi bi-caret-down-fill"></i></span></th>
+                <th class="sortable" data-key="score">Score</th>
+              </tr>
+            </thead>
+            <tbody id="etfSwingBody"></tbody>
+          </table>
+          <div class="explorer-empty" id="etfSwingEmpty" style="display:none; padding:24px; text-align:center; color:var(--text-muted); font-size:13px;">
+            Click Refresh to load — this scans the full NSE ETF list (~1-3 min depending on how many are listed).
+          </div>
         </div>
       </div>
     </div>
@@ -2083,7 +2098,7 @@ async function runBacktest(){
     const data = await res.json();
 
     if(data.error === "not_logged_in"){
-      showAdminMsg("Not logged in to Upstox — log in first, then run the backtest.");
+      showAdminMsg("Not logged in to your data source — log in first, then run the backtest.");
       btn.disabled = false;
       btn.innerHTML = `<i class="bi bi-play-circle"></i> Run Backtest`;
       return;
@@ -2245,7 +2260,7 @@ async function checkMobileStatus(mobile){
   }
 
   const isAdminLogin = mobile === ADMIN_MOBILE;
-  setStatusBox("checking", `<i class="bi bi-hourglass-split"></i><span>Checking ${isAdminLogin ? 'Upstox login' : 'system'} status…</span>`);
+  setStatusBox("checking", `<i class="bi bi-hourglass-split"></i><span>Checking ${isAdminLogin ? 'data source login' : 'system'} status…</span>`);
 
   let healthy = false;
   try {
@@ -2259,9 +2274,9 @@ async function checkMobileStatus(mobile){
 
   if(isAdminLogin){
     if(healthy){
-      setStatusBox("good", `<i class="bi bi-check-circle-fill"></i><span>Upstox: Active — system ready</span>`);
+      setStatusBox("good", `<i class="bi bi-check-circle-fill"></i><span>Data source: Active — system ready</span>`);
     } else {
-      setStatusBox("bad", `<i class="bi bi-exclamation-triangle-fill"></i><span>Upstox: Not logged in today</span><button type="button" onclick="openUpstoxLoginPopup()" class="status-action"><i class="bi bi-box-arrow-up-right"></i> Log in to Upstox</button>`);
+      setStatusBox("bad", `<i class="bi bi-exclamation-triangle-fill"></i><span>Data source: Not logged in today</span><button type="button" onclick="openUpstoxLoginPopup()" class="status-action"><i class="bi bi-box-arrow-up-right"></i> Log in</button>`);
     }
   } else {
     if(healthy){
@@ -4064,7 +4079,7 @@ async function loadChart(symbol){
     if(!res.ok) throw new Error("HTTP " + res.status);
     const data = await res.json();
     if(data.error){
-      showChartMsg(data.error === "not_logged_in" ? "Log in to Upstox to load charts." : "Couldn't load chart data for this symbol.", "bi-exclamation-triangle");
+      showChartMsg(data.error === "not_logged_in" ? "Log in to your data source to load charts." : "Couldn't load chart data for this symbol.", "bi-exclamation-triangle");
       return;
     }
     renderQuadChart(data);
@@ -4467,22 +4482,35 @@ document.querySelectorAll("#scanModeSection .scan-mode-btn").forEach(btn => {
 // Refresh scan-mode info whenever Settings is opened
 document.getElementById("settingsBtn")?.addEventListener("click", refreshScanModeUI);
 
-/* ---------------- Strategy Focus (admin) ----------------
-   Data-driven so a future 3rd/4th strategy is just one more entry here —
-   no rewrite of the toggle UI needed. Each entry needs a matching CSS rule
-   (html.hide-<key> .sector-jump-btn.<key>, html.hide-<key> #<key>StrategyCard)
-   added when that strategy's own UI elements get built. */
+/* ---------------- Strategy Focus ----------------
+   Server-side setting (see /strategy-focus in main.py) — applies to
+   EVERY user, not just the admin's own browser. Data-driven so a
+   future 3rd/4th strategy is just one more entry here — no rewrite of
+   the toggle UI needed. Each entry needs a matching CSS rule
+   (html.hide-<key> .sector-jump-btn.<key>, html.hide-<key> #<key>StrategyCard
+   or equivalent) added when that strategy's own UI elements get built. */
 const STRATEGIES = [
   { key: "orb", label: "ORB Breakout" },
   { key: "drb", label: "DRB Breakout" },
+  { key: "etf", label: "ETF Swing Screener" },
 ];
 
-function getEnabledStrategies(){
+let lastKnownEnabledStrategies = STRATEGIES.map(s => s.key); // default until the server responds
+
+async function fetchAndApplyStrategyFocus(){
+  const base = getBackendUrl();
+  if(!base){ applyStrategyFocus(lastKnownEnabledStrategies); return; }
   try {
-    const saved = JSON.parse(localStorage.getItem("enabledStrategies"));
-    if(Array.isArray(saved) && saved.length) return saved;
-  } catch(e){}
-  return STRATEGIES.map(s => s.key); // default: all on
+    const res = await fetch(base + "/strategy-focus");
+    if(!res.ok) throw new Error("HTTP " + res.status);
+    const data = await res.json();
+    if(Array.isArray(data.enabled) && data.enabled.length){
+      lastKnownEnabledStrategies = data.enabled;
+    }
+  } catch(err){
+    // couldn't reach the server — keep showing whatever we last knew rather than guessing
+  }
+  applyStrategyFocus(lastKnownEnabledStrategies);
 }
 
 function applyStrategyFocus(enabledKeys){
@@ -4527,24 +4555,58 @@ function renderStrategyFocusList(){
     </div>
   `).join("");
   list.querySelectorAll("input[type=checkbox]").forEach(input => {
-    input.addEventListener("change", function(){
-      const enabled = getEnabledStrategies();
+    input.addEventListener("change", async function(){
       const key = this.dataset.key;
-      let next = this.checked ? [...new Set([...enabled, key])] : enabled.filter(k => k !== key);
+      const next = this.checked
+        ? [...new Set([...lastKnownEnabledStrategies, key])]
+        : lastKnownEnabledStrategies.filter(k => k !== key);
       const msg = document.getElementById("strategyFocusMsg");
       if(next.length === 0){
         this.checked = true; // block turning off the last remaining strategy
+        msg.textContent = "At least one strategy must stay on.";
+        msg.style.color = "var(--bear)";
         msg.style.display = "block";
         setTimeout(() => { msg.style.display = "none"; }, 2500);
         return;
       }
-      localStorage.setItem("enabledStrategies", JSON.stringify(next));
-      applyStrategyFocus(next);
+      const base = getBackendUrl();
+      if(!base){
+        this.checked = !this.checked;
+        msg.textContent = "Set your Live Data Source first.";
+        msg.style.color = "var(--bear)";
+        msg.style.display = "block";
+        return;
+      }
+      try {
+        const res = await fetch(base + "/strategy-focus", {
+          method: "POST",
+          headers: adminHeaders(),
+          body: JSON.stringify({ enabled: next })
+        });
+        const data = await res.json();
+        if(!data.success){
+          this.checked = !this.checked; // revert the checkbox
+          msg.textContent = data.error === "unauthorized" ? "Admin PIN check failed — try logging out and back in." : "Couldn't save that.";
+          msg.style.color = "var(--bear)";
+          msg.style.display = "block";
+          return;
+        }
+        lastKnownEnabledStrategies = data.enabled;
+        applyStrategyFocus(lastKnownEnabledStrategies);
+      } catch(err){
+        this.checked = !this.checked;
+        msg.textContent = "Couldn't reach the server to save this.";
+        msg.style.color = "var(--bear)";
+        msg.style.display = "block";
+      }
     });
   });
 }
 renderStrategyFocusList();
-applyStrategyFocus(getEnabledStrategies());
+fetchAndApplyStrategyFocus();
+// Every user (not just admin) re-checks this periodically, so a change
+// the admin makes actually reaches everyone else's already-open tab.
+setInterval(fetchAndApplyStrategyFocus, 20000);
 
 
 /* ---------------- Refresh button ---------------- */
@@ -4589,6 +4651,7 @@ setInterval(() => {
 /* ---------------- ETF Swing Screener ---------------- */
 let etfSwingData = [];
 let etfSwingSort = { key: "chg_1mo", dir: 1 }; // most fallen (most negative) first by default
+let etfSignalFilter = "all";
 
 function etfChgTxt(v){
   if(v == null) return '<span class="cell-sub">—</span>';
@@ -4599,12 +4662,13 @@ function renderEtfSwingTable(){
   const tbody = document.getElementById("etfSwingBody");
   const empty = document.getElementById("etfSwingEmpty");
   const sectorFilter = document.getElementById("etfSwingSectorFilter").value;
-  const filtered = sectorFilter === "all" ? etfSwingData : etfSwingData.filter(r => r.sector === sectorFilter);
+  let filtered = sectorFilter === "all" ? etfSwingData : etfSwingData.filter(r => r.sector === sectorFilter);
+  if(etfSignalFilter !== "all") filtered = filtered.filter(r => (r.signal || "WATCH") === etfSignalFilter);
 
   if(!filtered.length){
     tbody.innerHTML = "";
     empty.style.display = "block";
-    empty.textContent = etfSwingData.length ? "No ETFs match this sector filter." : "Click Refresh to load — this scans the full NSE ETF list (~1-3 min depending on how many are listed).";
+    empty.textContent = etfSwingData.length ? "No ETFs match these filters." : "Click Refresh to load — this scans the full NSE ETF list (~1-3 min depending on how many are listed).";
     return;
   }
   empty.style.display = "none";
@@ -4664,12 +4728,12 @@ async function loadEtfSwing(){
     if(!res.ok) throw new Error("HTTP " + res.status);
     const data = await res.json();
     if(data.error){
-      empty.textContent = data.error === "not_logged_in" ? "Log in to Upstox to load this." : "Couldn't load ETF data right now.";
+      empty.textContent = data.error === "not_logged_in" ? "Log in to your data source to load this." : "Couldn't load ETF data right now.";
       etfSwingData = [];
     } else {
       etfSwingData = data.etfs || [];
       document.getElementById("etfSwingCount").textContent = `${data.universe_size || etfSwingData.length} ETFs found · updated ${data.computed_at || ''}`;
-      if(!etfSwingData.length) empty.textContent = "No ETF data returned — check the symbols still match Upstox's instrument list.";
+      if(!etfSwingData.length) empty.textContent = "No ETF data returned — check the symbols still match your data source's instrument list.";
     }
     populateEtfSectorFilter();
     renderEtfSwingTable();
@@ -4684,6 +4748,13 @@ async function loadEtfSwing(){
 }
 document.getElementById("etfSwingRefreshBtn").addEventListener("click", loadEtfSwing);
 document.getElementById("etfSwingSectorFilter").addEventListener("change", renderEtfSwingTable);
+document.querySelectorAll("#etfSwingSection .filter-chip").forEach(chip => {
+  chip.addEventListener("click", function(){
+    etfSignalFilter = this.dataset.signal;
+    document.querySelectorAll("#etfSwingSection .filter-chip").forEach(c => c.classList.toggle("active", c === this));
+    renderEtfSwingTable();
+  });
+});
 document.querySelectorAll("#etfSwingTable th.sortable").forEach(th => {
   th.addEventListener("click", function(){
     const key = this.dataset.key;
