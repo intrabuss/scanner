@@ -562,12 +562,29 @@ html[data-theme="light"] .avatar{ background:linear-gradient(160deg,#E3E7EE,#F3F
 .alert-toggle-btn.on i{ animation:bellRing 1.8s ease infinite; }
 @keyframes bellRing{ 0%,100%{ transform:rotate(0); } 5%{ transform:rotate(14deg); } 10%{ transform:rotate(-12deg); } 15%{ transform:rotate(8deg); } 20%{ transform:rotate(0); } }
 .alert-toggle-hint{ font-size:10.5px; color:var(--text-muted); }
+.sector-alert-bell{
+  display:inline-flex; align-items:center; justify-content:center; width:26px; height:26px;
+  border-radius:6px; border:1px solid var(--border-med); background:var(--bg-surface); color:var(--text-muted);
+  font-size:12px; flex-shrink:0;
+}
+.sector-alert-bell:hover{ border-color:var(--brand); color:var(--brand); }
+.sector-alert-bell.on{ background:var(--brand-dim); border-color:rgba(76,141,255,.5); color:var(--brand); }
+
+.main-alert-switch{
+  display:flex; align-items:center; gap:7px; font-size:12px; font-weight:600; color:var(--text-secondary);
+}
+.main-alert-switch i{ font-size:13px; }
+.main-alert-switch .switch{ width:34px; height:19px; }
+.main-alert-switch .switch-slider::before{ width:13px; height:13px; left:3px; top:2px; }
+.main-alert-switch .switch input:checked + .switch-slider::before{ transform:translateX(14px); }
+
 .alert-test-btn{
   display:inline-flex; align-items:center; gap:5px; font-size:11.5px; font-weight:600;
   padding:5px 10px; border-radius:16px; border:1px dashed var(--border-med);
   background:transparent; color:var(--text-secondary);
 }
 .alert-test-btn:hover{ border-color:var(--brand); color:var(--brand); }
+.alert-test-btn:disabled{ opacity:.4; pointer-events:none; }
 
 /* Legend explaining the merged chip's letters */
 .chip-legend{
@@ -1030,6 +1047,14 @@ html[data-theme="light"] .avatar{ background:linear-gradient(160deg,#E3E7EE,#F3F
 .chart-popover-toggle.active{ background:var(--brand-dim); color:var(--brand); border-color:rgba(76,141,255,.4); }
 .chart-popover-toggle.loading i{ animation:spin .8s linear infinite; }
 @keyframes spin{ from{ transform:rotate(0deg); } to{ transform:rotate(360deg); } }
+
+.chart-view-toggle{
+  display:inline-flex; align-items:center; gap:6px; font-size:12.5px; font-weight:600;
+  padding:6px 12px; border-radius:var(--radius-sm); border:1px solid var(--border-med);
+  background:var(--bg-surface); color:var(--text-secondary);
+}
+.chart-view-toggle:hover{ background:var(--brand-dim); color:var(--brand); border-color:rgba(76,141,255,.4); }
+.chart-view-toggle.active{ background:var(--brand-dim); color:var(--brand); border-color:rgba(76,141,255,.4); }
 
 /* News floating panel over the chart */
 .chart-popover{
@@ -1544,7 +1569,12 @@ html.hide-etf #etfSwingSection{ display:none !important; }
     <!-- SECTOR TREND -->
     <div class="section-head">
       <div class="section-title">Sector Trend <span class="count" id="sectorCount">18 sectors</span></div>
-      <div class="section-sub" id="sectorTimeWindow" style="font-size:11px; color:var(--text-muted); font-family:var(--font-data);"></div>
+      <div style="display:flex; align-items:center; gap:12px;">
+        <div class="section-sub" id="sectorTimeWindow" style="font-size:11px; color:var(--text-muted); font-family:var(--font-data);"></div>
+        <div class="section-sub" style="font-size:11px; color:var(--text-muted); display:flex; align-items:center; gap:5px;">
+          <i class="bi bi-bell"></i> Alerts per sector — bell icon in each row
+        </div>
+      </div>
     </div>
     <div class="card-x table-scroll">
       <table class="data-grid" id="sectorTable">
@@ -1931,7 +1961,8 @@ html.hide-etf #etfSwingSection{ display:none !important; }
       <button type="button" class="alert-test-btn" id="explorerAlertTestBtn" title="Fires a fake break so you can check sound/toast/notification work — doesn't affect real data">
         <i class="bi bi-play-fill"></i> Test Alert
       </button>
-      <span class="alert-toggle-hint">When on, a bell sound plays whenever a new confirmed break appears — works in the background too, not just while this is open.</span>
+      <span class="alert-toggle-hint" id="explorerAlertHintDrb">When on, a bell sound plays whenever a new confirmed break appears — works in the background too, not just while this is open.</span>
+      <span class="alert-toggle-hint" id="explorerAlertHintOrb" style="display:none;">ORB alerts are per-sector — use the bell icon on each row in Sector Trend below to turn them on for specific sectors.</span>
     </div>
     <div class="chip-legend">
       <span class="chip-legend-item"><b>Score</b> /10</span>
@@ -2005,6 +2036,13 @@ html.hide-etf #etfSwingSection{ display:none !important; }
     <div class="explorer-toolbar">
       <input type="text" class="explorer-search" id="lsSearch" placeholder="Search symbol or company…">
       <select class="explorer-select" id="lsSectorFilter"><option value="all">All Sectors</option></select>
+    </div>
+    <div class="explorer-alert-row">
+      <button type="button" class="alert-toggle-btn" id="lsAlertToggle">
+        <i class="bi bi-bell"></i>
+        <span id="lsAlertToggleLbl">Top 10 Alerts: Off</span>
+      </button>
+      <span class="alert-toggle-hint">Alerts when a stock newly enters the Top 10 by RVOL (RVOL &gt; 1.2) in Long or Short — covers both directions.</span>
     </div>
     <div class="explorer-body table-scroll">
       <table class="data-grid" id="lsTable">
@@ -2230,6 +2268,9 @@ broke_low  = live_price &lt; yesterday_low</code></pre>
         <option value="M">1M</option>
       </select>
       <button class="icon-btn" id="chartReloadBtn" title="Reload"><i class="bi bi-arrow-clockwise"></i></button>
+      <button class="chart-view-toggle" id="chartViewToggleBtn" title="Switch between the 4-panel grid and a live TradingView chart (with EMA 9/20/50)">
+        <i class="bi bi-graph-up"></i> <span id="chartViewToggleLbl">TradingView</span>
+      </button>
       <button class="chart-popover-toggle" id="chartBreaklogToggleBtn" title="Today's break log"><i class="bi bi-clock-history"></i> Breaks</button>
       <button class="chart-popover-toggle" id="chartNewsToggleBtn" title="Latest news"><i class="bi bi-newspaper"></i> News</button>
       <div class="chart-legend">
@@ -2372,6 +2413,7 @@ function showApp(session){
   document.getElementById("liveDataSourceSection").style.display = isAdmin ? "block" : "none";
   document.getElementById("strategyFocusWrap").style.display = isAdmin ? "block" : "none";
   document.getElementById("emailAlertsWrap").style.display = isAdmin ? "block" : "none";
+  document.getElementById("explorerAlertTestBtn").style.display = isAdmin ? "" : "none";
   document.getElementById("emailAlertsNonAdminMsg").style.display = isAdmin ? "none" : "block";
   document.getElementById("scanModeSection").classList.toggle("read-only", !isAdmin);
   document.getElementById("scanModeNonAdminMsg").style.display = isAdmin ? "none" : "block";
@@ -3922,11 +3964,28 @@ function renderSectorTrend(){
         <div class="sector-jump">
           <button type="button" class="sector-jump-btn orb ${sc.orbBreak.count > 0 ? 'has-break ' + sc.orbBreak.dir : ''}" onclick="openExplorer('ORB','all','${sc.name.replace(/'/g,"\\'")}')" title="ORB breakouts in ${sc.name}">ORB${sc.orbBreak.count > 0 ? `<span class="jump-break-badge">${sc.orbBreak.count}</span>` : ''}</button>
           <button type="button" class="sector-jump-btn drb ${sc.drbBreak.count > 0 ? 'has-break ' + sc.drbBreak.dir : ''}" onclick="openExplorer('DRB','all','${sc.name.replace(/'/g,"\\'")}')" title="DRB breakouts in ${sc.name}">DRB${sc.drbBreak.count > 0 ? `<span class="jump-break-badge">${sc.drbBreak.count}</span>` : ''}</button>
+          <button type="button" class="sector-alert-bell ${alertEnabledSectors.has(sc.name) ? 'on' : ''}" data-sector="${sc.name.replace(/"/g,'&quot;')}" title="${alertEnabledSectors.has(sc.name) ? 'ORB alerts ON for ' + sc.name + ' — click to turn off' : 'Turn on ORB alerts for ' + sc.name}"><i class="bi bi-bell${alertEnabledSectors.has(sc.name) ? '-fill' : ''}"></i></button>
         </div>
       </td>
     </tr>
   `).join("");
 
+  document.querySelectorAll(".sector-alert-bell").forEach(btn => {
+    btn.addEventListener("click", function(){
+      const sector = this.dataset.sector;
+      if(alertEnabledSectors.has(sector)) alertEnabledSectors.delete(sector);
+      else alertEnabledSectors.add(sector);
+      localStorage.setItem("orbSectorAlerts", JSON.stringify([...alertEnabledSectors]));
+      this.classList.toggle("on");
+      const nowOn = this.classList.contains("on");
+      this.querySelector("i").className = "bi bi-bell" + (nowOn ? "-fill" : "");
+      this.title = nowOn ? `ORB alerts ON for ${sector} — click to turn off` : `Turn on ORB alerts for ${sector}`;
+      if(nowOn){
+        if("Notification" in window && Notification.permission === "default") Notification.requestPermission();
+        playAlertBell();
+      }
+    });
+  });
 }
 
 /* ---------------- Render: Long / Short tables ---------------- */
@@ -4017,14 +4076,28 @@ let currentExplorerStrategy = null;
    host/deploy. First poll after enabling (or after a page load) only
    establishes the baseline — it deliberately doesn't alert on breaks
    that already existed before you turned it on. */
-let alertEnabled = { ORB: false, DRB: false };
+let alertEnabled = { DRB: false, LS: false };
 try {
   const saved = JSON.parse(localStorage.getItem("breakAlertEnabled"));
-  if(saved && typeof saved === "object") alertEnabled = { ORB: !!saved.ORB, DRB: !!saved.DRB };
+  if(saved && typeof saved === "object") alertEnabled = { DRB: !!saved.DRB, LS: !!saved.LS };
+} catch(e){}
+
+// ORB alerts are per-sector, not a single on/off — the bell icon on each
+// Sector Trend row toggles membership in this set. A break only alerts if
+// its stock's sector is in here.
+let alertEnabledSectors = new Set();
+try {
+  const savedSectors = JSON.parse(localStorage.getItem("orbSectorAlerts"));
+  if(Array.isArray(savedSectors)) alertEnabledSectors = new Set(savedSectors);
 } catch(e){}
 
 const seenBreaks = { ORB: new Set(), DRB: new Set() };
 let breakBaselineSet = { ORB: false, DRB: false };
+let prevTop10Long = new Set();
+let prevTop10Short = new Set();
+let top10BaselineSet = false;
+const LS_ALERT_MIN_RVOL = 1.2;
+const LS_ALERT_TOP_N = 10;
 
 let audioCtx = null;
 function playAlertBell(){
@@ -4048,7 +4121,7 @@ function playAlertBell(){
   }
 }
 
-function showBreakToast(strategy, symbol, price, dir, qty, time){
+function showBreakToast(strategy, symbol, price, dir, qty, time, rovl){
   const wrap = document.getElementById("breakToastWrap");
   const isBuy = dir === "up";
   const toast = document.createElement("div");
@@ -4057,7 +4130,7 @@ function showBreakToast(strategy, symbol, price, dir, qty, time){
     <div class="break-toast-icon"><i class="bi ${isBuy ? 'bi-arrow-up-short' : 'bi-arrow-down-short'}"></i></div>
     <div class="break-toast-body">
       <div class="break-toast-top"><strong>${symbol}</strong> <span class="break-toast-strategy">${strategy}</span> <span class="break-toast-time">${time}</span></div>
-      <div class="break-toast-detail">₹${price.toLocaleString('en-IN')} · ${isBuy ? 'BUY' : 'SELL'} · Qty ${qty.toLocaleString('en-IN')}</div>
+      <div class="break-toast-detail">₹${price.toLocaleString('en-IN')} · ${isBuy ? 'BUY' : 'SELL'} · Qty ${qty.toLocaleString('en-IN')}${rovl ? ` · RVOL ${rovl}x` : ''}</div>
     </div>`;
   wrap.appendChild(toast);
   setTimeout(() => { toast.classList.add("show"); }, 10);
@@ -4067,14 +4140,14 @@ function showBreakToast(strategy, symbol, price, dir, qty, time){
   }, 6000);
 }
 
-function fireBreakNotification(strategy, symbol, price, dir, qty, time){
+function fireBreakNotification(strategy, symbol, price, dir, qty, time, rovl){
   playAlertBell();
-  showBreakToast(strategy, symbol, price, dir, qty, time);
+  showBreakToast(strategy, symbol, price, dir, qty, time, rovl);
   const isBuy = dir === "up";
   if("Notification" in window && Notification.permission === "granted"){
     try {
       new Notification(`${symbol} — ${isBuy ? "BUY" : "SELL"} (${strategy})`, {
-        body: `${time} · ₹${price.toLocaleString('en-IN')} · Qty ${qty.toLocaleString('en-IN')}`,
+        body: `${time} · ₹${price.toLocaleString('en-IN')} · Qty ${qty.toLocaleString('en-IN')}${rovl ? ` · RVOL ${rovl}x` : ''}`,
         tag: `${strategy}-${symbol}-${time}`,
       });
     } catch(e){}
@@ -4090,33 +4163,90 @@ function checkForNewBreaksAndAlert(strategy, rows){
       const key = `${r.sym}|${e.time}|${e.dir}`;
       if(seen.has(key)) return;
       seen.add(key);
-      if(breakBaselineSet[strategy]) newBreaks.push({ symbol: r.sym, price: r.price, dir: e.dir, time: e.time });
+      if(breakBaselineSet[strategy]) newBreaks.push({ symbol: r.sym, price: r.price, dir: e.dir, time: e.time, rovl: r.rovl || 0, sector: r.sector });
     });
   });
   breakBaselineSet[strategy] = true;
-  if(newBreaks.length && alertEnabled[strategy]){
+
+  // ORB is per-sector (bell toggle on each Sector Trend row); DRB stays a
+  // single on/off. Filter down to only the breaks that should actually alert.
+  const eligible = strategy === "ORB"
+    ? newBreaks.filter(b => alertEnabledSectors.has(b.sector))
+    : (alertEnabled[strategy] ? newBreaks : []);
+
+  if(eligible.length){
+    // Highest relative volume fires first when several breaks land in the
+    // same poll — that's the one most worth seeing immediately.
+    eligible.sort((a, b) => b.rovl - a.rovl);
     const buyingPower = getBuyingPowerPerTrade();
-    newBreaks.forEach(b => {
+    eligible.forEach(b => {
       const qty = Math.max(0, Math.floor(buyingPower / b.price));
-      fireBreakNotification(strategy, b.symbol, b.price, b.dir, qty, b.time);
+      fireBreakNotification(strategy, b.symbol, b.price, b.dir, qty, b.time, b.rovl);
     });
   }
+}
+
+function checkTopLongShortAndAlert(allOrbRows){
+  // Long = today's gainers, Short = today's losers — same source data and
+  // definition the Long/Short Opportunities modal itself uses.
+  const longCandidates = allOrbRows.filter(r => r.chg >= 0 && r.rovl > LS_ALERT_MIN_RVOL)
+    .sort((a, b) => b.rovl - a.rovl).slice(0, LS_ALERT_TOP_N);
+  const shortCandidates = allOrbRows.filter(r => r.chg < 0 && r.rovl > LS_ALERT_MIN_RVOL)
+    .sort((a, b) => b.rovl - a.rovl).slice(0, LS_ALERT_TOP_N);
+
+  const newLongSet = new Set(longCandidates.map(r => r.sym));
+  const newShortSet = new Set(shortCandidates.map(r => r.sym));
+
+  if(top10BaselineSet && alertEnabled.LS){
+    longCandidates.forEach(r => {
+      if(!prevTop10Long.has(r.sym)){
+        const qty = Math.max(0, Math.floor(getBuyingPowerPerTrade() / r.price));
+        fireBreakNotification("LONG", r.sym, r.price, "up", qty, "Top 10", r.rovl);
+      }
+    });
+    shortCandidates.forEach(r => {
+      if(!prevTop10Short.has(r.sym)){
+        const qty = Math.max(0, Math.floor(getBuyingPowerPerTrade() / r.price));
+        fireBreakNotification("SHORT", r.sym, r.price, "down", qty, "Top 10", r.rovl);
+      }
+    });
+  }
+  top10BaselineSet = true;
+  prevTop10Long = newLongSet;
+  prevTop10Short = newShortSet;
 }
 
 function updateExplorerAlertToggleUI(){
   const strategy = currentExplorerStrategy || "ORB";
   const btn = document.getElementById("explorerAlertToggle");
+  const testBtn = document.getElementById("explorerAlertTestBtn");
+
+  if(strategy === "ORB"){
+    // ORB alerts are per-sector now (bell icon on each Sector Trend row) —
+    // there's no single on/off to show here, so hide this button entirely
+    // and point people at Sector Trend instead.
+    btn.style.display = "none";
+    document.getElementById("explorerAlertHintDrb").style.display = "none";
+    document.getElementById("explorerAlertHintOrb").style.display = "";
+    if(testBtn) testBtn.disabled = alertEnabledSectors.size === 0;
+    return;
+  }
+
+  btn.style.display = "";
+  document.getElementById("explorerAlertHintDrb").style.display = "";
+  document.getElementById("explorerAlertHintOrb").style.display = "none";
   const lbl = document.getElementById("explorerAlertToggleLbl");
-  const on = !!alertEnabled[strategy];
+  const on = !!alertEnabled.DRB;
   btn.classList.toggle("on", on);
-  lbl.textContent = `${strategy} Alerts: ${on ? "On" : "Off"}`;
+  lbl.textContent = `DRB Alerts: ${on ? "On" : "Off"}`;
+  if(testBtn) testBtn.disabled = !on;
 }
 document.getElementById("explorerAlertToggle").addEventListener("click", function(){
-  const strategy = currentExplorerStrategy || "ORB";
-  alertEnabled[strategy] = !alertEnabled[strategy];
+  // Only reachable for DRB now — the button is hidden entirely for ORB.
+  alertEnabled.DRB = !alertEnabled.DRB;
   localStorage.setItem("breakAlertEnabled", JSON.stringify(alertEnabled));
   updateExplorerAlertToggleUI();
-  if(alertEnabled[strategy]){
+  if(alertEnabled.DRB){
     if("Notification" in window && Notification.permission === "default") Notification.requestPermission();
     playAlertBell(); // quick confirmation chime so you know it's actually on
   }
@@ -4133,7 +4263,18 @@ document.getElementById("explorerAlertTestBtn").addEventListener("click", functi
   const qty = Math.max(1, Math.floor(getBuyingPowerPerTrade() / sample.price));
   const now = new Date();
   const timeStr = now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: false });
-  fireBreakNotification(strategy, sample.sym, sample.price, Math.random() > 0.5 ? "up" : "down", qty, timeStr + " (test)");
+  fireBreakNotification(strategy, sample.sym, sample.price, Math.random() > 0.5 ? "up" : "down", qty, timeStr + " (test)", sample.rovl || 1.5);
+});
+
+document.getElementById("lsAlertToggle").addEventListener("click", function(){
+  alertEnabled.LS = !alertEnabled.LS;
+  localStorage.setItem("breakAlertEnabled", JSON.stringify(alertEnabled));
+  this.classList.toggle("on", alertEnabled.LS);
+  document.getElementById("lsAlertToggleLbl").textContent = `Top 10 Alerts: ${alertEnabled.LS ? "On" : "Off"}`;
+  if(alertEnabled.LS){
+    if("Notification" in window && Notification.permission === "default") Notification.requestPermission();
+    playAlertBell();
+  }
 });
 
 let explorerSort = { key: "rovl", dir: -1 };
@@ -4494,6 +4635,8 @@ const INDEX_TV_MAP = {
 
 let currentChartSymbol = null;
 let currentChartForcePlain = false;
+let currentChartIsEtf = false;
+let chartViewMode = "grid"; // "grid" or "tradingview" — user-switchable for stocks, always "tradingview" for ETFs
 let currentChartNewsTitles = [];
 
 function tvSymbol(symbol){
@@ -4909,23 +5052,51 @@ document.getElementById("chartBreaklogCloseBtn").addEventListener("click", close
 
 function openChartModal(symbol, forcePlain){
   currentChartSymbol = symbol;
-  currentChartForcePlain = !!forcePlain;
+  currentChartIsEtf = !!forcePlain;
+  chartViewMode = forcePlain ? "tradingview" : "grid"; // ETFs always start on TradingView; stocks always start on grid
+  currentChartForcePlain = effectiveForcePlain();
   const row = findRowForSymbol(symbol);
   document.getElementById("chartTitle").textContent = symbol;
   document.getElementById("chartSub").textContent = row
     ? `${row.name || ""} · ${row.sector || ""} · ₹${row.price.toLocaleString('en-IN')}`
     : "Live daily chart";
   document.getElementById("chartOpenTv").href = `https://www.tradingview.com/chart/?symbol=${encodeURIComponent(tvSymbol(symbol))}`;
-  document.getElementById("chartIntervalSelect").style.display = forcePlain ? "" : "none";
-  if(forcePlain) document.getElementById("chartIntervalSelect").value = "D"; // ETFs: plain daily chart, no ORB/DRB context to pick a shorter default from
+  // The Grid/TradingView switch only makes sense for stocks — ETFs have no
+  // grid alternative (no ORB/DRB context), so it's TradingView-only for them.
+  document.getElementById("chartViewToggleBtn").style.display = forcePlain ? "none" : "";
+  updateChartViewToggleUI();
+  applyChartViewVisibility();
   document.getElementById("chartBreaklogToggleBtn").style.display = forcePlain ? "none" : "";
   renderChartBreakSummary(row);
   renderChartLevels(row);
   closeChartPopovers();
   document.getElementById("chartOverlay").classList.add("show");
-  loadChart(symbol, forcePlain);
+  loadChart(symbol, currentChartForcePlain);
   loadChartNews(symbol);
 }
+function effectiveForcePlain(){
+  return currentChartIsEtf || chartViewMode === "tradingview";
+}
+function applyChartViewVisibility(){
+  const plain = effectiveForcePlain();
+  document.getElementById("chartIntervalSelect").style.display = plain ? "" : "none";
+  if(plain) document.getElementById("chartIntervalSelect").value = "D"; // default to 1-day, as requested
+}
+function updateChartViewToggleUI(){
+  const btn = document.getElementById("chartViewToggleBtn");
+  const lbl = document.getElementById("chartViewToggleLbl");
+  const onTv = chartViewMode === "tradingview";
+  btn.classList.toggle("active", onTv);
+  lbl.textContent = onTv ? "4 Grid" : "TradingView"; // shows what clicking it will switch TO
+}
+document.getElementById("chartViewToggleBtn").addEventListener("click", function(){
+  if(currentChartIsEtf) return; // ETFs don't have a grid alternative
+  chartViewMode = chartViewMode === "tradingview" ? "grid" : "tradingview";
+  currentChartForcePlain = effectiveForcePlain();
+  updateChartViewToggleUI();
+  applyChartViewVisibility();
+  loadChart(currentChartSymbol, currentChartForcePlain);
+});
 function closeChartModal(){
   document.getElementById("chartOverlay").classList.remove("show");
   document.getElementById("tvChartContainer").innerHTML = "";
@@ -5057,6 +5228,7 @@ async function fetchLiveData(){
     drbRows = drbData.map(r => mapApiRowToTableRow(r, "DRB"));
     checkForNewBreaksAndAlert("ORB", orbRows);
     checkForNewBreaksAndAlert("DRB", drbRows);
+    checkTopLongShortAndAlert(orbRows);
 
     if(idxRes.ok){
       const idxData = await idxRes.json();
@@ -5579,6 +5751,7 @@ function renderStrategyFocusList(){
   });
 }
 renderStrategyFocusList();
+updateExplorerAlertToggleUI(); // initial sync so the main switch + test button reflect the real (default: off) state on page load
 fetchAndApplyStrategyFocus();
 // Every user (not just admin) re-checks this periodically, so a change
 // the admin makes actually reaches everyone else's already-open tab.
