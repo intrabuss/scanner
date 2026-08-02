@@ -1507,6 +1507,10 @@ html.hide-etf #etfSwingSection{ display:none !important; }
           <span class="status-dot pulse"></span> Market Open
         </span>
 
+        <button class="icon-btn" id="marketBriefBtn" title="Market Brief" style="display:none;">
+          <i class="bi bi-stars"></i>
+        </button>
+
         <div class="clock-block d-none d-sm-block">
           <div class="clock-time mono" id="clockTime">09:41:22</div>
           <div class="clock-date" id="clockDate">Fri, 31 Jul 2026</div>
@@ -1525,21 +1529,6 @@ html.hide-etf #etfSwingSection{ display:none !important; }
     <div class="dashboard-top-disclaimer">
       <i class="bi bi-mortarboard"></i>
       <span>All data, scores, and AI-generated text on this dashboard are for educational and informational purposes only and do not constitute investment advice. Nothing here is a recommendation to buy or sell any security — trade at your own discretion and risk.</span>
-    </div>
-
-    <!-- AI MARKET BRIEF -->
-    <div class="brief-card" id="briefCard">
-      <div class="brief-icon"><i class="bi bi-stars"></i></div>
-      <div class="brief-body">
-        <div class="brief-head">
-          <span class="brief-title">Market Brief · Sector Report</span>
-          <span class="brief-time" id="briefTime"></span>
-        </div>
-        <div class="brief-text-wrap" id="briefTextWrap">
-          <div class="brief-text" id="briefText"></div>
-        </div>
-        <button type="button" class="brief-toggle" id="briefToggleBtn">Read full report <i class="bi bi-chevron-down"></i></button>
-      </div>
     </div>
 
     <!-- SCAN SIZE — visible to everyone; only admin can actually switch it -->
@@ -2246,6 +2235,22 @@ broke_low  = live_price &lt; yesterday_low</code></pre>
           <div class="risk-output-item warn"><div class="lbl">Risk per Trade</div><div class="val mono" id="outRiskPerTrade">₹0</div></div>
         </div>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ MARKET BRIEF MODAL ============ -->
+<div class="modal-overlay" id="marketBriefOverlay">
+  <div class="modal-box">
+    <div class="modal-head">
+      <div>
+        <div style="font-weight:800; font-size:16px;"><i class="bi bi-stars"></i> Market Brief · Sector Report</div>
+        <div class="explorer-meta" id="briefTime"></div>
+      </div>
+      <button class="icon-btn" id="marketBriefClose"><i class="bi bi-x-lg"></i></button>
+    </div>
+    <div class="explorer-body table-scroll" style="padding:16px 20px;">
+      <div class="brief-text" id="briefText"></div>
     </div>
   </div>
 </div>
@@ -5310,27 +5315,18 @@ async function fetchMarketBrief(){
     const res = await fetch(base + "/ai/brief");
     if(!res.ok) return;
     const data = await res.json();
-    const card = document.getElementById("briefCard");
+    const btn = document.getElementById("marketBriefBtn");
     const textEl = document.getElementById("briefText");
     const timeEl = document.getElementById("briefTime");
-    const wrapEl = document.getElementById("briefTextWrap");
-    const toggleBtn = document.getElementById("briefToggleBtn");
     if(data.text){
-      if(textEl.textContent !== data.text){
-        // Content actually changed (new slot generated) — collapse back down
-        // rather than leaving it expanded from a stale read of the last report.
-        wrapEl.classList.remove("expanded");
-        toggleBtn.classList.remove("open");
-        toggleBtn.innerHTML = 'Read full report <i class="bi bi-chevron-down"></i>';
-      }
       textEl.textContent = data.text;
       textEl.classList.remove("brief-error");
       timeEl.textContent = data.generated_at ? `updated ${data.generated_at}` : "";
-      card.classList.add("show");
+      btn.style.display = "inline-flex";
     } else if(data.error){
       // Quiet fail — most likely OPENROUTER_API_KEY isn't set yet. Don't nag with
-      // a visible error card every load; just stay hidden until it's configured.
-      card.classList.remove("show");
+      // a visible button every load; just stay hidden until it's configured.
+      btn.style.display = "none";
     }
     updateAskAiQuota(data.calls_used_today, data.calls_limit);
   } catch(err){
@@ -5339,10 +5335,17 @@ async function fetchMarketBrief(){
 }
 fetchMarketBrief();
 setInterval(fetchMarketBrief, 5 * 60 * 1000);
-document.getElementById("briefToggleBtn").addEventListener("click", function(){
-  const expanded = document.getElementById("briefTextWrap").classList.toggle("expanded");
-  this.classList.toggle("open", expanded);
-  this.innerHTML = expanded ? 'Show less <i class="bi bi-chevron-down"></i>' : 'Read full report <i class="bi bi-chevron-down"></i>';
+
+function openMarketBrief(){
+  document.getElementById("marketBriefOverlay").classList.add("show");
+}
+function closeMarketBrief(){
+  document.getElementById("marketBriefOverlay").classList.remove("show");
+}
+document.getElementById("marketBriefBtn").addEventListener("click", openMarketBrief);
+document.getElementById("marketBriefClose").addEventListener("click", closeMarketBrief);
+document.getElementById("marketBriefOverlay").addEventListener("click", function(e){
+  if(e.target === this) closeMarketBrief();
 });
 
 /* =====================================================================
