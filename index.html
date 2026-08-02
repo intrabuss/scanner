@@ -562,6 +562,12 @@ html[data-theme="light"] .avatar{ background:linear-gradient(160deg,#E3E7EE,#F3F
 .alert-toggle-btn.on i{ animation:bellRing 1.8s ease infinite; }
 @keyframes bellRing{ 0%,100%{ transform:rotate(0); } 5%{ transform:rotate(14deg); } 10%{ transform:rotate(-12deg); } 15%{ transform:rotate(8deg); } 20%{ transform:rotate(0); } }
 .alert-toggle-hint{ font-size:10.5px; color:var(--text-muted); }
+.alert-test-btn{
+  display:inline-flex; align-items:center; gap:5px; font-size:11.5px; font-weight:600;
+  padding:5px 10px; border-radius:16px; border:1px dashed var(--border-med);
+  background:transparent; color:var(--text-secondary);
+}
+.alert-test-btn:hover{ border-color:var(--brand); color:var(--brand); }
 
 /* Legend explaining the merged chip's letters */
 .chip-legend{
@@ -1296,6 +1302,7 @@ html.hide-etf #etfSwingSection{ display:none !important; }
 .break-toast.sell .break-toast-icon{ background:var(--bear-dim); color:var(--bear); }
 .break-toast-top{ font-size:13px; display:flex; align-items:center; gap:6px; }
 .break-toast-strategy{ font-size:10px; font-weight:700; color:var(--text-muted); text-transform:uppercase; }
+.break-toast-time{ font-size:10px; color:var(--text-muted); font-family:var(--font-data); margin-left:auto; }
 .break-toast-detail{ font-size:12px; color:var(--text-secondary); margin-top:2px; font-family:var(--font-data); }
 
 .ask-ai-fab{
@@ -1920,6 +1927,9 @@ html.hide-etf #etfSwingSection{ display:none !important; }
       <button type="button" class="alert-toggle-btn" id="explorerAlertToggle">
         <i class="bi bi-bell"></i>
         <span id="explorerAlertToggleLbl">Alerts: Off</span>
+      </button>
+      <button type="button" class="alert-test-btn" id="explorerAlertTestBtn" title="Fires a fake break so you can check sound/toast/notification work — doesn't affect real data">
+        <i class="bi bi-play-fill"></i> Test Alert
       </button>
       <span class="alert-toggle-hint">When on, a bell sound plays whenever a new confirmed break appears — works in the background too, not just while this is open.</span>
     </div>
@@ -4038,7 +4048,7 @@ function playAlertBell(){
   }
 }
 
-function showBreakToast(strategy, symbol, price, dir, qty){
+function showBreakToast(strategy, symbol, price, dir, qty, time){
   const wrap = document.getElementById("breakToastWrap");
   const isBuy = dir === "up";
   const toast = document.createElement("div");
@@ -4046,7 +4056,7 @@ function showBreakToast(strategy, symbol, price, dir, qty){
   toast.innerHTML = `
     <div class="break-toast-icon"><i class="bi ${isBuy ? 'bi-arrow-up-short' : 'bi-arrow-down-short'}"></i></div>
     <div class="break-toast-body">
-      <div class="break-toast-top"><strong>${symbol}</strong> <span class="break-toast-strategy">${strategy}</span></div>
+      <div class="break-toast-top"><strong>${symbol}</strong> <span class="break-toast-strategy">${strategy}</span> <span class="break-toast-time">${time}</span></div>
       <div class="break-toast-detail">₹${price.toLocaleString('en-IN')} · ${isBuy ? 'BUY' : 'SELL'} · Qty ${qty.toLocaleString('en-IN')}</div>
     </div>`;
   wrap.appendChild(toast);
@@ -4057,15 +4067,15 @@ function showBreakToast(strategy, symbol, price, dir, qty){
   }, 6000);
 }
 
-function fireBreakNotification(strategy, symbol, price, dir, qty){
+function fireBreakNotification(strategy, symbol, price, dir, qty, time){
   playAlertBell();
-  showBreakToast(strategy, symbol, price, dir, qty);
+  showBreakToast(strategy, symbol, price, dir, qty, time);
   const isBuy = dir === "up";
   if("Notification" in window && Notification.permission === "granted"){
     try {
       new Notification(`${symbol} — ${isBuy ? "BUY" : "SELL"} (${strategy})`, {
-        body: `₹${price.toLocaleString('en-IN')} · Qty ${qty.toLocaleString('en-IN')}`,
-        tag: `${strategy}-${symbol}`,
+        body: `${time} · ₹${price.toLocaleString('en-IN')} · Qty ${qty.toLocaleString('en-IN')}`,
+        tag: `${strategy}-${symbol}-${time}`,
       });
     } catch(e){}
   }
@@ -4080,7 +4090,7 @@ function checkForNewBreaksAndAlert(strategy, rows){
       const key = `${r.sym}|${e.time}|${e.dir}`;
       if(seen.has(key)) return;
       seen.add(key);
-      if(breakBaselineSet[strategy]) newBreaks.push({ symbol: r.sym, price: r.price, dir: e.dir });
+      if(breakBaselineSet[strategy]) newBreaks.push({ symbol: r.sym, price: r.price, dir: e.dir, time: e.time });
     });
   });
   breakBaselineSet[strategy] = true;
@@ -4088,7 +4098,7 @@ function checkForNewBreaksAndAlert(strategy, rows){
     const buyingPower = getBuyingPowerPerTrade();
     newBreaks.forEach(b => {
       const qty = Math.max(0, Math.floor(buyingPower / b.price));
-      fireBreakNotification(strategy, b.symbol, b.price, b.dir, qty);
+      fireBreakNotification(strategy, b.symbol, b.price, b.dir, qty, b.time);
     });
   }
 }
@@ -4110,6 +4120,20 @@ document.getElementById("explorerAlertToggle").addEventListener("click", functio
     if("Notification" in window && Notification.permission === "default") Notification.requestPermission();
     playAlertBell(); // quick confirmation chime so you know it's actually on
   }
+});
+
+document.getElementById("explorerAlertTestBtn").addEventListener("click", function(){
+  if("Notification" in window && Notification.permission === "default") Notification.requestPermission();
+  const strategy = currentExplorerStrategy || "ORB";
+  // Uses a real symbol/price from today's data if any is loaded, so the test
+  // looks like a genuine alert — falls back to a placeholder if nothing's
+  // loaded yet (e.g. testing before ever opening the Trade Explorer).
+  const sourceRows = strategy === "ORB" ? orbRows : drbRows;
+  const sample = (sourceRows && sourceRows[0]) || { sym: "RELIANCE", price: 2900 };
+  const qty = Math.max(1, Math.floor(getBuyingPowerPerTrade() / sample.price));
+  const now = new Date();
+  const timeStr = now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: false });
+  fireBreakNotification(strategy, sample.sym, sample.price, Math.random() > 0.5 ? "up" : "down", qty, timeStr + " (test)");
 });
 
 let explorerSort = { key: "rovl", dir: -1 };
