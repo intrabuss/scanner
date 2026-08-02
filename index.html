@@ -4295,7 +4295,7 @@ function hideChartMsg(){
   document.getElementById("chartMsg").classList.remove("show");
 }
 
-function buildChartEmbedUrl(symbol, intervalMin){
+function buildChartEmbedUrl(symbol, intervalMin, includeEmas){
   const isLight = document.documentElement.getAttribute("data-theme") === "light";
   // Match the embedded TradingView candles/grid/background to our own design tokens
   // (bull #22C55E, bear #EF4444) instead of TradingView's default red/green, so the
@@ -4313,6 +4313,24 @@ function buildChartEmbedUrl(symbol, intervalMin){
     "mainSeriesProperties.candleStyle.wickUpColor": "#22C55E",
     "mainSeriesProperties.candleStyle.wickDownColor": "#EF4444"
   };
+
+  // EMA 9/20/50 overlay — shown on every TradingView chart (this widget-embed
+  // path, used for regular stock charts and ETF charts alike; the admin
+  // quad-chart is a separately self-drawn canvas and isn't affected).
+  let studies = "[]";
+  let studiesOverrides = "{}";
+  if(includeEmas){
+    studies = JSON.stringify(["MAExp@tv-basicstudies", "MAExp@tv-basicstudies", "MAExp@tv-basicstudies"]);
+    studiesOverrides = JSON.stringify({
+      "MAExp@tv-basicstudies.length": 9,
+      "MAExp@tv-basicstudies.plot.color": "#F59E0B",
+      "MAExp@tv-basicstudies@1.length": 20,
+      "MAExp@tv-basicstudies@1.plot.color": "#3B82F6",
+      "MAExp@tv-basicstudies@2.length": 50,
+      "MAExp@tv-basicstudies@2.plot.color": "#EC4899"
+    });
+  }
+
   const params = new URLSearchParams({
     symbol: tvSymbol(symbol),
     interval: intervalMin,
@@ -4320,13 +4338,13 @@ function buildChartEmbedUrl(symbol, intervalMin){
     symboledit: "1",
     saveimage: "0",
     toolbarbg: isLight ? "F3F5F8" : "141922",
-    studies: "[]",
+    studies: studies,
     theme: isLight ? "light" : "dark",
     style: "1",
     timezone: "Asia/Kolkata",
     withdateranges: "1",
     hideideas: "1",
-    studies_overrides: "{}",
+    studies_overrides: studiesOverrides,
     overrides: JSON.stringify(overrides),
     enabled_features: "[]",
     disabled_features: "[]",
@@ -4502,15 +4520,12 @@ function renderQuadChart(data){
 }
 
 async function loadChart(symbol, forcePlain){
-  const session = getSession();
-  const isAdmin = session && session.mobile === ADMIN_MOBILE;
-
-  if(!isAdmin || forcePlain){
+  if(forcePlain){
     showChartMsg("Loading chart…", "bi-hourglass-split");
     const container = document.getElementById("tvChartContainer");
     container.classList.remove("chart-quad-grid");
     const intervalMin = document.getElementById("chartIntervalSelect").value;
-    container.innerHTML = `<iframe src="${buildChartEmbedUrl(symbol, intervalMin)}" allowtransparency="true"></iframe>`;
+    container.innerHTML = `<iframe src="${buildChartEmbedUrl(symbol, intervalMin, true)}" allowtransparency="true"></iframe>`;
     document.getElementById("tvChartContainer").querySelector("iframe").addEventListener("load", hideChartMsg);
     setTimeout(hideChartMsg, 1500); // fallback in case the iframe's own load event doesn't fire
     return;
@@ -4522,7 +4537,9 @@ async function loadChart(symbol, forcePlain){
   container.innerHTML = "";
   try{
     const base = getBackendUrl();
-    const res = await fetch(base + "/candles/" + encodeURIComponent(symbol));
+    const row = findRowForSymbol(symbol);
+    const strategyParam = row && row.strategy ? `?strategy=${encodeURIComponent(row.strategy)}` : "";
+    const res = await fetch(base + "/candles/" + encodeURIComponent(symbol) + strategyParam);
     if(!res.ok) throw new Error("HTTP " + res.status);
     const data = await res.json();
     if(data.error){
@@ -4633,14 +4650,12 @@ document.getElementById("chartBreaklogCloseBtn").addEventListener("click", close
 function openChartModal(symbol, forcePlain){
   currentChartSymbol = symbol;
   const row = findRowForSymbol(symbol);
-  const session = getSession();
-  const isAdmin = session && session.mobile === ADMIN_MOBILE;
   document.getElementById("chartTitle").textContent = symbol;
   document.getElementById("chartSub").textContent = row
     ? `${row.name || ""} · ${row.sector || ""} · ₹${row.price.toLocaleString('en-IN')}`
     : "Live daily chart";
   document.getElementById("chartOpenTv").href = `https://www.tradingview.com/chart/?symbol=${encodeURIComponent(tvSymbol(symbol))}`;
-  document.getElementById("chartIntervalSelect").style.display = (isAdmin && !forcePlain) ? "none" : "";
+  document.getElementById("chartIntervalSelect").style.display = forcePlain ? "" : "none";
   if(forcePlain) document.getElementById("chartIntervalSelect").value = "D"; // ETFs: plain daily chart, no ORB/DRB context to pick a shorter default from
   renderChartBreakSummary(row);
   renderChartLevels(row);
