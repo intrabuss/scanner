@@ -1476,6 +1476,7 @@ html.hide-etf #etfSwingSection{ display:none !important; }
     <button class="nav-icon" id="strategyGuideBtn"><i class="bi bi-question-circle"></i><span class="tip">Strategy Guide</span></button>
     <button class="nav-icon" id="globalMarketsBtn"><i class="bi bi-globe-americas"></i><span class="tip">Global</span></button>
     <button class="nav-icon" id="fiiDiiBtn"><i class="bi bi-bank2"></i><span class="tip">FII/DII</span></button>
+    <button class="nav-icon" id="riskMgmtBtn"><i class="bi bi-shield-check"></i><span class="tip">Risk Mgmt</span></button>
     <button class="nav-icon" id="settingsBtn" style="margin-top:auto;"><i class="bi bi-gear-fill"></i><span class="tip">Settings</span></button>
   </nav>
 
@@ -1592,44 +1593,6 @@ html.hide-etf #etfSwingSection{ display:none !important; }
       </table>
     </div>
 
-    <!-- RISK MANAGEMENT -->
-    <div class="section-head">
-      <div class="section-title">Risk Management <span class="count">Before entering a trade</span></div>
-    </div>
-    <div class="card-x">
-      <div class="risk-grid">
-        <div>
-          <div class="risk-input-row">
-            <label>Total Capital</label>
-            <div class="rm-inputwrap"><span class="mono" style="color:var(--text-muted);">₹</span><input type="number" id="rmCapital" class="mono" value="100000" min="0"></div>
-          </div>
-          <div class="risk-input-row">
-            <label>Max Trades / Day</label>
-            <div class="rm-inputwrap"><input type="number" id="rmMaxTrades" class="mono" value="5" min="1"></div>
-          </div>
-          <div class="risk-input-row">
-            <label>Leverage</label>
-            <div class="rm-inputwrap"><input type="number" id="rmLeverage" class="mono" value="5" min="1">×</div>
-          </div>
-          <div class="risk-input-row">
-            <label>Max Risk (% of capital)</label>
-            <div class="rm-inputwrap"><input type="number" id="rmMaxRiskPct" class="mono" value="3" min="0" step="0.5">%</div>
-          </div>
-          <div class="risk-input-row">
-            <label>Current Price (for qty)</label>
-            <div class="rm-inputwrap"><span class="mono" style="color:var(--text-muted);">₹</span><input type="number" id="rmPrice" class="mono" value="500" min="1"></div>
-          </div>
-        </div>
-        <div class="risk-outputs">
-          <div class="risk-output-item"><div class="lbl">Capital per Trade</div><div class="val mono" id="outCapPerTrade">₹0</div></div>
-          <div class="risk-output-item accent"><div class="lbl">Buying Power / Trade</div><div class="val mono" id="outBuyingPower">₹0</div></div>
-          <div class="risk-output-item"><div class="lbl">Quantity (at CMP)</div><div class="val mono" id="outQty">0</div></div>
-          <div class="risk-output-item"><div class="lbl">Max Risk (Total)</div><div class="val mono" id="outMaxRisk">₹0</div></div>
-          <div class="risk-output-item warn"><div class="lbl">Risk per Trade</div><div class="val mono" id="outRiskPerTrade">₹0</div></div>
-        </div>
-      </div>
-    </div>
-
     <!-- LONG / SHORT -->
     <div class="row g-3 mt-1">
       <div class="col-12 col-xl-6" id="longSection">
@@ -1640,7 +1603,7 @@ html.hide-etf #etfSwingSection{ display:none !important; }
         <div class="card-x table-scroll">
           <table class="data-grid" id="longTable">
             <thead>
-              <tr><th>Symbol</th><th>Sector</th><th>% Chg</th><th>LTP</th><th>ROVL</th><th>Status</th><th class="col-breaklog">Break Log</th></tr>
+              <tr><th>Symbol</th><th>Sector</th><th>% Chg</th><th>LTP</th><th>ROVL</th><th>Status</th></tr>
             </thead>
             <tbody></tbody>
           </table>
@@ -1655,7 +1618,7 @@ html.hide-etf #etfSwingSection{ display:none !important; }
         <div class="card-x table-scroll">
           <table class="data-grid" id="shortTable">
             <thead>
-              <tr><th>Symbol</th><th>Sector</th><th>% Chg</th><th>LTP</th><th>ROVL</th><th>Status</th><th class="col-breaklog">Break Log</th></tr>
+              <tr><th>Symbol</th><th>Sector</th><th>% Chg</th><th>LTP</th><th>ROVL</th><th>Status</th></tr>
             </thead>
             <tbody></tbody>
           </table>
@@ -2236,6 +2199,52 @@ broke_low  = live_price &lt; yesterday_low</code></pre>
           </div>
         </div>
       <div class="explorer-empty" id="fiiDiiEmpty" style="display:none;">Couldn't reach NSE for FII/DII data right now — showing last known figures, if any.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ RISK MANAGEMENT MODAL ============ -->
+<div class="modal-overlay" id="riskMgmtOverlay">
+  <div class="modal-box">
+    <div class="modal-head">
+      <div>
+        <div style="font-weight:800; font-size:16px;">Risk Management</div>
+        <div class="explorer-meta">Before entering a trade</div>
+      </div>
+      <button class="icon-btn" id="riskMgmtClose"><i class="bi bi-x-lg"></i></button>
+    </div>
+    <div style="padding:16px 20px;">
+      <div class="risk-grid">
+        <div>
+          <div class="risk-input-row">
+            <label>Total Capital</label>
+            <div class="rm-inputwrap"><span class="mono" style="color:var(--text-muted);">₹</span><input type="number" id="rmCapital" class="mono" value="100000" min="0"></div>
+          </div>
+          <div class="risk-input-row">
+            <label>Max Trades / Day</label>
+            <div class="rm-inputwrap"><input type="number" id="rmMaxTrades" class="mono" value="5" min="1"></div>
+          </div>
+          <div class="risk-input-row">
+            <label>Leverage</label>
+            <div class="rm-inputwrap"><input type="number" id="rmLeverage" class="mono" value="5" min="1">×</div>
+          </div>
+          <div class="risk-input-row">
+            <label>Max Risk (% of capital)</label>
+            <div class="rm-inputwrap"><input type="number" id="rmMaxRiskPct" class="mono" value="3" min="0" step="0.5">%</div>
+          </div>
+          <div class="risk-input-row">
+            <label>Current Price (for qty)</label>
+            <div class="rm-inputwrap"><span class="mono" style="color:var(--text-muted);">₹</span><input type="number" id="rmPrice" class="mono" value="500" min="1"></div>
+          </div>
+        </div>
+        <div class="risk-outputs">
+          <div class="risk-output-item"><div class="lbl">Capital per Trade</div><div class="val mono" id="outCapPerTrade">₹0</div></div>
+          <div class="risk-output-item accent"><div class="lbl">Buying Power / Trade</div><div class="val mono" id="outBuyingPower">₹0</div></div>
+          <div class="risk-output-item"><div class="lbl">Quantity (at CMP)</div><div class="val mono" id="outQty">0</div></div>
+          <div class="risk-output-item"><div class="lbl">Max Risk (Total)</div><div class="val mono" id="outMaxRisk">₹0</div></div>
+          <div class="risk-output-item warn"><div class="lbl">Risk per Trade</div><div class="val mono" id="outRiskPerTrade">₹0</div></div>
+        </div>
       </div>
     </div>
   </div>
@@ -3091,6 +3100,18 @@ document.getElementById("fiiDiiBtn").addEventListener("click", openFiiDii);
 document.getElementById("fiiDiiClose").addEventListener("click", closeFiiDii);
 document.getElementById("fiiDiiOverlay").addEventListener("click", function(e){
   if(e.target === this) closeFiiDii();
+});
+
+function openRiskMgmt(){
+  document.getElementById("riskMgmtOverlay").classList.add("show");
+}
+function closeRiskMgmt(){
+  document.getElementById("riskMgmtOverlay").classList.remove("show");
+}
+document.getElementById("riskMgmtBtn").addEventListener("click", openRiskMgmt);
+document.getElementById("riskMgmtClose").addEventListener("click", closeRiskMgmt);
+document.getElementById("riskMgmtOverlay").addEventListener("click", function(e){
+  if(e.target === this) closeRiskMgmt();
 });
 
 function updateIndicesFromLive(liveIndices){
@@ -3999,7 +4020,6 @@ function renderOppTable(bodyId, rows){
       <td class="mono">${r.price.toLocaleString('en-IN')}</td>
       <td><span class="rovl-tag ${r.rovl > 1.2 ? 'hot' : 'normal'}">${r.rovl}${r.rovl > 1.2 ? ' 🔥' : ''}</span></td>
       <td><span class="badge-status ${r.status}"><span class="dot"></span>${label(r.status)}</span></td>
-      <td class="mono cell-sub break-log-cell">${renderBreakLog(r.breakLog)}</td>
     </tr>
   `).join("");
 }
