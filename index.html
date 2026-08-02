@@ -2124,6 +2124,25 @@ broke_low  = live_price &lt; yesterday_low</code></pre>
   </div>
 </div>
 
+<!-- ASK AI WIDGET -->
+<button class="ask-ai-fab" id="askAiFab" title="Ask AI about today's scan">
+  <i class="bi bi-stars"></i>
+</button>
+<div class="ask-ai-panel" id="askAiPanel">
+  <div class="ask-ai-head">
+    <span class="ask-ai-head-title">Ask AI</span>
+    <span class="ask-ai-quota" id="askAiQuota"></span>
+    <button class="ask-ai-close" id="askAiCloseBtn"><i class="bi bi-x-lg"></i></button>
+  </div>
+  <div class="ask-ai-body" id="askAiBody">
+    <div class="ask-ai-empty">Ask about today's scan — e.g. "what's leading today" or "why is Auto sector weak". Answers are based only on the current live scan, not general market opinions.</div>
+  </div>
+  <div class="ask-ai-input-row">
+    <input type="text" class="ask-ai-input" id="askAiInput" placeholder="Ask about today's scan…" maxlength="500">
+    <button class="ask-ai-send" id="askAiSendBtn"><i class="bi bi-send"></i></button>
+  </div>
+</div>
+
 <script>
 /* =====================================================================
    AUTH / ACCESS CONTROL
@@ -5138,23 +5157,5 @@ document.querySelectorAll("#etfSwingTable th.sortable").forEach(th => {
 
 </script>
 
-<!-- ASK AI WIDGET -->
-<button class="ask-ai-fab" id="askAiFab" title="Ask AI about today's scan">
-  <i class="bi bi-stars"></i>
-</button>
-<div class="ask-ai-panel" id="askAiPanel">
-  <div class="ask-ai-head">
-    <span class="ask-ai-head-title">Ask AI</span>
-    <span class="ask-ai-quota" id="askAiQuota"></span>
-    <button class="ask-ai-close" id="askAiCloseBtn"><i class="bi bi-x-lg"></i></button>
-  </div>
-  <div class="ask-ai-body" id="askAiBody">
-    <div class="ask-ai-empty">Ask about today's scan — e.g. "what's leading today" or "why is Auto sector weak". Answers are based only on the current live scan, not general market opinions.</div>
-  </div>
-  <div class="ask-ai-input-row">
-    <input type="text" class="ask-ai-input" id="askAiInput" placeholder="Ask about today's scan…" maxlength="500">
-    <button class="ask-ai-send" id="askAiSendBtn"><i class="bi bi-send"></i></button>
-  </div>
-</div>
 </body>
 </html>
