@@ -2957,10 +2957,12 @@ document.getElementById("loginForm").addEventListener("submit", async function(e
 
   const isAdminLogin = mobile === ADMIN_MOBILE;
 
-  // Admin gets in regardless (needs access to go fix Upstox login if needed);
-  // normal users only get in once the system is confirmed healthy
-  if(!isAdminLogin && !lastCheckWasHealthy){
-    return; // status box already says "contact your admin"
+  // Both admin and regular users need the system confirmed healthy before
+  // entry now — the "Log in to Upstox" control admin needs is already
+  // right here on this screen (the status box above shows it), so there's
+  // no need to let admin into the dashboard first just to reach it.
+  if(!lastCheckWasHealthy){
+    return; // status box already explains why (shows the Log in button for admin)
   }
 
   let adminPin = "";
