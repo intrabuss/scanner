@@ -695,6 +695,17 @@ html[data-theme="light"] .avatar{ background:linear-gradient(160deg,#E3E7EE,#F3F
 }
 .login-title{ font-weight:800; font-size:19px; letter-spacing:-.01em; }
 .login-sub{ font-size:12.5px; color:var(--text-muted); margin-top:4px; margin-bottom:22px; }
+.edu-disclaimer-box{
+  display:flex; align-items:flex-start; gap:8px; margin-bottom:14px;
+  padding:10px 12px; border-radius:var(--radius-sm);
+  background:var(--bg-surface); border:1px solid var(--border-med);
+  font-size:11px; line-height:1.5; color:var(--text-muted);
+}
+.edu-disclaimer-box i{ font-size:13px; margin-top:1px; flex-shrink:0; color:var(--text-secondary); }
+.dashboard-footer-disclaimer{
+  margin-top:28px; padding:16px 8px 4px; border-top:1px solid var(--border-soft);
+  font-size:10.5px; line-height:1.6; color:var(--text-muted); text-align:center;
+}
 .live-status-box{
   margin-bottom:14px; padding:11px 12px; border-radius:var(--radius-sm);
   font-size:12.5px; font-weight:600; display:flex; align-items:center; gap:8px; line-height:1.4;
@@ -1359,6 +1370,10 @@ html.hide-etf #etfSwingSection{ display:none !important; }
         <div class="form-hint">Required for the admin number — knowing the number alone isn't enough.</div>
       </div>
       <div class="live-status-box" id="liveStatusBox" style="display:none;"></div>
+      <div class="edu-disclaimer-box">
+        <i class="bi bi-mortarboard"></i>
+        <span>For educational and informational purposes only. Not investment advice — nothing here is a recommendation to buy or sell any security.</span>
+      </div>
       <button type="submit" class="btn-primary" id="loginSubmitBtn"><i class="bi bi-arrow-right-circle"></i> Enter Dashboard</button>
     </form>
 
@@ -1635,6 +1650,10 @@ html.hide-etf #etfSwingSection{ display:none !important; }
           </div>
         </div>
       </div>
+    </div>
+
+    <div class="dashboard-footer-disclaimer">
+      All data, scores, and AI-generated text on this dashboard are for educational and informational purposes only and do not constitute investment advice. Nothing here is a recommendation to buy or sell any security — trade at your own discretion and risk.
     </div>
 
   </main>
