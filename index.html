@@ -2609,6 +2609,7 @@ document.getElementById("breakLogToggle").addEventListener("change", function(){
 
 function openSettings(){
   document.getElementById("settingsOverlay").classList.add("show");
+  document.querySelector("#settingsOverlay .modal-box").scrollTop = 0;
 }
 function closeSettings(){
   document.getElementById("settingsOverlay").classList.remove("show");
