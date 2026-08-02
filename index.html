@@ -1807,6 +1807,10 @@ html.hide-etf #etfSwingSection{ display:none !important; }
       </div>
       <div id="backendUrlMsg" style="font-size:11.5px; color:var(--bull); display:none; margin-bottom:8px;">Saved — reconnecting…</div>
 
+      <div id="settingsUpstoxStatus" class="live-status-box checking">
+        <i class="bi bi-hourglass-split"></i><span>Checking Upstox login…</span>
+      </div>
+
       <div class="settings-divider"></div>
     </div>
 
@@ -2559,6 +2563,16 @@ function showApp(session){
   roleBadge.innerHTML = isAdmin
     ? '<i class="bi bi-shield-fill-check"></i> Admin'
     : '<i class="bi bi-person-fill"></i> User';
+
+  // Admin is deliberately let in even when Upstox isn't logged in yet (so
+  // there's a way to reach the login button at all) — but landing on a
+  // dashboard with no live data and no visible next step was the actual
+  // bug being reported. This surfaces it immediately instead of silently.
+  if(isAdmin){
+    fetch(getBackendUrl() + "/health").then(r => r.json()).then(data => {
+      if(!data.logged_in) openSettings();
+    }).catch(() => {});
+  }
 }
 
 /* ---------------- Admin: manage allowed mobile numbers ---------------- */
@@ -2958,9 +2972,50 @@ document.getElementById("breakLogToggle").addEventListener("change", function(){
 function openSettings(){
   document.getElementById("settingsOverlay").classList.add("show");
   document.querySelector("#settingsOverlay .modal-box").scrollTop = 0;
+  const session = getSession();
+  if(session && session.mobile === ADMIN_MOBILE) refreshSettingsUpstoxStatus();
 }
 function closeSettings(){
   document.getElementById("settingsOverlay").classList.remove("show");
+}
+
+// This is the fix for admin landing inside the dashboard with Upstox not
+// logged in and no way to get back to the login popup without logging out
+// entirely — the gate's "Log in" button only ever existed pre-entry. Same
+// idea, reachable from Settings instead.
+async function refreshSettingsUpstoxStatus(){
+  const el = document.getElementById("settingsUpstoxStatus");
+  if(!el) return;
+  el.className = "live-status-box checking";
+  el.innerHTML = `<i class="bi bi-hourglass-split"></i><span>Checking Upstox login…</span>`;
+  try {
+    const res = await fetch(getBackendUrl() + "/health");
+    const data = await res.json();
+    if(data.logged_in){
+      el.className = "live-status-box good";
+      el.innerHTML = `<i class="bi bi-check-circle-fill"></i><span>Upstox: logged in today (${data.daily_cache_size ?? 0} symbols cached)</span>`;
+    } else {
+      el.className = "live-status-box bad";
+      el.innerHTML = `<i class="bi bi-exclamation-triangle-fill"></i><span>Upstox: not logged in today</span><button type="button" class="status-action" id="settingsUpstoxLoginBtn"><i class="bi bi-box-arrow-up-right"></i> Log in</button>`;
+      document.getElementById("settingsUpstoxLoginBtn").addEventListener("click", function(){
+        openUpstoxLoginPopupFromSettings();
+      });
+    }
+  } catch(err){
+    el.className = "live-status-box bad";
+    el.innerHTML = `<i class="bi bi-wifi-off"></i><span>Can't reach the backend to check.</span>`;
+  }
+}
+
+function openUpstoxLoginPopupFromSettings(){
+  const popup = window.open(getBackendUrl() + "/login", "upstoxLogin", "width=480,height=680,menubar=no,toolbar=no");
+  const poll = setInterval(() => {
+    if(!popup || popup.closed){
+      clearInterval(poll);
+      refreshSettingsUpstoxStatus(); // reflect whatever happened in the popup
+      fetchLiveData(); // also retry the live feed immediately, no need to wait for the next poll cycle
+    }
+  }, 800);
 }
 
 document.getElementById("settingsBtn").addEventListener("click", openSettings);
