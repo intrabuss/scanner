@@ -552,6 +552,17 @@ html[data-theme="light"] .avatar{ background:linear-gradient(160deg,#E3E7EE,#F3F
 #explorerTable.sector-hidden .col-sector{ display:none; }
 .explorer-cards.sector-hidden .col-sector{ display:none; }
 
+.explorer-alert-row{ display:flex; align-items:center; gap:10px; padding:8px 4px 0; flex-wrap:wrap; }
+.alert-toggle-btn{
+  display:inline-flex; align-items:center; gap:6px; font-size:12.5px; font-weight:700;
+  padding:6px 12px; border-radius:20px; border:1px solid var(--border-med);
+  background:var(--bg-surface); color:var(--text-secondary);
+}
+.alert-toggle-btn.on{ background:var(--brand-dim); color:var(--brand); border-color:rgba(76,141,255,.45); }
+.alert-toggle-btn.on i{ animation:bellRing 1.8s ease infinite; }
+@keyframes bellRing{ 0%,100%{ transform:rotate(0); } 5%{ transform:rotate(14deg); } 10%{ transform:rotate(-12deg); } 15%{ transform:rotate(8deg); } 20%{ transform:rotate(0); } }
+.alert-toggle-hint{ font-size:10.5px; color:var(--text-muted); }
+
 /* Legend explaining the merged chip's letters */
 .chip-legend{
   display:flex; flex-wrap:wrap; align-items:center; gap:8px;
@@ -1730,6 +1741,23 @@ html.hide-etf #etfSwingSection{ display:none !important; }
 
     <div class="settings-divider"></div>
 
+    <div id="emailAlertsWrap">
+      <div class="modal-section-lbl">Email Alerts</div>
+      <div style="font-size:11.5px; color:var(--text-muted); margin-bottom:10px;">Send the current ETF Buy List on demand. From address is fixed on the server; recipient is configurable here.</div>
+      <div class="form-field">
+        <label for="emailToInput">Send To</label>
+        <input type="email" id="emailToInput" placeholder="you@example.com">
+      </div>
+      <div style="display:flex; gap:8px; margin-top:10px;">
+        <button class="btn-view" id="emailToSaveBtn" style="width:auto; padding:9px 16px;"><i class="bi bi-check-lg"></i> Save Address</button>
+        <button class="btn-etf-refresh" id="emailEtfSendBtn"><i class="bi bi-envelope"></i> Send ETF Buy List Now</button>
+      </div>
+      <div id="emailAlertsMsg" style="font-size:11.5px; display:none; margin-top:8px;"></div>
+    </div>
+    <div id="emailAlertsNonAdminMsg" style="font-size:11.5px; color:var(--text-muted); display:none;">Contact your admin to configure email alerts.</div>
+
+    <div class="settings-divider"></div>
+
     <div class="modal-section-lbl">Table Display</div>
     <div class="toggle-row">
       <div>
@@ -1845,6 +1873,13 @@ html.hide-etf #etfSwingSection{ display:none !important; }
       <button class="filter-chip" data-signal="BUY">Buy</button>
       <button class="filter-chip" data-signal="SELL">Sell</button>
       <button class="filter-chip" data-signal="WATCH">Watch</button>
+    </div>
+    <div class="explorer-alert-row">
+      <button type="button" class="alert-toggle-btn" id="explorerAlertToggle">
+        <i class="bi bi-bell"></i>
+        <span id="explorerAlertToggleLbl">Alerts: Off</span>
+      </button>
+      <span class="alert-toggle-hint">When on, a bell sound plays whenever a new confirmed break appears — works in the background too, not just while this is open.</span>
     </div>
     <div class="chip-legend">
       <span class="chip-legend-item"><b>Score</b> /10</span>
@@ -2281,6 +2316,8 @@ function showApp(session){
   document.getElementById("adminSection").style.display = isAdmin ? "block" : "none";
   document.getElementById("liveDataSourceSection").style.display = isAdmin ? "block" : "none";
   document.getElementById("strategyFocusWrap").style.display = isAdmin ? "block" : "none";
+  document.getElementById("emailAlertsWrap").style.display = isAdmin ? "block" : "none";
+  document.getElementById("emailAlertsNonAdminMsg").style.display = isAdmin ? "none" : "block";
   document.getElementById("scanModeSection").classList.toggle("read-only", !isAdmin);
   document.getElementById("scanModeNonAdminMsg").style.display = isAdmin ? "none" : "block";
   if(isAdmin) renderAdminList();
@@ -3916,6 +3953,78 @@ SECTORS.forEach(s => {
 let explorerData = [];
 let explorerSignal = "all";
 let currentExplorerStrategy = null;
+
+/* ---------------- Break Alerts (bell sound) ----------------
+   Per-strategy on/off, persisted in the browser. Runs on every regular
+   20s poll cycle (fetchLiveData), not just while the Trade Explorer is
+   open — the toggle button just happens to live there. A synthesized
+   tone is used instead of an audio file so there's nothing extra to
+   host/deploy. First poll after enabling (or after a page load) only
+   establishes the baseline — it deliberately doesn't alert on breaks
+   that already existed before you turned it on. */
+let alertEnabled = { ORB: false, DRB: false };
+try {
+  const saved = JSON.parse(localStorage.getItem("breakAlertEnabled"));
+  if(saved && typeof saved === "object") alertEnabled = { ORB: !!saved.ORB, DRB: !!saved.DRB };
+} catch(e){}
+
+const seenBreaks = { ORB: new Set(), DRB: new Set() };
+let breakBaselineSet = { ORB: false, DRB: false };
+
+let audioCtx = null;
+function playAlertBell(){
+  try {
+    if(!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const now = audioCtx.currentTime;
+    [880, 1320].forEach((freq, i) => {
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = "sine";
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0, now + i * 0.14);
+      gain.gain.linearRampToValueAtTime(0.25, now + i * 0.14 + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.14 + 0.5);
+      osc.connect(gain).connect(audioCtx.destination);
+      osc.start(now + i * 0.14);
+      osc.stop(now + i * 0.14 + 0.5);
+    });
+  } catch(e){
+    // Web Audio blocked (e.g. no user interaction yet on this page load) — silently skip rather than error
+  }
+}
+
+function checkForNewBreaksAndAlert(strategy, rows){
+  const seen = seenBreaks[strategy];
+  let sawNew = false;
+  rows.forEach(r => {
+    (r.breakLog || []).forEach(e => {
+      if(e.dir !== "up" && e.dir !== "down") return; // skip "reversed" entries
+      const key = `${r.sym}|${e.time}|${e.dir}`;
+      if(seen.has(key)) return;
+      seen.add(key);
+      if(breakBaselineSet[strategy]) sawNew = true; // only alert on breaks seen AFTER the baseline pass
+    });
+  });
+  breakBaselineSet[strategy] = true;
+  if(sawNew && alertEnabled[strategy]) playAlertBell();
+}
+
+function updateExplorerAlertToggleUI(){
+  const strategy = currentExplorerStrategy || "ORB";
+  const btn = document.getElementById("explorerAlertToggle");
+  const lbl = document.getElementById("explorerAlertToggleLbl");
+  const on = !!alertEnabled[strategy];
+  btn.classList.toggle("on", on);
+  lbl.textContent = `${strategy} Alerts: ${on ? "On" : "Off"}`;
+}
+document.getElementById("explorerAlertToggle").addEventListener("click", function(){
+  const strategy = currentExplorerStrategy || "ORB";
+  alertEnabled[strategy] = !alertEnabled[strategy];
+  localStorage.setItem("breakAlertEnabled", JSON.stringify(alertEnabled));
+  updateExplorerAlertToggleUI();
+  if(alertEnabled[strategy]) playAlertBell(); // quick confirmation chime so you know it's actually on
+});
+
 let explorerSort = { key: "rovl", dir: -1 };
 
 function renderBreakLog(entries){
@@ -4083,6 +4192,7 @@ function openExplorer(strategy, initialSignal, initialSector){
   explorerData = isORB ? orbRows : drbRows;
   explorerSignal = initialSignal || "all";
   explorerSort = { key: "rovl", dir: -1 };
+  updateExplorerAlertToggleUI();
 
   const validSector = initialSector && SECTORS.includes(initialSector) ? initialSector : "all";
 
@@ -4272,6 +4382,7 @@ const INDEX_TV_MAP = {
 };
 
 let currentChartSymbol = null;
+let currentChartForcePlain = false;
 let currentChartNewsTitles = [];
 
 function tvSymbol(symbol){
@@ -4295,12 +4406,12 @@ function hideChartMsg(){
   document.getElementById("chartMsg").classList.remove("show");
 }
 
-function buildChartEmbedUrl(symbol, intervalMin, includeEmas){
+function chartColorOverrides(){
   const isLight = document.documentElement.getAttribute("data-theme") === "light";
   // Match the embedded TradingView candles/grid/background to our own design tokens
   // (bull #22C55E, bear #EF4444) instead of TradingView's default red/green, so the
   // chart doesn't look like a bolted-on widget against the rest of the dashboard.
-  const overrides = {
+  return {
     "paneProperties.background": isLight ? "#FFFFFF" : "#10141B",
     "paneProperties.backgroundType": "solid",
     "paneProperties.vertGridProperties.color": isLight ? "#E3E7EE" : "#1A2029",
@@ -4313,44 +4424,80 @@ function buildChartEmbedUrl(symbol, intervalMin, includeEmas){
     "mainSeriesProperties.candleStyle.wickUpColor": "#22C55E",
     "mainSeriesProperties.candleStyle.wickDownColor": "#EF4444"
   };
+}
 
-  // EMA 9/20/50 overlay — shown on every TradingView chart (this widget-embed
-  // path, used for regular stock charts and ETF charts alike; the admin
-  // quad-chart is a separately self-drawn canvas and isn't affected).
-  let studies = "[]";
-  let studiesOverrides = "{}";
-  if(includeEmas){
-    studies = JSON.stringify(["MAExp@tv-basicstudies", "MAExp@tv-basicstudies", "MAExp@tv-basicstudies"]);
-    studiesOverrides = JSON.stringify({
-      "MAExp@tv-basicstudies.length": 9,
-      "MAExp@tv-basicstudies.plot.color": "#F59E0B",
-      "MAExp@tv-basicstudies@1.length": 20,
-      "MAExp@tv-basicstudies@1.plot.color": "#3B82F6",
-      "MAExp@tv-basicstudies@2.length": 50,
-      "MAExp@tv-basicstudies@2.plot.color": "#EC4899"
-    });
+// TradingView's simple iframe embed (widgetembed URL + studies_overrides) can
+// only apply ONE override value per indicator TYPE — it has no way to give
+// three instances of the same EMA study three different lengths (this is
+// exactly why 9/20/50 wasn't rendering correctly before). Getting genuinely
+// distinct EMAs requires the full JS widget constructor plus its
+// createStudy() API, which supports true per-instance overrides. That means
+// loading tv.js and building a real TradingView.widget() instead of an
+// <iframe src="...">.
+let tvScriptPromise = null;
+function loadTradingViewScript(){
+  if(window.TradingView) return Promise.resolve();
+  if(tvScriptPromise) return tvScriptPromise;
+  tvScriptPromise = new Promise((resolve, reject) => {
+    const script = document.createElement("script");
+    script.src = "https://s3.tradingview.com/tv.js";
+    script.onload = resolve;
+    script.onerror = reject;
+    document.head.appendChild(script);
+  });
+  return tvScriptPromise;
+}
+
+async function renderPlainTvChart(symbol, intervalMin, includeEmas){
+  const container = document.getElementById("tvChartContainer");
+  container.classList.remove("chart-quad-grid");
+  container.innerHTML = "";
+  const isLight = document.documentElement.getAttribute("data-theme") === "light";
+
+  try {
+    await loadTradingViewScript();
+  } catch(e){
+    showChartMsg("Couldn't load the chart engine — check your connection and try again.", "bi-wifi-off");
+    return;
   }
 
-  const params = new URLSearchParams({
+  const widget = new TradingView.widget({
+    autosize: true,
     symbol: tvSymbol(symbol),
     interval: intervalMin,
-    hidesidetoolbar: "0",
-    symboledit: "1",
-    saveimage: "0",
-    toolbarbg: isLight ? "F3F5F8" : "141922",
-    studies: studies,
+    timezone: "Asia/Kolkata",
     theme: isLight ? "light" : "dark",
     style: "1",
-    timezone: "Asia/Kolkata",
-    withdateranges: "1",
-    hideideas: "1",
-    studies_overrides: studiesOverrides,
-    overrides: JSON.stringify(overrides),
-    enabled_features: "[]",
-    disabled_features: "[]",
-    locale: "en"
+    locale: "en",
+    toolbar_bg: isLight ? "#F3F5F8" : "#141922",
+    enable_publishing: false,
+    hide_side_toolbar: false,
+    withdateranges: true,
+    hideideas: true,
+    save_image: false,
+    studies: includeEmas ? ["MAExp@tv-basicstudies"] : [],
+    studies_overrides: includeEmas ? {
+      "moving average exponential.length": 9,
+      "moving average exponential.plot.color": "#F59E0B"
+    } : {},
+    overrides: chartColorOverrides(),
+    container_id: "tvChartContainer",
   });
-  return `https://s.tradingview.com/widgetembed/?${params.toString()}`;
+
+  widget.onChartReady(() => {
+    hideChartMsg();
+    if(!includeEmas) return;
+    // The base EMA(9) came in via studies/studies_overrides above (the one
+    // reliable path for a single instance). The 20 and 50 lengths get added
+    // as separate instances via createStudy, which is the only API that
+    // actually accepts a distinct length per instance of the same indicator.
+    try {
+      widget.activeChart().createStudy("Moving Average Exponential", false, false, { length: 20 }, { "plot.color": "#3B82F6" });
+      widget.activeChart().createStudy("Moving Average Exponential", false, false, { length: 50 }, { "plot.color": "#EC4899" });
+    } catch(e){
+      console.warn("EMA 20/50 overlay failed:", e);
+    }
+  });
 }
 
 /* =====================================================================
@@ -4409,6 +4556,45 @@ function drawQuadPanel(canvas, candles, opts){
   // divider between price area and volume area
   ctx.strokeStyle = gridColor; ctx.lineWidth = 1;
   ctx.beginPath(); ctx.moveTo(0, priceH + 0.5); ctx.lineTo(w, priceH + 0.5); ctx.stroke();
+
+  // Price axis — this was missing entirely before (only a hover tooltip
+  // existed). Draw a handful of evenly-spaced horizontal gridlines with
+  // their price labels along the right edge, plus a highlighted line at
+  // the last close so the current price is always visible at a glance.
+  const textColor = cssVar("--text-muted") || "#8D96A6";
+  const labelBg = cssVar("--bg-raised") || "#10141B";
+  ctx.save();
+  ctx.font = "10px 'IBM Plex Mono', monospace";
+  ctx.textBaseline = "middle";
+  const priceSteps = 4;
+  for(let i = 0; i <= priceSteps; i++){
+    const v = lo + ((hi - lo) * i) / priceSteps;
+    const py = y(v);
+    ctx.strokeStyle = gridColor; ctx.lineWidth = 1; ctx.setLineDash([2, 3]);
+    ctx.beginPath(); ctx.moveTo(0, py); ctx.lineTo(w - 4, py); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = textColor; ctx.textAlign = "right";
+    ctx.fillText(v.toFixed(v >= 1000 ? 0 : 2), w - 4, py);
+  }
+  ctx.restore();
+
+  // Last price — highlighted so today's/current close stands out from the
+  // rest of the scale, same idea as a live ticker price line.
+  const lastClose = candles[candles.length - 1].c;
+  const lastY = y(lastClose);
+  const lastColor = candles[candles.length - 1].c >= candles[candles.length - 1].o ? bull : bear;
+  ctx.save();
+  ctx.strokeStyle = lastColor; ctx.lineWidth = 1; ctx.setLineDash([3, 3]);
+  ctx.beginPath(); ctx.moveTo(0, lastY); ctx.lineTo(w, lastY); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.font = "bold 10px 'IBM Plex Mono', monospace";
+  const priceLabel = lastClose.toFixed(lastClose >= 1000 ? 0 : 2);
+  const labelW = ctx.measureText(priceLabel).width + 8;
+  ctx.fillStyle = lastColor;
+  ctx.fillRect(w - labelW, lastY - 8, labelW, 16);
+  ctx.fillStyle = "#fff"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  ctx.fillText(priceLabel, w - labelW / 2, lastY + 0.5);
+  ctx.restore();
 
   // ORB dashed break lines
   if(orbHigh != null){
@@ -4522,12 +4708,8 @@ function renderQuadChart(data){
 async function loadChart(symbol, forcePlain){
   if(forcePlain){
     showChartMsg("Loading chart…", "bi-hourglass-split");
-    const container = document.getElementById("tvChartContainer");
-    container.classList.remove("chart-quad-grid");
     const intervalMin = document.getElementById("chartIntervalSelect").value;
-    container.innerHTML = `<iframe src="${buildChartEmbedUrl(symbol, intervalMin, true)}" allowtransparency="true"></iframe>`;
-    document.getElementById("tvChartContainer").querySelector("iframe").addEventListener("load", hideChartMsg);
-    setTimeout(hideChartMsg, 1500); // fallback in case the iframe's own load event doesn't fire
+    await renderPlainTvChart(symbol, intervalMin, true);
     return;
   }
 
@@ -4649,6 +4831,7 @@ document.getElementById("chartBreaklogCloseBtn").addEventListener("click", close
 
 function openChartModal(symbol, forcePlain){
   currentChartSymbol = symbol;
+  currentChartForcePlain = !!forcePlain;
   const row = findRowForSymbol(symbol);
   document.getElementById("chartTitle").textContent = symbol;
   document.getElementById("chartSub").textContent = row
@@ -4657,6 +4840,7 @@ function openChartModal(symbol, forcePlain){
   document.getElementById("chartOpenTv").href = `https://www.tradingview.com/chart/?symbol=${encodeURIComponent(tvSymbol(symbol))}`;
   document.getElementById("chartIntervalSelect").style.display = forcePlain ? "" : "none";
   if(forcePlain) document.getElementById("chartIntervalSelect").value = "D"; // ETFs: plain daily chart, no ORB/DRB context to pick a shorter default from
+  document.getElementById("chartBreaklogToggleBtn").style.display = forcePlain ? "none" : "";
   renderChartBreakSummary(row);
   renderChartLevels(row);
   closeChartPopovers();
@@ -4676,10 +4860,10 @@ document.getElementById("chartOverlay").addEventListener("click", function(e){
   if(e.target === this) closeChartModal();
 });
 document.getElementById("chartReloadBtn").addEventListener("click", function(){
-  if(currentChartSymbol) loadChart(currentChartSymbol);
+  if(currentChartSymbol) loadChart(currentChartSymbol, currentChartForcePlain);
 });
 document.getElementById("chartIntervalSelect").addEventListener("change", function(){
-  if(currentChartSymbol) loadChart(currentChartSymbol);
+  if(currentChartSymbol) loadChart(currentChartSymbol, currentChartForcePlain);
 });
 
 /* ---------------- Live clock ---------------- */
@@ -4793,6 +4977,8 @@ async function fetchLiveData(){
 
     orbRows = orbData.map(r => mapApiRowToTableRow(r, "ORB"));
     drbRows = drbData.map(r => mapApiRowToTableRow(r, "DRB"));
+    checkForNewBreaksAndAlert("ORB", orbRows);
+    checkForNewBreaksAndAlert("DRB", drbRows);
 
     if(idxRes.ok){
       const idxData = await idxRes.json();
@@ -5079,6 +5265,76 @@ document.querySelectorAll("#scanModeSection .scan-mode-btn").forEach(btn => {
 
 // Refresh scan-mode info whenever Settings is opened
 document.getElementById("settingsBtn")?.addEventListener("click", refreshScanModeUI);
+
+/* ---------------- Email Alerts ---------------- */
+async function loadEmailConfig(){
+  const base = getBackendUrl();
+  if(!base) return;
+  try {
+    const res = await fetch(base + "/email-config");
+    if(!res.ok) return;
+    const data = await res.json();
+    document.getElementById("emailToInput").value = data.to || "";
+    if(!data.configured){
+      const msg = document.getElementById("emailAlertsMsg");
+      msg.textContent = "EMAIL_FROM / EMAIL_APP_PASSWORD aren't set on the server yet — sending will fail until configured.";
+      msg.style.color = "var(--text-muted)";
+      msg.style.display = "block";
+    }
+  } catch(err){
+    // settings panel just won't prefill the address until reachable
+  }
+}
+document.getElementById("settingsBtn")?.addEventListener("click", loadEmailConfig);
+
+document.getElementById("emailToSaveBtn").addEventListener("click", async function(){
+  const base = getBackendUrl();
+  const msg = document.getElementById("emailAlertsMsg");
+  const to = document.getElementById("emailToInput").value.trim();
+  if(!base){ msg.textContent = "Set your Live Data Source first."; msg.style.color = "var(--bear)"; msg.style.display = "block"; return; }
+  try {
+    const res = await fetch(base + "/email-config", {
+      method: "POST", headers: adminHeaders(), body: JSON.stringify({ to })
+    });
+    const data = await res.json();
+    if(!data.success){
+      msg.textContent = data.error === "unauthorized" ? "Admin PIN check failed — try logging out and back in." : data.error === "invalid_email" ? "Enter a valid email address." : "Couldn't save that.";
+      msg.style.color = "var(--bear)";
+    } else {
+      msg.textContent = `Saved — alerts will go to ${data.to}.`;
+      msg.style.color = "var(--bull)";
+    }
+    msg.style.display = "block";
+  } catch(err){
+    msg.textContent = "Couldn't reach the server to save this.";
+    msg.style.color = "var(--bear)";
+    msg.style.display = "block";
+  }
+});
+
+document.getElementById("emailEtfSendBtn").addEventListener("click", async function(){
+  const base = getBackendUrl();
+  const msg = document.getElementById("emailAlertsMsg");
+  const btn = this;
+  if(!base){ msg.textContent = "Set your Live Data Source first."; msg.style.color = "var(--bear)"; msg.style.display = "block"; return; }
+  btn.disabled = true;
+  btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Sending…';
+  try {
+    const res = await fetch(base + "/email/etf-buy-list", { method: "POST", headers: adminHeaders() });
+    const data = await res.json();
+    msg.textContent = data.success ? data.message : (data.error === "unauthorized" ? "Admin PIN check failed — try logging out and back in." : data.message || "Send failed.");
+    msg.style.color = data.success ? "var(--bull)" : "var(--bear)";
+    msg.style.display = "block";
+  } catch(err){
+    msg.textContent = "Couldn't reach the server to send this.";
+    msg.style.color = "var(--bear)";
+    msg.style.display = "block";
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="bi bi-envelope"></i> Send ETF Buy List Now';
+  }
+});
+
 
 /* ---------------- Strategy Focus ----------------
    Server-side setting (see /strategy-focus in main.py) — applies to
