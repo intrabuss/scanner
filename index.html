@@ -274,7 +274,6 @@ img, svg{ max-width:100%; }
   font-size:12px; font-weight:600;
   border:1px solid; cursor:default; position:relative;
 }
-.status-pill.closed{ cursor:pointer; }
 .status-pill.open{ background:var(--bull-dim); color:var(--bull); border-color:rgba(34,197,94,.35); }
 .status-pill.closed{ background:var(--bear-dim); color:var(--bear); border-color:rgba(239,68,68,.35); }
 .status-dot{ width:6px; height:6px; border-radius:50%; background:currentColor; }
@@ -494,6 +493,15 @@ html[data-theme="light"] .avatar{ background:linear-gradient(160deg,#E3E7EE,#F3F
 
 .sym{ font-weight:700; font-family:var(--font-data); font-size:13px; }
 .sym-sub{ font-size:11px; color:var(--text-muted); margin-top:1px; }
+
+/* Row action icons — copy symbol, pin/watchlist, quick position-sizing */
+.row-action-icons{ display:inline-flex; align-items:center; gap:7px; margin-left:7px; vertical-align:middle; }
+.row-action-icon{ font-size:12px; color:var(--text-muted); cursor:pointer; opacity:.55; transition:opacity .12s ease, color .12s ease; }
+.row-action-icon:hover{ opacity:1; color:var(--brand); }
+.row-action-icon.copied{ color:var(--bull); opacity:1; }
+.row-action-icon.pin-btn.pinned{ color:var(--brand); opacity:1; }
+.row-action-icon.size-btn:hover{ color:var(--bull); }
+tr.pinned-row{ background:var(--brand-dim); }
 .cell-sub{ color:var(--text-secondary); }
 
 /* Technical score mini bar */
@@ -1627,8 +1635,12 @@ html.hide-etf #etfSwingSection{ display:none !important; }
 
         <span class="status-pill open" id="marketStatus">
           <span class="status-dot pulse" id="marketStatusDot"></span> <span id="marketStatusLabel">Market Open</span>
-          <div class="market-closed-pop" id="marketClosedPop"></div>
         </span>
+
+        <button class="icon-btn" id="holidayListBtn" title="NSE Holidays 2026" style="position:relative;">
+          <i class="bi bi-calendar-week"></i>
+          <div class="market-closed-pop" id="holidayListPop"></div>
+        </button>
 
         <button class="icon-btn" id="marketBriefBtn" title="Market Brief" style="display:none;">
           <i class="bi bi-stars"></i>
@@ -2625,7 +2637,7 @@ document.getElementById("upstoxLoginBannerBtn").addEventListener("click", functi
     }
   }, 800);
 });
-setInterval(refreshUpstoxLoginBanner, 20000); // catches a login done from Settings, another tab, or the daily routine finishing on its own
+setInterval(throttleWhenHidden(refreshUpstoxLoginBanner, 90000), 20000); // catches a login done from Settings, another tab, or the daily routine finishing on its own
 
 /* ---------------- Admin: manage allowed mobile numbers ---------------- */
 async function renderAdminList(){
@@ -2745,7 +2757,7 @@ async function runBacktest(){
       const t = r.technicals || {};
       return `
         <tr class="rail-${status}">
-          <td><div class="sym sym-link" onclick="openChartModal('${r.symbol}')">${r.symbol} <i class="bi bi-graph-up"></i></div></td>
+          <td><div class="sym sym-link" onclick="openChartModal('${r.symbol}')">${r.symbol} <i class="bi bi-graph-up"></i></div>${copyIconHtml(r.symbol)}</td>
           <td class="cell-sub">${r.name}</td>
           <td class="cell-sub">${r.sector}</td>
           <td class="mono">${r.price.toLocaleString('en-IN')}</td>
@@ -4421,8 +4433,8 @@ function renderSectorTrend(){
 function renderOppTable(bodyId, rows){
   const body = document.querySelector(bodyId);
   body.innerHTML = rows.map(r => `
-    <tr class="rail-${r.status}">
-      <td><div class="sym sym-link" onclick="openChartModal('${r.sym}')">${r.sym} <i class="bi bi-graph-up"></i></div></td>
+    <tr class="rail-${r.status}${pinnedSymbols.has(r.sym) ? ' pinned-row' : ''}">
+      <td><div class="sym sym-link" onclick="openChartModal('${r.sym}')">${r.sym} <i class="bi bi-graph-up"></i></div>${rowActionIconsHtml(r.sym, r.price)}</td>
       <td class="cell-sub">${r.sector}</td>
       <td><span class="chg-txt ${r.chg >= 0 ? 'up' : 'down'}">${r.chg >= 0 ? '+' : ''}${r.chg.toFixed(2)}%</span></td>
       <td class="mono">${r.price.toLocaleString('en-IN')}</td>
@@ -4779,6 +4791,9 @@ function renderExplorer(){
     if(typeof a[k] === "string") return a[k].localeCompare(b[k]) * explorerSort.dir;
     return (a[k] - b[k]) * explorerSort.dir;
   });
+  // Pinned symbols float to the top regardless of sort — stable partition,
+  // so within "pinned" and "unpinned" the chosen sort order is preserved.
+  rows.sort((a,b) => (pinnedSymbols.has(b.sym) ? 1 : 0) - (pinnedSymbols.has(a.sym) ? 1 : 0));
 
   document.getElementById("explorerEmpty").style.display = rows.length ? "none" : "block";
 
@@ -4798,8 +4813,8 @@ function renderExplorer(){
     : `${statScope.length} symbols in ${sector} · sorted by ROVL · flat stocks (<0.5% move) hidden`;
 
   document.getElementById("explorerBody").innerHTML = rows.map(r => `
-    <tr class="rail-${r.status}">
-      <td><div class="sym sym-link" onclick="openChartModal('${r.sym}')">${r.sym} <i class="bi bi-graph-up"></i></div></td>
+    <tr class="rail-${r.status}${pinnedSymbols.has(r.sym) ? ' pinned-row' : ''}">
+      <td><div class="sym sym-link" onclick="openChartModal('${r.sym}')">${r.sym} <i class="bi bi-graph-up"></i></div>${rowActionIconsHtml(r.sym, r.price)}</td>
       <td class="cell-sub">${r.name}</td>
       <td class="cell-sub col-sector">${r.sector}</td>
       <td><span class="chg-txt ${r.chg >= 0 ? 'up' : 'down'}">${r.chg >= 0 ? '+' : ''}${r.chg.toFixed(2)}%</span></td>
@@ -4813,10 +4828,10 @@ function renderExplorer(){
   `).join("");
 
   document.getElementById("explorerCards").innerHTML = rows.map((r, i) => `
-    <div class="exp-card rail-${r.status}">
+    <div class="exp-card rail-${r.status}${pinnedSymbols.has(r.sym) ? ' pinned-row' : ''}">
       <div class="exp-card-top">
         <div>
-          <div class="exp-card-sym">${r.sym}</div>
+          <div class="exp-card-sym">${r.sym}${rowActionIconsHtml(r.sym, r.price)}</div>
           <div class="cell-sub col-sector" style="font-size:11px;">${r.sector}</div>
         </div>
         ${comboChip(r, false)}
@@ -4966,8 +4981,8 @@ function renderLongShort(){
   document.getElementById("lsEmpty").style.display = rows.length ? "none" : "block";
 
   document.getElementById("lsBody").innerHTML = rows.map(r => `
-    <tr class="rail-${lsDirection === 'long' ? 'bull' : 'bear'}">
-      <td><div class="sym sym-link" onclick="openChartModal('${r.sym}')">${r.sym} <i class="bi bi-graph-up"></i></div></td>
+    <tr class="rail-${lsDirection === 'long' ? 'bull' : 'bear'}${pinnedSymbols.has(r.sym) ? ' pinned-row' : ''}">
+      <td><div class="sym sym-link" onclick="openChartModal('${r.sym}')">${r.sym} <i class="bi bi-graph-up"></i></div>${rowActionIconsHtml(r.sym, r.price)}</td>
       <td class="cell-sub">${r.name}</td>
       <td class="cell-sub">${r.sector}</td>
       <td>${strengthBadge(r.sector)}</td>
@@ -5616,21 +5631,100 @@ document.getElementById("chartIntervalSelect").addEventListener("change", functi
   if(currentChartSymbol) loadChart(currentChartSymbol, currentChartForcePlain);
 });
 
+/* ---------------- Row action icons: copy / pin / size-this-trade ---------------- */
+function copySymbol(sym, evt){
+  const btn = evt && evt.currentTarget;
+  const showCopied = () => {
+    if(!btn) return;
+    const original = btn.innerHTML;
+    btn.innerHTML = '<i class="bi bi-check-lg"></i>';
+    btn.classList.add("copied");
+    setTimeout(() => { btn.innerHTML = original; btn.classList.remove("copied"); }, 1000);
+  };
+  const fallbackCopy = () => {
+    const ta = document.createElement("textarea");
+    ta.value = sym; ta.style.position = "fixed"; ta.style.opacity = "0";
+    document.body.appendChild(ta); ta.select();
+    try { document.execCommand("copy"); } catch(e){ /* nothing more we can do */ }
+    document.body.removeChild(ta);
+    showCopied();
+  };
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(sym).then(showCopied).catch(fallbackCopy);
+  } else {
+    fallbackCopy();
+  }
+}
+window.copySymbol = copySymbol;
+
+const PINNED_SYMBOLS_KEY = "ib_pinned_symbols";
+let pinnedSymbols = new Set();
+try { pinnedSymbols = new Set(JSON.parse(localStorage.getItem(PINNED_SYMBOLS_KEY) || "[]")); } catch(e){ pinnedSymbols = new Set(); }
+function savePinnedSymbols(){
+  try { localStorage.setItem(PINNED_SYMBOLS_KEY, JSON.stringify([...pinnedSymbols])); } catch(e){ /* storage full/unavailable */ }
+}
+function togglePinSymbol(sym, evt){
+  if(pinnedSymbols.has(sym)) pinnedSymbols.delete(sym);
+  else pinnedSymbols.add(sym);
+  savePinnedSymbols();
+  const btn = evt && evt.currentTarget;
+  if(btn) btn.classList.toggle("pinned", pinnedSymbols.has(sym));
+  if(typeof renderExplorer === "function" && explorerOverlayIsOpen()) renderExplorer();
+}
+window.togglePinSymbol = togglePinSymbol;
+function explorerOverlayIsOpen(){
+  const el = document.getElementById("explorerOverlay");
+  return el && el.classList.contains("show");
+}
+
+// Opens the Risk Mgmt calculator pre-filled with this row's live price, so
+// sizing a trade you're actually looking at doesn't require re-typing the
+// price by hand.
+function sizeThisTrade(sym, price, evt){
+  if(evt) evt.stopPropagation();
+  document.getElementById("riskMgmtOverlay").classList.add("show");
+  const priceInput = document.getElementById("rmPrice");
+  if(priceInput && price != null){
+    priceInput.value = price;
+    priceInput.dispatchEvent(new Event("input", { bubbles: true }));
+  }
+}
+window.sizeThisTrade = sizeThisTrade;
+
+function rowActionIconsHtml(sym, price){
+  const pinned = pinnedSymbols.has(sym);
+  return `<span class="row-action-icons">` +
+    `<i class="bi bi-clipboard row-action-icon" onclick="copySymbol('${sym}', event)" title="Copy symbol"></i>` +
+    `<i class="bi bi-pin-angle-fill row-action-icon pin-btn${pinned ? ' pinned' : ''}" onclick="togglePinSymbol('${sym}', event)" title="${pinned ? 'Unpin' : 'Pin to top'}"></i>` +
+    `<i class="bi bi-calculator row-action-icon size-btn" onclick="sizeThisTrade('${sym}', ${price != null ? price : 'null'}, event)" title="Size this trade"></i>` +
+    `</span>`;
+}
+function copyIconHtml(sym){
+  return `<i class="bi bi-clipboard row-action-icon" onclick="copySymbol('${sym}', event)" title="Copy symbol"></i>`;
+}
+
 /* ---------------- Live clock ---------------- */
-function renderMarketClosedPopover(now, reason, next, beforeOpenToday){
-  const pop = document.getElementById("marketClosedPop");
+// Full-year holiday list, always available via its own button (not tied to
+// market open/closed state) — highlights whichever holiday is NEXT from
+// today, regardless of whether today itself is a trading day or not.
+function renderHolidayListPopover(now){
+  const pop = document.getElementById("holidayListPop");
   const todayIso = now.toISOString().slice(0,10);
-  const nextIso = next.toISOString().slice(0,10);
-  const nextLabel = beforeOpenToday ? "today at 9:15 AM" : next.toLocaleDateString('en-IN', { weekday:'short', day:'2-digit', month:'short' }) + " at 9:15 AM";
+  // "Next" holiday: the soonest one on/after today. If today itself is a
+  // holiday, that's the one that gets highlighted.
+  const upcoming = NSE_HOLIDAYS_2026.find(iso => iso >= todayIso);
   const rows = NSE_HOLIDAYS_2026.map(iso => {
     const d = new Date(iso + "T00:00:00");
     const label = d.toLocaleDateString('en-IN', { weekday:'short', day:'2-digit', month:'short' });
-    const isToday = iso === todayIso;
-    return `<div class="mcp-holiday-row${isToday ? ' today' : ''}"><span>${NSE_HOLIDAY_NAMES_2026[iso]}</span><span class="mcp-date">${label}</span></div>`;
+    const isNext = iso === upcoming;
+    return `<div class="mcp-holiday-row${isNext ? ' today' : ''}"><span>${NSE_HOLIDAY_NAMES_2026[iso]}</span><span class="mcp-date">${label}</span></div>`;
   }).join("");
+  const nextLabel = upcoming
+    ? new Date(upcoming + "T00:00:00").toLocaleDateString('en-IN', { weekday:'short', day:'2-digit', month:'short' }) + " — " + NSE_HOLIDAY_NAMES_2026[upcoming]
+    : "None remaining this year";
   pop.innerHTML = `
-    <div class="mcp-reason">Closed — ${reason}</div>
-    <div class="mcp-next">Reopens ${nextLabel}</div>
+    <div class="mcp-reason">Next holiday</div>
+    <div class="mcp-next">${nextLabel}</div>
     <div class="mcp-list-label">NSE Holidays 2026</div>
     <div class="mcp-holidays-scroll">${rows}</div>
   `;
@@ -5652,27 +5746,23 @@ function tick(){
   pill.className = "status-pill " + (open ? "open" : "closed");
   document.getElementById("marketStatusDot").className = "status-dot " + (open ? "pulse" : "");
   document.getElementById("marketStatusLabel").textContent = open ? "Market Open" : (reason ? `Market Closed — ${reason}` : "Market Closed");
-
-  if(!open){
-    const todayIsTradingDay = isTradingDay(now);
-    const beforeOpen = todayIsTradingDay && (now.getHours() < 9 || (now.getHours() === 9 && now.getMinutes() < 15));
-    const next = beforeOpen ? now : nextTradingDay(now);
-    renderMarketClosedPopover(now, reason || "After hours", next, beforeOpen);
-  }
 }
 tick();
 setInterval(tick, 1000);
+setInterval(() => renderHolidayListPopover(new Date()), 60000); // keep "next holiday" correct if the popover's left open across a date change
 
+document.getElementById("holidayListBtn").addEventListener("click", function(e){
+  e.stopPropagation();
+  const pop = document.getElementById("holidayListPop");
+  const opening = !pop.classList.contains("show");
+  if(opening) renderHolidayListPopover(new Date());
+  pop.classList.toggle("show", opening);
+});
 document.addEventListener("click", function(e){
-  const pill = document.getElementById("marketStatus");
-  const pop = document.getElementById("marketClosedPop");
-  if(!pill || !pop) return;
-  if(pop.contains(e.target)) return; // clicking inside the popover (e.g. scrolling) shouldn't close it
-  if(pill.contains(e.target) && pill.classList.contains("closed")){
-    pop.classList.toggle("show");
-  } else {
-    pop.classList.remove("show");
-  }
+  const pop = document.getElementById("holidayListPop");
+  if(!pop) return;
+  if(pop.contains(e.target)) return; // clicking inside (e.g. scrolling the list) shouldn't close it
+  if(!document.getElementById("holidayListBtn").contains(e.target)) pop.classList.remove("show");
 });
 
 /* =====================================================================
@@ -5680,6 +5770,31 @@ document.addEventListener("click", function(e){
 ===================================================================== */
 const BACKEND_URL_KEY = "ib_backend_url";
 const DEFAULT_BACKEND_URL = "https://143-110-248-250.nip.io";
+// Wraps a poll function so it still fires on the normal cadence while the
+// tab/screen is active, but skips most ticks while backgrounded (phone
+// locked, app switched away) — cuts battery/data use during the long
+// stretches a trading dashboard sits open but unwatched, without fully
+// stopping (a real breakout alert shouldn't go silent just because the
+// screen's off). Drop-in: wrap the function passed to setInterval, nothing
+// else about that call site (including existing clearInterval calls on the
+// returned timer id) needs to change.
+function throttleWhenHidden(fn, hiddenIntervalMs){
+  let lastRun = 0;
+  return function(...args){
+    if(document.hidden){
+      const now = Date.now();
+      if(now - lastRun < hiddenIntervalMs) return; // skip this tick while backgrounded
+      lastRun = now;
+    }
+    return fn.apply(this, args);
+  };
+}
+
+document.addEventListener("keydown", function(e){
+  if(e.key !== "Escape") return;
+  document.querySelectorAll(".modal-overlay.show").forEach(el => el.classList.remove("show"));
+});
+
 let backendPollTimer = null;
 
 function getBackendUrl(){
@@ -5806,7 +5921,7 @@ function startBackendPolling(){
   fetchLiveData();
   fetchMarketBrief();
   if(backendPollTimer) clearInterval(backendPollTimer);
-  backendPollTimer = setInterval(fetchLiveData, 20000);
+  backendPollTimer = setInterval(throttleWhenHidden(fetchLiveData, 60000), 20000);
 }
 
 document.getElementById("backendUrlSaveBtn").addEventListener("click", function(){
@@ -6009,7 +6124,7 @@ async function refreshScanModeUI(){
       msg.textContent = `Rebuilding for "${data.universe_rebuild.mode === 'nifty500' ? 'Nifty 500' : 'Full Market'}" (started ${data.universe_rebuild.started_at}) — dashboard keeps serving today's existing data meanwhile.`;
       msg.style.color = "var(--text-muted)";
       msg.style.display = "block";
-      if(!scanModePollTimer) scanModePollTimer = setInterval(refreshScanModeUI, 15000);
+      if(!scanModePollTimer) scanModePollTimer = setInterval(throttleWhenHidden(refreshScanModeUI, 60000), 15000);
     } else {
       if(scanModePollTimer){ clearInterval(scanModePollTimer); scanModePollTimer = null; }
       msg.style.display = "none";
@@ -6294,7 +6409,7 @@ updateExplorerAlertToggleUI(); // initial sync so the main switch + test button 
 fetchAndApplyStrategyFocus();
 // Every user (not just admin) re-checks this periodically, so a change
 // the admin makes actually reaches everyone else's already-open tab.
-setInterval(fetchAndApplyStrategyFocus, 20000);
+setInterval(throttleWhenHidden(fetchAndApplyStrategyFocus, 90000), 20000);
 
 
 /* ---------------- Refresh button ---------------- */
@@ -6380,7 +6495,7 @@ function renderEtfSwingTable(){
   tbody.innerHTML = sorted.map(r => `
     <tr>
       <td>
-        <div class="sym sym-link" onclick="openChartModal('${r.symbol}', true)">${r.symbol} <i class="bi bi-graph-up"></i></div>
+        <div class="sym sym-link" onclick="openChartModal('${r.symbol}', true)">${r.symbol} <i class="bi bi-graph-up"></i></div>${copyIconHtml(r.symbol)}
         <div class="cell-sub" style="font-size:11px;">${r.name}</div>
       </td>
       <td class="cell-sub">${r.sector || 'Other'}</td>
@@ -6459,7 +6574,7 @@ document.getElementById("etfSwingRefreshBtn").addEventListener("click", async fu
   // Manual load succeeded — start (or keep) a quiet background refresh so
   // price/volume stay live without re-running the expensive history fetch.
   if(etfSwingData.length && !etfSwingPollTimer){
-    etfSwingPollTimer = setInterval(() => loadEtfSwing(true), 20000);
+    etfSwingPollTimer = setInterval(throttleWhenHidden(() => loadEtfSwing(true), 90000), 20000);
   }
 });
 document.getElementById("etfSwingSectorFilter").addEventListener("change", renderEtfSwingTable);
