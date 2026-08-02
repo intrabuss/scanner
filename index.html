@@ -1777,6 +1777,24 @@ html.hide-etf #etfSwingSection{ display:none !important; }
         <button class="btn-etf-refresh" id="emailEtfSendBtn"><i class="bi bi-envelope"></i> Send ETF Buy List Now</button>
       </div>
       <div id="emailAlertsMsg" style="font-size:11.5px; display:none; margin-top:8px;"></div>
+
+      <div class="settings-divider" style="margin:14px 0;"></div>
+
+      <div class="toggle-row">
+        <div>
+          <div class="toggle-row-title">Auto-send daily</div>
+          <div class="toggle-row-sub">Sends the ETF Buy List automatically every day at the time below.</div>
+        </div>
+        <label class="switch">
+          <input type="checkbox" id="emailScheduleToggle">
+          <span class="switch-slider"></span>
+        </label>
+      </div>
+      <div class="form-field" style="margin-top:10px;">
+        <label for="emailScheduleTime">Send time</label>
+        <input type="time" id="emailScheduleTime" value="09:00">
+      </div>
+      <div id="emailScheduleMsg" style="font-size:11.5px; display:none; margin-top:8px;"></div>
     </div>
     <div id="emailAlertsNonAdminMsg" style="font-size:11.5px; color:var(--text-muted); display:none;">Contact your admin to configure email alerts.</div>
 
@@ -4290,7 +4308,7 @@ function closeExplorer(){
   document.getElementById("explorerOverlay").classList.remove("show");
 }
 
-document.querySelectorAll(".btn-view").forEach(btn => {
+document.querySelectorAll(".btn-view[data-strategy]").forEach(btn => {
   btn.addEventListener("click", () => openExplorer(btn.dataset.strategy));
 });
 document.getElementById("explorerClose").addEventListener("click", closeExplorer);
@@ -5313,7 +5331,7 @@ async function loadEmailConfig(){
     document.getElementById("emailToInput").value = data.to || "";
     if(!data.configured){
       const msg = document.getElementById("emailAlertsMsg");
-      msg.textContent = "EMAIL_FROM / EMAIL_APP_PASSWORD aren't set on the server yet — sending will fail until configured.";
+      msg.textContent = "No email provider configured on the server yet (RESEND_API_KEY or EMAIL_FROM/EMAIL_APP_PASSWORD) — sending will fail until set.";
       msg.style.color = "var(--text-muted)";
       msg.style.display = "block";
     }
@@ -5370,6 +5388,50 @@ document.getElementById("emailEtfSendBtn").addEventListener("click", async funct
     btn.innerHTML = '<i class="bi bi-envelope"></i> Send ETF Buy List Now';
   }
 });
+
+/* ---------------- Email Alerts: daily auto-send schedule ---------------- */
+async function loadEmailSchedule(){
+  const base = getBackendUrl();
+  if(!base) return;
+  try {
+    const res = await fetch(base + "/email-schedule");
+    if(!res.ok) return;
+    const data = await res.json();
+    document.getElementById("emailScheduleToggle").checked = !!data.enabled;
+    if(data.time) document.getElementById("emailScheduleTime").value = data.time;
+  } catch(err){
+    // settings panel just won't prefill the schedule until reachable
+  }
+}
+document.getElementById("settingsBtn")?.addEventListener("click", loadEmailSchedule);
+
+async function saveEmailSchedule(){
+  const base = getBackendUrl();
+  const msg = document.getElementById("emailScheduleMsg");
+  const enabled = document.getElementById("emailScheduleToggle").checked;
+  const scheduleTime = document.getElementById("emailScheduleTime").value || "09:00";
+  if(!base){ msg.textContent = "Set your Live Data Source first."; msg.style.color = "var(--bear)"; msg.style.display = "block"; return; }
+  try {
+    const res = await fetch(base + "/email-schedule", {
+      method: "POST", headers: adminHeaders(), body: JSON.stringify({ enabled, time: scheduleTime })
+    });
+    const data = await res.json();
+    if(!data.success){
+      msg.textContent = data.error === "unauthorized" ? "Admin PIN check failed — try logging out and back in." : data.error === "invalid_time" ? "Enter a valid time." : "Couldn't save that.";
+      msg.style.color = "var(--bear)";
+    } else {
+      msg.textContent = data.enabled ? `Auto-send is ON — daily at ${data.time}.` : "Auto-send is OFF.";
+      msg.style.color = "var(--bull)";
+    }
+    msg.style.display = "block";
+  } catch(err){
+    msg.textContent = "Couldn't reach the server to save this.";
+    msg.style.color = "var(--bear)";
+    msg.style.display = "block";
+  }
+}
+document.getElementById("emailScheduleToggle").addEventListener("change", saveEmailSchedule);
+document.getElementById("emailScheduleTime").addEventListener("change", saveEmailSchedule);
 
 
 /* ---------------- Strategy Focus ----------------
