@@ -676,6 +676,39 @@ html[data-theme="light"] .avatar{ background:linear-gradient(160deg,#E3E7EE,#F3F
   .sector-graph-cell{ width:14px; height:24px; }
 }
 
+/* Sector Breadth module — independent of the composite score/classification
+   above (which stays the single source of truth for BUY/SELL/WATCH and
+   STRONG/WEAK/NEUTRAL). This is a second, purely visual read of how many
+   of the 10 named indicators + relative volume are passing right now
+   (snapshot row) and how that breadth has built or faded across the
+   session (strip beneath). Hue always comes from sectorStatusMap (the
+   existing composite classification) — green=bull, red=bear; a NEUTRAL
+   sector never gets a hue here, only gray opacity, so this can't visually
+   imply a direction the composite score hasn't actually confirmed. */
+.breadth-snapshot{ display:flex; gap:2px; align-items:center; margin-bottom:4px; }
+.breadth-snapshot.empty{ font-size:11px; color:var(--text-muted); font-style:italic; }
+.breadth-box{
+  width:7px; height:14px; border-radius:2px; flex-shrink:0;
+  background:var(--text-secondary); transition:opacity .15s ease;
+}
+.breadth-box.bull{ background:var(--bull); }
+.breadth-box.bear{ background:var(--bear); }
+.breadth-box.neutral{ background:var(--text-secondary); }
+
+.breadth-strip{ display:flex; gap:1px; align-items:flex-end; height:18px; }
+.breadth-bar{
+  width:3px; border-radius:1px 1px 0 0; flex-shrink:0; align-self:flex-end;
+  background:var(--text-secondary); transition:.15s ease;
+}
+.breadth-bar.bull{ background:var(--bull); }
+.breadth-bar.bear{ background:var(--bear); }
+.breadth-bar.neutral{ background:var(--text-secondary); }
+.breadth-bar.now{ outline:1px solid var(--text-primary); outline-offset:0; }
+@media (max-width: 767.98px){
+  .breadth-box{ width:9px; height:18px; }
+  .breadth-strip{ height:22px; }
+}
+
 /* ============ LOGIN GATE ============ */
 .login-gate{
   position:fixed; inset:0; z-index:1000; background:var(--bg-base);
@@ -1596,6 +1629,7 @@ html.hide-etf #etfSwingSection{ display:none !important; }
             <th>Sector</th>
             <th>% Change</th>
             <th>Trend</th>
+            <th>Breadth <i class="bi bi-info-circle" style="font-size:11px; opacity:.6;" title="Live indicator breadth — separate live-vs-daily-technical read, updates every 3 min. Can differ from the Status badge, which only moves when the composite score crosses its thresholds."></i></th>
             <th>Status</th>
             <th>Explore</th>
           </tr>
@@ -3943,6 +3977,134 @@ function renderSectorGraph(name){
   ).join("") + `</div>`;
 }
 
+/* ---------------- Sector Breadth module ----------------
+   Independent from the composite score/classification above — reads only
+   sectorStatusMap[name] for color; every other number here is computed
+   fresh from the backend's per-stock `indicators` dict (added alongside
+   this) and never touches the composite sum. Two views:
+   - SNAPSHOT: 11 fixed boxes (10 named indicators + relative volume
+     strength) — "what fraction of this sector's stocks pass this flag
+     right now." Frozen/updated once per 3-min bucket, not every 20s poll,
+     so the row doesn't flicker on ordinary noise.
+   - HISTORY STRIP: one bar per 3-min bucket, height/opacity scaling with
+     average breadth (0-1) — lets you see breadth building or fading
+     across the session, which a snapshot alone can't show. Isolated from
+     sectorHistory (the composite-badge strip above) — separate array,
+     separate localStorage key, nothing shared. */
+const SECTOR_BREADTH_KEY_PREFIX = "ib_sector_breadth_";
+const SECTOR_BREADTH_SAMPLE_MINUTES = 3;
+const SECTOR_BREADTH_MAX_POINTS = 100;
+const BREADTH_INDICATOR_LABELS = {
+  above_ema9:    "Above EMA9",
+  supertrend_up: "Supertrend Up",
+  macd_bull:     "MACD Bullish",
+  rsi_above_50:  "RSI > 55",
+  above_pivot:   "Above Pivot",
+  gap_positive:  "Gap Up",
+  broke_bullish: "Broke Bullish",
+  adx_strong:    "ADX > 25 (Strong Trend)",
+  rvol_strong:   "RVOL > 1.5x",
+  chg_positive:  "Chg % Positive",
+};
+const BREADTH_KEYS = Object.keys(BREADTH_INDICATOR_LABELS); // fixed order for display
+
+let sectorBreadthSnapshot = {};  // { sectorName: { <key>: fraction0to1|null, rovl: fraction0to1 } } — frozen per 3-min bucket
+let sectorBreadthHistory = {};   // { sectorName: [{t:"HH:MM", avgBreadth: fraction0to1|null}, ...] }
+let lastSectorBreadthBucket = null;
+
+function loadSectorBreadthHistory(){
+  const key = SECTOR_BREADTH_KEY_PREFIX + todayDateKey();
+  try {
+    Object.keys(localStorage)
+      .filter(k => k.startsWith(SECTOR_BREADTH_KEY_PREFIX) && k !== key)
+      .forEach(k => localStorage.removeItem(k)); // drop prior days' strips
+    const raw = localStorage.getItem(key);
+    sectorBreadthHistory = raw ? JSON.parse(raw) : {};
+  } catch(e){ sectorBreadthHistory = {}; }
+}
+function saveSectorBreadthHistory(){
+  try { localStorage.setItem(SECTOR_BREADTH_KEY_PREFIX + todayDateKey(), JSON.stringify(sectorBreadthHistory)); }
+  catch(e){ /* storage full/unavailable — breadth strip just won't persist across refreshes */ }
+}
+loadSectorBreadthHistory();
+
+function sectorBreadthBucketKey(now){
+  const m = now.getMinutes();
+  const bucketMin = m - (m % SECTOR_BREADTH_SAMPLE_MINUTES);
+  return String(now.getHours()).padStart(2,"0") + ":" + String(bucketMin).padStart(2,"0");
+}
+
+// Real per-indicator breadth for one sector's rows this poll — what
+// fraction of stocks in the sector currently pass each named flag. This is
+// the granular read the composite score only ever sees blended together.
+function computeSectorBreadth(rows, rovlDiffNorm){
+  const out = {};
+  BREADTH_KEYS.forEach(k => {
+    let passed = 0, total = 0;
+    rows.forEach(r => {
+      if(!r.indicators) return; // backend hasn't sent indicators yet — leave null, not 0
+      total++;
+      if(r.indicators[k]) passed++;
+    });
+    out[k] = total ? passed / total : null;
+  });
+  out.rovl = rovlDiffNorm; // already 0-1 normalized across sectors (from the composite pass)
+  return out;
+}
+
+function sampleSectorBreadth(sectorAgg, breadthBySector){
+  // Snapshot always holds the latest computed breadth (updated every poll)...
+  sectorAgg.forEach(sc => { sectorBreadthSnapshot[sc.name] = breadthBySector[sc.name]; });
+  // ...but the history strip only appends once per 3-min bucket, same
+  // pattern as the existing 5-min composite-status sampler.
+  const now = new Date();
+  const bucket = sectorBreadthBucketKey(now);
+  if(bucket === lastSectorBreadthBucket) return;
+  lastSectorBreadthBucket = bucket;
+  sectorAgg.forEach(sc => {
+    const b = breadthBySector[sc.name];
+    const vals = BREADTH_KEYS.map(k => b[k]).filter(v => v != null);
+    const avgBreadth = vals.length ? vals.reduce((a,v)=>a+v,0) / vals.length : null;
+    const hist = sectorBreadthHistory[sc.name] || (sectorBreadthHistory[sc.name] = []);
+    if(hist.length && hist[hist.length - 1].t === bucket) return;
+    hist.push({ t: bucket, avgBreadth });
+    if(hist.length > SECTOR_BREADTH_MAX_POINTS) hist.shift();
+  });
+  saveSectorBreadthHistory();
+}
+
+function renderSectorBreadthSnapshot(name){
+  const snap = sectorBreadthSnapshot[name];
+  if(!snap) return `<div class="breadth-snapshot empty">Building…</div>`;
+  const status = sectorStatusMap[name] || "neutral";
+  const boxes = [...BREADTH_KEYS, "rovl"].map(k => {
+    const lbl = k === "rovl" ? "Relative Volume Strength" : BREADTH_INDICATOR_LABELS[k];
+    const v = snap[k];
+    const pct = v == null ? null : Math.round(v * 100);
+    // Opacity conveys pass fraction; hue never changes across the row for
+    // a given sector — it comes from the sector's own composite status.
+    const opacity = v == null ? 0.10 : (0.15 + 0.85 * v);
+    return `<span class="breadth-box ${status}" style="opacity:${opacity.toFixed(2)}" title="${lbl}: ${pct == null ? 'no data yet' : pct + '% of sector'}"></span>`;
+  }).join("");
+  return `<div class="breadth-snapshot">${boxes}</div>`;
+}
+
+function renderSectorBreadthStrip(name){
+  const hist = sectorBreadthHistory[name];
+  if(!hist || !hist.length) return `<span class="sector-graph-empty">Building…</span>`;
+  const status = sectorStatusMap[name] || "neutral";
+  return `<div class="breadth-strip">` + hist.map((p, i) => {
+    const h = p.avgBreadth == null ? 3 : Math.max(3, Math.round(p.avgBreadth * 18));
+    const opacity = p.avgBreadth == null ? 0.15 : (0.25 + 0.75 * p.avgBreadth);
+    const pct = p.avgBreadth == null ? 'no data' : Math.round(p.avgBreadth * 100) + '% breadth';
+    return `<span class="breadth-bar ${status}${i === hist.length - 1 ? ' now' : ''}" style="height:${h}px; opacity:${opacity.toFixed(2)}" title="${p.t} — ${pct}"></span>`;
+  }).join("") + `</div>`;
+}
+
+function renderSectorBreadth(name){
+  return renderSectorBreadthSnapshot(name) + renderSectorBreadthStrip(name);
+}
+
 function updateSectorTimeWindow(){
   const el = document.getElementById("sectorTimeWindow");
   if(!el) return;
@@ -4014,6 +4176,14 @@ function renderSectorTrend(){
     };
   });
 
+  // Per-indicator breadth for the heatmap module — separate from
+  // compositeScore/indicatorScore above, which only ever see a blended
+  // average. This keeps the named, per-flag detail the heatmap needs.
+  const breadthBySector = {};
+  sectorAgg.forEach((sc, i) => {
+    breadthBySector[sc.name] = computeSectorBreadth(bySector[sc.name] || [], sc.rovlDiffNorm);
+  });
+
   // Rotation effect: re-sort every cycle so the grid visibly reshuffles as
   // sectors rotate. Group first by classification (STRONG block, then
   // NEUTRAL, then WEAK) so a NEUTRAL sector can never sit above a STRONG one
@@ -4029,6 +4199,7 @@ function renderSectorTrend(){
   sectorAgg.forEach(sc => { sectorStatusMap[sc.name] = sc.status; });
 
   sampleSectorHistory(sectorAgg);
+  sampleSectorBreadth(sectorAgg, breadthBySector);
   updateSectorTimeWindow();
 
   document.getElementById("sectorCount").textContent = sectorAgg.length + " sectors";
@@ -4038,6 +4209,7 @@ function renderSectorTrend(){
       <td style="font-weight:600;">${sc.name}</td>
       <td><span class="chg-txt ${sc.avgChg >= 0 ? 'up' : 'down'}">${sc.avgChg >= 0 ? '+' : ''}${sc.avgChg.toFixed(2)}%</span></td>
       <td>${renderSectorGraph(sc.name)}</td>
+      <td>${renderSectorBreadth(sc.name)}</td>
       <td><span class="badge-status ${sc.status}" title="Composite ${sc.compositeScore.toFixed(2)} · Indicators ${Math.round(sc.indicatorScore*100)}% · ROVL ${sc.rovlDiff >= 0 ? '+' : ''}${sc.rovlDiff.toFixed(2)} vs avg"><span class="dot"></span>${label(sc.status)}</span></td>
       <td>
         <div class="sector-jump">
