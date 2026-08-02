@@ -1080,6 +1080,15 @@ html.breaklog-hidden .break-log-cell,
 html.breaklog-hidden th.col-breaklog,
 html.breaklog-hidden .exp-card-breaklog{ display:none !important; }
 
+/* Strategy Focus (admin) — hides one strategy's UI surface entirely when
+   the admin wants the dashboard scoped to just ORB or just DRB */
+html.hide-orb #orbStrategyCard,
+html.hide-orb .sector-jump-btn.orb{ display:none !important; }
+html.hide-drb #drbStrategyCard,
+html.hide-drb .sector-jump-btn.drb{ display:none !important; }
+html.hide-orb .sector-jump,
+html.hide-drb .sector-jump{ display:flex; }
+
 /* ---- Toggle switch (used for Break Log visibility, etc.) ---- */
 .toggle-row{
   display:flex; align-items:center; justify-content:space-between; gap:14px;
@@ -1345,7 +1354,7 @@ html.breaklog-hidden .exp-card-breaklog{ display:none !important; }
       <div class="section-title">Live Strategies</div>
     </div>
     <div class="row g-3">
-      <div class="col-12 col-md-6">
+      <div class="col-12 col-md-6" id="orbStrategyCard">
         <div class="card-x strategy-card">
           <div class="strategy-top">
             <div class="strategy-icon"><i class="bi bi-box-arrow-in-up-right"></i></div>
@@ -1362,7 +1371,7 @@ html.breaklog-hidden .exp-card-breaklog{ display:none !important; }
         </div>
       </div>
 
-      <div class="col-12 col-md-6">
+      <div class="col-12 col-md-6" id="drbStrategyCard">
         <div class="card-x strategy-card">
           <div class="strategy-top">
             <div class="strategy-icon"><i class="bi bi-arrows-angle-expand"></i></div>
@@ -1435,6 +1444,24 @@ html.breaklog-hidden .exp-card-breaklog{ display:none !important; }
       </button>
     </div>
     <div id="scanModeMsg" style="font-size:11.5px; display:none; margin-top:8px;"></div>
+
+    <div class="settings-divider"></div>
+
+    <div id="strategyFocusWrap">
+      <div class="modal-section-lbl">Strategy Focus</div>
+      <div style="font-size:11.5px; color:var(--text-muted); margin-bottom:10px;">Scope the whole dashboard to one strategy — hides the other's card and Sector Trend buttons everywhere</div>
+      <div class="scan-mode-toggle" id="strategyFocusSection" style="grid-template-columns:1fr 1fr 1fr;">
+        <button type="button" class="scan-mode-btn" id="strategyFocusBothBtn" data-focus="both">
+          <div class="scan-mode-title">Both</div>
+        </button>
+        <button type="button" class="scan-mode-btn" id="strategyFocusOrbBtn" data-focus="orb">
+          <div class="scan-mode-title">ORB Only</div>
+        </button>
+        <button type="button" class="scan-mode-btn" id="strategyFocusDrbBtn" data-focus="drb">
+          <div class="scan-mode-title">DRB Only</div>
+        </button>
+      </div>
+    </div>
 
     <div class="settings-divider"></div>
 
@@ -1761,6 +1788,7 @@ html.breaklog-hidden .exp-card-breaklog{ display:none !important; }
         <option value="M">1M</option>
       </select>
       <button class="icon-btn" id="chartReloadBtn" title="Reload"><i class="bi bi-arrow-clockwise"></i></button>
+      <button class="chart-popover-toggle" id="chartBreaklogToggleBtn" title="Today's break log"><i class="bi bi-clock-history"></i> Breaks</button>
       <button class="chart-popover-toggle" id="chartNewsToggleBtn" title="Latest news"><i class="bi bi-newspaper"></i> News</button>
       <div class="chart-legend">
         <span class="lg-item"><i class="bi bi-arrow-up-short" style="color:var(--bull);"></i>Buy break</span>
@@ -1769,10 +1797,6 @@ html.breaklog-hidden .exp-card-breaklog{ display:none !important; }
       <a class="btn-link-tv" id="chartOpenTv" href="#" target="_blank" rel="noopener">
         <i class="bi bi-box-arrow-up-right"></i> Open on TradingView
       </a>
-    </div>
-    <div class="chart-breaklog" id="chartBreaklog" style="display:none;">
-      <div class="chart-breaklog-lbl"><i class="bi bi-clock-history"></i> Today's break log</div>
-      <div class="breaks" id="chartBreakSummary"></div>
     </div>
     <div class="chart-levels" id="chartLevels" style="display:none;">
       <span class="lvl-chip high"><i class="bi bi-arrow-bar-up"></i> <span id="chartLevelHighLbl">High</span> <span class="mono" id="chartLevelHigh">—</span></span>
@@ -1783,6 +1807,15 @@ html.breaklog-hidden .exp-card-breaklog{ display:none !important; }
       <div class="chart-msg" id="chartMsg">
         <i class="bi bi-hourglass-split"></i>
         <div id="chartMsgText">Loading chart…</div>
+      </div>
+      <div class="chart-popover" id="chartBreaklog">
+        <div class="chart-popover-head">
+          <div class="chart-breaklog-lbl" style="margin:0;"><i class="bi bi-clock-history"></i> Today's break log</div>
+          <button type="button" class="icon-btn" id="chartBreaklogCloseBtn"><i class="bi bi-x-lg"></i></button>
+        </div>
+        <div class="chart-popover-body">
+          <div class="breaks" id="chartBreakSummary"></div>
+        </div>
       </div>
       <div class="chart-popover" id="chartNews">
         <div class="chart-popover-head">
@@ -1868,6 +1901,7 @@ function showApp(session){
   document.getElementById("adminDivider").style.display = isAdmin ? "block" : "none";
   document.getElementById("adminSection").style.display = isAdmin ? "block" : "none";
   document.getElementById("liveDataSourceSection").style.display = isAdmin ? "block" : "none";
+  document.getElementById("strategyFocusWrap").style.display = isAdmin ? "block" : "none";
   if(isAdmin) renderAdminList();
 
   const roleBadge = document.getElementById("roleBadge");
@@ -3895,6 +3929,20 @@ function renderQuadChart(data){
 }
 
 async function loadChart(symbol){
+  const session = getSession();
+  const isAdmin = session && session.mobile === ADMIN_MOBILE;
+
+  if(!isAdmin){
+    showChartMsg("Loading chart…", "bi-hourglass-split");
+    const container = document.getElementById("tvChartContainer");
+    container.classList.remove("chart-quad-grid");
+    const intervalMin = document.getElementById("chartIntervalSelect").value;
+    container.innerHTML = `<iframe src="${buildChartEmbedUrl(symbol, intervalMin)}" allowtransparency="true"></iframe>`;
+    document.getElementById("tvChartContainer").querySelector("iframe").addEventListener("load", hideChartMsg);
+    setTimeout(hideChartMsg, 1500); // fallback in case the iframe's own load event doesn't fire
+    return;
+  }
+
   showChartMsg("Loading chart…", "bi-hourglass-split");
   const container = document.getElementById("tvChartContainer");
   container.classList.add("chart-quad-grid");
@@ -3916,17 +3964,14 @@ async function loadChart(symbol){
 }
 
 function renderChartBreakSummary(row){
-  const panel = document.getElementById("chartBreaklog");
   const el = document.getElementById("chartBreakSummary");
   if(!row || !row.breakLog || !row.breakLog.length){
     el.innerHTML = '<span style="color:var(--text-muted); font-size:12px;">No breaks logged yet today.</span>';
-    panel.style.display = "block";
     return;
   }
   el.innerHTML = row.breakLog.map(e => `
     <span class="brk-chip ${e.dir}"><i class="bi ${e.dir === 'up' ? 'bi-arrow-up-short' : 'bi-arrow-down-short'}"></i>${e.time} · ${e.rvol}x</span>
   `).join("");
-  panel.style.display = "block";
 }
 
 function renderChartLevels(row){
@@ -3989,28 +4034,40 @@ async function loadChartNews(symbol){
   }
 }
 
+const CHART_POPOVERS = {
+  chartNews: "chartNewsToggleBtn",
+  chartBreaklog: "chartBreaklogToggleBtn",
+};
 function toggleChartPopover(id){
   const panel = document.getElementById(id);
-  const btn = document.getElementById("chartNewsToggleBtn");
+  const btn = document.getElementById(CHART_POPOVERS[id]);
   const willShow = !panel.classList.contains("show");
+  closeChartPopovers();
   panel.classList.toggle("show", willShow);
   btn.classList.toggle("active", willShow);
 }
 function closeChartPopovers(){
-  document.getElementById("chartNews").classList.remove("show");
-  document.getElementById("chartNewsToggleBtn").classList.remove("active");
+  Object.entries(CHART_POPOVERS).forEach(([panelId, btnId]) => {
+    document.getElementById(panelId).classList.remove("show");
+    document.getElementById(btnId).classList.remove("active");
+  });
 }
 document.getElementById("chartNewsToggleBtn").addEventListener("click", () => toggleChartPopover("chartNews"));
 document.getElementById("chartNewsCloseBtn").addEventListener("click", closeChartPopovers);
+document.getElementById("chartBreaklogToggleBtn").addEventListener("click", () => toggleChartPopover("chartBreaklog"));
+document.getElementById("chartBreaklogCloseBtn").addEventListener("click", closeChartPopovers);
 
 function openChartModal(symbol){
   currentChartSymbol = symbol;
   const row = findRowForSymbol(symbol);
+  const session = getSession();
+  const isAdmin = session && session.mobile === ADMIN_MOBILE;
   document.getElementById("chartTitle").textContent = symbol;
   document.getElementById("chartSub").textContent = row
     ? `${row.name || ""} · ${row.sector || ""} · ₹${row.price.toLocaleString('en-IN')}`
     : "Live intraday chart";
   document.getElementById("chartOpenTv").href = `https://www.tradingview.com/chart/?symbol=${encodeURIComponent(tvSymbol(symbol))}`;
+  document.getElementById("chartIntervalSelect").style.display = isAdmin ? "none" : "";
   renderChartBreakSummary(row);
   renderChartLevels(row);
   closeChartPopovers();
@@ -4203,6 +4260,24 @@ async function refreshScanModeUI(){
 
 // Refresh scan-mode info whenever Settings is opened
 document.getElementById("settingsBtn")?.addEventListener("click", refreshScanModeUI);
+
+/* ---------------- Strategy Focus (admin) ---------------- */
+function applyStrategyFocus(focus){
+  document.documentElement.classList.toggle("hide-drb", focus === "orb");
+  document.documentElement.classList.toggle("hide-orb", focus === "drb");
+  document.querySelectorAll("#strategyFocusSection .scan-mode-btn").forEach(btn => {
+    btn.classList.toggle("active", btn.dataset.focus === focus);
+  });
+}
+const savedStrategyFocus = localStorage.getItem("strategyFocus") || "both";
+applyStrategyFocus(savedStrategyFocus);
+document.querySelectorAll("#strategyFocusSection .scan-mode-btn").forEach(btn => {
+  btn.addEventListener("click", function(){
+    const focus = this.dataset.focus;
+    localStorage.setItem("strategyFocus", focus);
+    applyStrategyFocus(focus);
+  });
+});
 
 
 /* ---------------- Refresh button ---------------- */
