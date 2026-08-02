@@ -288,6 +288,23 @@ img, svg{ max-width:100%; }
   white-space:nowrap;
 }
 .calc-pill.show{ display:inline-flex; }
+
+.initial-load-overlay{
+  position:fixed; inset:0; z-index:9999;
+  display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px;
+  background:var(--bg-base);
+  transition:opacity .25s ease;
+}
+.initial-load-overlay.hidden{ opacity:0; pointer-events:none; }
+.initial-load-spinner{
+  width:38px; height:38px; border-radius:50%;
+  border:3px solid var(--border-med); border-top-color:var(--brand);
+  animation:loaderRotate .7s linear infinite;
+}
+.initial-load-title{ font-size:14px; font-weight:700; color:var(--text-primary); }
+.initial-load-sub{ font-size:12px; color:var(--text-muted); }
+.initial-load-overlay.error .initial-load-spinner{ display:none; }
+.initial-load-overlay.error .initial-load-title{ color:var(--bear); }
 .calc-dot{
   width:12px; height:12px; border-radius:50%;
   border:2px solid rgba(76,141,255,.3); border-top-color:var(--brand);
@@ -879,6 +896,7 @@ html[data-theme="light"] .avatar{ background:linear-gradient(160deg,#E3E7EE,#F3F
   flex-shrink:0; text-align:center; padding:10px 10px 6px;
   font-size:12.5px; font-weight:700; color:var(--text-secondary); letter-spacing:.01em;
 }
+.chart-quad-stale{ font-weight:600; color:var(--text-muted); text-transform:none; letter-spacing:0; }
 .chart-quad-panel-canvas-wrap{ position:relative; flex:1; min-height:0; padding:0 10px 10px; }
 .chart-quad-panel canvas{ width:100%; height:100%; display:block; cursor:crosshair; }
 .chart-quad-tooltip{
@@ -1219,6 +1237,12 @@ html.hide-drb .sector-jump{ display:flex; }
   <!-- ============ MAIN ============ -->
   <main class="main" id="topOfPage">
 
+    <div class="initial-load-overlay" id="initialLoadOverlay">
+      <div class="initial-load-spinner"></div>
+      <div class="initial-load-title" id="initialLoadTitle">Connecting to your live data source…</div>
+      <div class="initial-load-sub" id="initialLoadSub">First load can take a few seconds</div>
+    </div>
+
     <!-- HEADER -->
     <div class="topbar">
       <div class="brand-lockup">
@@ -1230,7 +1254,7 @@ html.hide-drb .sector-jump{ display:flex; }
 
       <div class="topbar-right">
         <span class="calc-pill" id="calcPill">
-          <span class="calc-dot"></span> Calculating…
+          <span class="calc-dot"></span>
         </span>
 
         <span class="status-pill open" id="marketStatus">
@@ -1449,18 +1473,9 @@ html.hide-drb .sector-jump{ display:flex; }
 
     <div id="strategyFocusWrap">
       <div class="modal-section-lbl">Strategy Focus</div>
-      <div style="font-size:11.5px; color:var(--text-muted); margin-bottom:10px;">Scope the whole dashboard to one strategy — hides the other's card and Sector Trend buttons everywhere</div>
-      <div class="scan-mode-toggle" id="strategyFocusSection" style="grid-template-columns:1fr 1fr 1fr;">
-        <button type="button" class="scan-mode-btn" id="strategyFocusBothBtn" data-focus="both">
-          <div class="scan-mode-title">Both</div>
-        </button>
-        <button type="button" class="scan-mode-btn" id="strategyFocusOrbBtn" data-focus="orb">
-          <div class="scan-mode-title">ORB Only</div>
-        </button>
-        <button type="button" class="scan-mode-btn" id="strategyFocusDrbBtn" data-focus="drb">
-          <div class="scan-mode-title">DRB Only</div>
-        </button>
-      </div>
+      <div style="font-size:11.5px; color:var(--text-muted); margin-bottom:10px;">Toggle strategies on/off — hides that strategy's card and Sector Trend buttons everywhere. At least one must stay on.</div>
+      <div id="strategyFocusList"></div>
+      <div id="strategyFocusMsg" style="font-size:11.5px; color:var(--bear); display:none; margin-top:6px;">At least one strategy must stay on.</div>
     </div>
 
     <div class="settings-divider"></div>
@@ -3909,10 +3924,11 @@ function renderQuadChart(data){
 
   CHART_PANELS.forEach(panel => {
     const candles = (data.timeframes && data.timeframes[panel.key]) || [];
+    const showStaleNote = data.stale_intraday && panel.key !== "daily";
     const box = document.createElement("div");
     box.className = "chart-quad-panel";
     box.innerHTML = `
-      <div class="chart-quad-panel-head">${panel.label}</div>
+      <div class="chart-quad-panel-head">${panel.label}${showStaleNote ? ` <span class="chart-quad-stale">· last session (${data.intraday_as_of})</span>` : ''}</div>
       <div class="chart-quad-panel-canvas-wrap">
         <canvas></canvas>
         <div class="chart-quad-tooltip"></div>
@@ -4142,18 +4158,49 @@ function showBackendBanner(state, text){
 }
 
 let contactAdminShownForOutage = false;
+let hasLoadedOnce = false;
+let lastSuccessfulFetchAt = null;
 
 function showCalcPill(){
-  document.getElementById("calcPill").classList.add("show");
+  const pill = document.getElementById("calcPill");
+  pill.classList.add("show");
+  pill.querySelector(".calc-pill-text")?.remove();
+  const label = document.createElement("span");
+  label.className = "calc-pill-text";
+  label.textContent = hasLoadedOnce ? "Updating…" : "Loading…";
+  pill.appendChild(label);
 }
 function hideCalcPill(){
   document.getElementById("calcPill").classList.remove("show");
 }
 
+function hideInitialLoadOverlay(){
+  document.getElementById("initialLoadOverlay").classList.add("hidden");
+}
+function showInitialLoadError(text){
+  const overlay = document.getElementById("initialLoadOverlay");
+  overlay.classList.add("error");
+  document.getElementById("initialLoadTitle").textContent = "Couldn't load live data";
+  document.getElementById("initialLoadSub").textContent = text;
+}
+
+function freshnessTickerText(){
+  if(!lastSuccessfulFetchAt) return "";
+  const secs = Math.round((Date.now() - lastSuccessfulFetchAt) / 1000);
+  if(secs < 5) return "updated just now";
+  if(secs < 60) return `updated ${secs}s ago`;
+  return `updated ${Math.floor(secs / 60)}m ago`;
+}
+setInterval(() => {
+  const el = document.getElementById("backendFreshness");
+  if(el && lastSuccessfulFetchAt) el.textContent = " · " + freshnessTickerText();
+}, 1000);
+
 async function fetchLiveData(){
   const base = getBackendUrl();
   if(!base){
     showBackendBanner("offline", "No live data source set — check your backend URL in Settings.");
+    if(!hasLoadedOnce) showInitialLoadError("No backend URL configured yet.");
     return;
   }
   showCalcPill();
@@ -4183,11 +4230,15 @@ async function fetchLiveData(){
       if(globalIdxPayload.data && globalIdxPayload.data.length) updateGlobalIndicesFromLive(globalIdxPayload.data, globalIdxPayload.updated_at);
     }
 
-    showBackendBanner("online", `Connected — ${orbRows.length} symbols · ORB + DRB live · last updated ${new Date().toLocaleTimeString('en-IN', {hour12:false})}`);
+    lastSuccessfulFetchAt = Date.now();
+    showBackendBanner("online", `Connected — ${orbRows.length} symbols · ORB + DRB live<span id="backendFreshness"> · updated just now</span>`);
     contactAdminShownForOutage = false;
     renderAll();
+    hasLoadedOnce = true;
+    hideInitialLoadOverlay();
   } catch(err){
     showBackendBanner("offline", "Can't reach the live backend right now — check the server is running.");
+    if(!hasLoadedOnce) showInitialLoadError("Can't reach the backend — check your Live Data Source in Settings.");
 
     const session = getSession();
     const isAdmin = session && session.mobile === ADMIN_MOBILE;
@@ -4261,23 +4312,63 @@ async function refreshScanModeUI(){
 // Refresh scan-mode info whenever Settings is opened
 document.getElementById("settingsBtn")?.addEventListener("click", refreshScanModeUI);
 
-/* ---------------- Strategy Focus (admin) ---------------- */
-function applyStrategyFocus(focus){
-  document.documentElement.classList.toggle("hide-drb", focus === "orb");
-  document.documentElement.classList.toggle("hide-orb", focus === "drb");
-  document.querySelectorAll("#strategyFocusSection .scan-mode-btn").forEach(btn => {
-    btn.classList.toggle("active", btn.dataset.focus === focus);
+/* ---------------- Strategy Focus (admin) ----------------
+   Data-driven so a future 3rd/4th strategy is just one more entry here —
+   no rewrite of the toggle UI needed. Each entry needs a matching CSS rule
+   (html.hide-<key> .sector-jump-btn.<key>, html.hide-<key> #<key>StrategyCard)
+   added when that strategy's own UI elements get built. */
+const STRATEGIES = [
+  { key: "orb", label: "ORB Breakout" },
+  { key: "drb", label: "DRB Breakout" },
+];
+
+function getEnabledStrategies(){
+  try {
+    const saved = JSON.parse(localStorage.getItem("enabledStrategies"));
+    if(Array.isArray(saved) && saved.length) return saved;
+  } catch(e){}
+  return STRATEGIES.map(s => s.key); // default: all on
+}
+
+function applyStrategyFocus(enabledKeys){
+  STRATEGIES.forEach(s => {
+    document.documentElement.classList.toggle("hide-" + s.key, !enabledKeys.includes(s.key));
+  });
+  document.querySelectorAll("#strategyFocusList .switch input").forEach(input => {
+    input.checked = enabledKeys.includes(input.dataset.key);
   });
 }
-const savedStrategyFocus = localStorage.getItem("strategyFocus") || "both";
-applyStrategyFocus(savedStrategyFocus);
-document.querySelectorAll("#strategyFocusSection .scan-mode-btn").forEach(btn => {
-  btn.addEventListener("click", function(){
-    const focus = this.dataset.focus;
-    localStorage.setItem("strategyFocus", focus);
-    applyStrategyFocus(focus);
+
+function renderStrategyFocusList(){
+  const list = document.getElementById("strategyFocusList");
+  list.innerHTML = STRATEGIES.map(s => `
+    <div class="toggle-row">
+      <div class="toggle-row-title">${s.label}</div>
+      <label class="switch">
+        <input type="checkbox" data-key="${s.key}">
+        <span class="slider"></span>
+      </label>
+    </div>
+  `).join("");
+  list.querySelectorAll("input[type=checkbox]").forEach(input => {
+    input.addEventListener("change", function(){
+      const enabled = getEnabledStrategies();
+      const key = this.dataset.key;
+      let next = this.checked ? [...new Set([...enabled, key])] : enabled.filter(k => k !== key);
+      const msg = document.getElementById("strategyFocusMsg");
+      if(next.length === 0){
+        this.checked = true; // block turning off the last remaining strategy
+        msg.style.display = "block";
+        setTimeout(() => { msg.style.display = "none"; }, 2500);
+        return;
+      }
+      localStorage.setItem("enabledStrategies", JSON.stringify(next));
+      applyStrategyFocus(next);
+    });
   });
-});
+}
+renderStrategyFocusList();
+applyStrategyFocus(getEnabledStrategies());
 
 
 /* ---------------- Refresh button ---------------- */
