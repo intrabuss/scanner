@@ -1060,6 +1060,14 @@ html[data-theme="light"] .avatar{ background:linear-gradient(160deg,#E3E7EE,#F3F
   font-size:12.5px; font-weight:700; color:var(--text-secondary); letter-spacing:.01em;
 }
 .chart-quad-stale{ font-weight:600; color:var(--text-muted); text-transform:none; letter-spacing:0; }
+.chart-quad-ema-legend{
+  flex-shrink:0; display:flex; justify-content:center; gap:9px;
+  padding:0 10px 6px; font-size:10px; font-family:var(--font-data);
+}
+.ema-legend-item{ display:inline-flex; align-items:center; gap:3px; color:var(--text-secondary); }
+.ema-legend-item i{ width:8px; height:8px; border-radius:50%; display:inline-block; }
+.ema-legend-item.dim{ opacity:.32; }
+.ema-legend-item.dim i{ background:var(--text-muted) !important; }
 .chart-quad-panel-canvas-wrap{ position:relative; flex:1; min-height:0; padding:0 10px 10px; }
 .chart-quad-panel canvas{ width:100%; height:100%; display:block; cursor:crosshair; }
 .chart-quad-tooltip{
@@ -4981,6 +4989,43 @@ const CHART_PANELS = [
   { key: "daily", label: "Daily Chart", showOrb: false },
 ];
 
+/* EMA overlay config. All four lengths are *offered* on every panel, but
+   each is only actually drawn if the panel has enough candles for that
+   length to mean something (see emaHasEnoughData below) — a "50-period"
+   EMA computed from 12 bars isn't an EMA50, it's noise, so rather than
+   draw a misleading line we skip it and say so in the legend. The 5min/
+   15min/60min panels only ever hold a single trading day's candles, so
+   in practice they'll usually show EMA9 (+EMA20 on 5min), while the
+   daily panel (now ~220 trading days, widened on the backend specifically
+   for this) is the one that can show all four including EMA200. */
+const EMA_LENGTHS = [
+  { length: 9,   color: "#00BFFF", label: "EMA9"   },
+  { length: 20,  color: "#FFD700", label: "EMA20"  },
+  { length: 50,  color: "#FF69B4", label: "EMA50"  },
+  { length: 200, color: "#FF4D4D", label: "EMA200" },
+];
+
+// Standard EMA: seed with the SMA of the first `length` closes, then EMA
+// from there. Returns an array the same length as `candles`, with `null`
+// for every index before the seed point (not enough data yet for this
+// length) so the caller can skip drawing that portion instead of guessing.
+function computeEMASeries(candles, length){
+  const closes = candles.map(c => c.c);
+  const out = new Array(closes.length).fill(null);
+  if(closes.length < length) return out; // not enough bars for this length at all
+  const k = 2 / (length + 1);
+  let sma = 0;
+  for(let i = 0; i < length; i++) sma += closes[i];
+  sma /= length;
+  out[length - 1] = sma;
+  let prev = sma;
+  for(let i = length; i < closes.length; i++){
+    prev = closes[i] * k + prev * (1 - k);
+    out[i] = prev;
+  }
+  return out;
+}
+
 function cssVar(name){
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 }
@@ -5010,6 +5055,15 @@ function drawQuadPanel(canvas, candles, opts){
   let hi = Math.max(...candles.map(c => c.h));
   if(orbHigh != null) hi = Math.max(hi, orbHigh);
   if(orbLow != null) lo = Math.min(lo, orbLow);
+
+  // Compute EMA series up front so their range is included in lo/hi
+  // (otherwise a fast-moving EMA line would clip off the top/bottom of
+  // the chart instead of being visible like the candles it tracks).
+  const emaSeries = EMA_LENGTHS.map(cfg => ({ ...cfg, values: computeEMASeries(candles, cfg.length) }));
+  emaSeries.forEach(s => {
+    s.values.forEach(v => { if(v != null){ if(v < lo) lo = v; if(v > hi) hi = v; } });
+  });
+
   const pad = (hi - lo) * 0.08 || 1;
   lo -= pad; hi += pad;
   const maxVol = Math.max(...candles.map(c => c.v), 1);
@@ -5095,6 +5149,23 @@ function drawQuadPanel(canvas, candles, opts){
     ctx.fillRect(cx - bodyW / 2, h - vh, bodyW, vh);
   });
 
+  // EMA overlay lines — drawn on top of candles. Each series only draws
+  // the contiguous stretch where computeEMASeries actually had enough
+  // bars (its leading `null`s), so a short-history panel just shows a
+  // shorter line instead of a misleading one starting from bar 1.
+  const emaDrawn = [];
+  emaSeries.forEach(s => {
+    const pts = s.values.map((v, i) => v == null ? null : [x(i), y(v)]).filter(Boolean);
+    if(pts.length < 2) return; // not enough data on this panel for this length
+    emaDrawn.push(s);
+    ctx.save();
+    ctx.strokeStyle = s.color; ctx.lineWidth = 1.4; ctx.lineJoin = "round";
+    ctx.beginPath();
+    pts.forEach(([px, py], i) => i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py));
+    ctx.stroke();
+    ctx.restore();
+  });
+
   // buy / sell bubbles from the ORB break log
   if(opts.showOrb && opts.markers && opts.markers.length){
     opts.markers.forEach(m => {
@@ -5117,7 +5188,8 @@ function drawQuadPanel(canvas, candles, opts){
     });
   }
 
-  canvas._chartData = { candles, x, y, slot, opts };
+  canvas._chartData = { candles, x, y, slot, opts, emaDrawn, emaAll: EMA_LENGTHS };
+  return emaDrawn;
 }
 
 function timeToMinutes(t){
@@ -5157,15 +5229,24 @@ function renderQuadChart(data){
     box.className = "chart-quad-panel";
     box.innerHTML = `
       <div class="chart-quad-panel-head">${panel.label}${showStaleNote ? ` <span class="chart-quad-stale">· last session (${data.intraday_as_of})</span>` : ''}</div>
+      <div class="chart-quad-ema-legend"></div>
       <div class="chart-quad-panel-canvas-wrap">
         <canvas></canvas>
         <div class="chart-quad-tooltip"></div>
       </div>`;
     container.appendChild(box);
     const canvas = box.querySelector("canvas");
+    const legendEl = box.querySelector(".chart-quad-ema-legend");
     const tooltip = box.querySelector(".chart-quad-tooltip");
     const opts = { orbHigh: data.orb_high, orbLow: data.orb_low, markers: data.markers, showOrb: panel.showOrb };
-    const draw = () => drawQuadPanel(canvas, candles, opts);
+    const draw = () => {
+      const drawn = drawQuadPanel(canvas, candles, opts);
+      const drawnLengths = new Set(drawn.map(s => s.length));
+      legendEl.innerHTML = EMA_LENGTHS.map(cfg => {
+        const live = drawnLengths.has(cfg.length);
+        return `<span class="ema-legend-item${live ? '' : ' dim'}" title="${live ? cfg.label : cfg.label + ' — not enough candles on this panel yet'}"><i style="background:${cfg.color}"></i>${cfg.label}</span>`;
+      }).join("");
+    };
     draw();
     attachQuadTooltip(canvas, tooltip);
     window.addEventListener("resize", debounce(draw, 150));
