@@ -760,6 +760,59 @@ html[data-theme="light"] .avatar{ background:linear-gradient(160deg,#E3E7EE,#F3F
 }
 .modal-box.wide .modal-head{ padding:16px 20px; border-bottom:1px solid var(--border-soft); }
 
+/* ============ STRATEGY GUIDE MODAL ============ */
+.modal-box.doc{ max-width:740px; max-height:88vh; padding:0; display:flex; flex-direction:column; }
+.modal-box.doc .modal-head{ padding:18px 22px; border-bottom:1px solid var(--border-soft); }
+.strategy-doc{ padding:22px 26px 30px; overflow-y:auto; font-size:13.5px; line-height:1.7; color:var(--text-secondary); }
+.strategy-doc > p:first-child{ margin-top:0; }
+.strategy-doc h4{
+  font-size:15px; font-weight:800; color:var(--text-primary);
+  margin:28px 0 10px; display:flex; align-items:center; gap:9px;
+}
+.strategy-doc h4:first-of-type{ margin-top:0; }
+.strategy-doc .doc-tag{
+  font-family:var(--font-data); font-size:10.5px; font-weight:700;
+  padding:2px 9px; border-radius:5px; letter-spacing:.03em;
+}
+.strategy-doc .doc-tag.orb{ background:var(--brand-dim); color:var(--brand); }
+.strategy-doc .doc-tag.drb{ background:var(--neutral-dim); color:var(--neutral); }
+.strategy-doc .doc-tag.shared{ background:var(--bull-dim); color:var(--bull); }
+.strategy-doc p{ margin:0 0 12px; }
+.strategy-doc strong{ color:var(--text-primary); font-weight:700; }
+.strategy-doc ol, .strategy-doc ul{ margin:0 0 14px; padding-left:20px; }
+.strategy-doc li{ margin-bottom:6px; }
+.strategy-doc li::marker{ color:var(--text-muted); }
+.strategy-doc code{
+  font-family:var(--font-data); font-size:12px; background:var(--bg-hover);
+  color:var(--text-primary); padding:1px 5px; border-radius:4px;
+}
+.strategy-doc pre{
+  background:var(--bg-raised); border:1px solid var(--border-soft);
+  border-radius:var(--radius-sm); padding:12px 14px; overflow-x:auto; margin:0 0 14px;
+}
+.strategy-doc pre code{ background:none; padding:0; font-size:12.5px; color:var(--text-primary); line-height:1.6; }
+.strategy-doc hr{ border:none; border-top:1px solid var(--border-soft); margin:24px 0; }
+.strategy-doc .doc-scroll{ overflow-x:auto; margin:0 0 16px; }
+.strategy-doc table{ width:100%; border-collapse:collapse; font-size:12.5px; min-width:460px; }
+.strategy-doc th{
+  text-align:left; padding:8px 10px; background:var(--bg-raised); color:var(--text-secondary);
+  font-weight:700; font-size:10.5px; text-transform:uppercase; letter-spacing:.03em;
+  border-bottom:1px solid var(--border-med); white-space:nowrap;
+}
+.strategy-doc td{ padding:9px 10px; border-bottom:1px solid var(--border-soft); color:var(--text-primary); vertical-align:top; }
+.strategy-doc tr:last-child td{ border-bottom:none; }
+.strategy-doc .doc-callout{
+  background:var(--brand-dim); border:1px solid rgba(76,141,255,.3); border-radius:var(--radius-md);
+  padding:12px 14px; font-size:12.5px; color:var(--text-primary); margin:4px 0 22px;
+  display:flex; gap:10px; align-items:flex-start;
+}
+.strategy-doc .doc-callout i{ color:var(--brand); font-size:15px; margin-top:1px; flex-shrink:0; }
+.strategy-doc .doc-note{ font-size:11.5px; color:var(--text-muted); font-style:italic; }
+@media (max-width: 767.98px){
+  .strategy-doc{ padding:18px 18px 26px; font-size:13px; }
+  .strategy-doc h4{ font-size:14px; margin-top:24px; }
+}
+
 /* ============ CHART MODAL (TradingView embed) ============ */
 .modal-box.chart-box{ max-width:1180px; height:84vh; overflow:hidden; }
 .modal-box.chart-box .modal-head{ padding:18px 22px 14px; }
@@ -1142,6 +1195,65 @@ html.hide-etf #etfSwingSection{ display:none !important; }
 .backend-banner.show{ display:flex; }
 .backend-banner.offline{ background:var(--bear-dim); border:1px solid rgba(239,68,68,.35); color:var(--bear); }
 .backend-banner.online{ background:var(--bull-dim); border:1px solid rgba(34,197,94,.35); color:var(--bull); }
+
+/* ===== AI MARKET BRIEF ===== */
+.brief-card{
+  display:none; gap:12px; padding:14px 16px; margin-bottom:16px;
+  background:var(--bg-raised); border:1px solid var(--border-soft); border-radius:var(--radius-lg);
+  box-shadow:var(--shadow-card);
+}
+.brief-card.show{ display:flex; }
+.brief-icon{
+  flex-shrink:0; width:30px; height:30px; border-radius:8px; background:var(--brand-dim);
+  color:var(--brand); display:flex; align-items:center; justify-content:center; font-size:15px;
+}
+.brief-body{ flex:1; min-width:0; }
+.brief-head{ display:flex; align-items:center; gap:8px; margin-bottom:4px; }
+.brief-title{ font-size:11.5px; font-weight:700; text-transform:uppercase; letter-spacing:.03em; color:var(--text-secondary); }
+.brief-time{ font-size:11px; color:var(--text-muted); }
+.brief-text{ font-size:13px; line-height:1.5; color:var(--text-primary); }
+.brief-error{ font-size:12.5px; color:var(--text-muted); font-style:italic; }
+
+/* ===== ASK AI WIDGET ===== */
+.ask-ai-fab{
+  position:fixed; right:20px; bottom:20px; z-index:900;
+  width:52px; height:52px; border-radius:50%; border:none; cursor:pointer;
+  background:var(--brand); color:#fff; font-size:20px;
+  display:flex; align-items:center; justify-content:center;
+  box-shadow:0 4px 14px rgba(76,141,255,.4);
+}
+.ask-ai-panel{
+  position:fixed; right:20px; bottom:84px; z-index:900; width:340px; max-width:calc(100vw - 40px);
+  max-height:min(480px, 70vh); display:none; flex-direction:column;
+  background:var(--bg-raised); border:1px solid var(--border-soft); border-radius:var(--radius-lg);
+  box-shadow:0 8px 30px rgba(0,0,0,.4); overflow:hidden;
+}
+.ask-ai-panel.open{ display:flex; }
+.ask-ai-head{
+  display:flex; align-items:center; justify-content:space-between; padding:12px 14px;
+  border-bottom:1px solid var(--border-soft); flex-shrink:0;
+}
+.ask-ai-head-title{ font-size:13px; font-weight:700; color:var(--text-primary); }
+.ask-ai-quota{ font-size:10.5px; color:var(--text-muted); }
+.ask-ai-close{ background:none; border:none; color:var(--text-muted); font-size:16px; cursor:pointer; padding:2px; }
+.ask-ai-body{ flex:1; overflow-y:auto; padding:12px 14px; display:flex; flex-direction:column; gap:10px; }
+.ask-ai-empty{ font-size:12px; color:var(--text-muted); line-height:1.5; }
+.ask-ai-msg{ font-size:12.5px; line-height:1.5; padding:9px 11px; border-radius:var(--radius-md); }
+.ask-ai-msg.user{ background:var(--brand-dim); color:var(--text-primary); align-self:flex-end; max-width:85%; }
+.ask-ai-msg.answer{ background:var(--bg-surface); border:1px solid var(--border-soft); color:var(--text-primary); }
+.ask-ai-msg.error{ background:var(--bear-dim); color:var(--bear); }
+.ask-ai-msg.loading{ background:var(--bg-surface); border:1px solid var(--border-soft); color:var(--text-muted); font-style:italic; }
+.ask-ai-input-row{ display:flex; gap:8px; padding:10px 12px; border-top:1px solid var(--border-soft); flex-shrink:0; }
+.ask-ai-input{
+  flex:1; background:var(--bg-surface); border:1px solid var(--border-med); border-radius:var(--radius-sm);
+  color:var(--text-primary); font-size:12.5px; padding:8px 10px; outline:none; font-family:var(--font-ui);
+}
+.ask-ai-input:focus{ border-color:var(--brand); }
+.ask-ai-send{
+  background:var(--brand); color:#fff; border:none; border-radius:var(--radius-sm);
+  width:34px; flex-shrink:0; font-size:14px; cursor:pointer;
+}
+.ask-ai-send:disabled{ opacity:.5; cursor:not-allowed; }
 </style>
 </head>
 <body>
@@ -1242,6 +1354,7 @@ html.hide-etf #etfSwingSection{ display:none !important; }
     <button class="nav-icon" data-target="longSection"><i class="bi bi-graph-up-arrow"></i><span class="tip">Long</span></button>
     <button class="nav-icon" data-target="shortSection"><i class="bi bi-graph-down-arrow"></i><span class="tip">Short</span></button>
     <button class="nav-icon" data-target="strategySection"><i class="bi bi-lightning-charge-fill"></i><span class="tip">Strategies</span></button>
+    <button class="nav-icon" id="strategyGuideBtn"><i class="bi bi-question-circle"></i><span class="tip">Strategy Guide</span></button>
     <button class="nav-icon" id="globalMarketsBtn"><i class="bi bi-globe-americas"></i><span class="tip">Global</span></button>
     <button class="nav-icon" id="fiiDiiBtn"><i class="bi bi-bank2"></i><span class="tip">FII/DII</span></button>
     <button class="nav-icon" id="settingsBtn" style="margin-top:auto;"><i class="bi bi-gear-fill"></i><span class="tip">Settings</span></button>
@@ -1288,6 +1401,18 @@ html.hide-etf #etfSwingSection{ display:none !important; }
     </div>
 
     <div class="backend-banner" id="backendBanner"></div>
+
+    <!-- AI MARKET BRIEF -->
+    <div class="brief-card" id="briefCard">
+      <div class="brief-icon"><i class="bi bi-stars"></i></div>
+      <div class="brief-body">
+        <div class="brief-head">
+          <span class="brief-title">Market Brief</span>
+          <span class="brief-time" id="briefTime"></span>
+        </div>
+        <div class="brief-text" id="briefText"></div>
+      </div>
+    </div>
 
     <!-- SCAN SIZE — visible to everyone; only admin can actually switch it -->
     <div class="section-head">
@@ -1408,6 +1533,7 @@ html.hide-etf #etfSwingSection{ display:none !important; }
     <!-- STRATEGY PANEL -->
     <div class="section-head" id="strategySection">
       <div class="section-title">Live Strategies</div>
+      <button class="section-link" id="strategyGuideInlineBtn" style="background:none; border:none; cursor:pointer;"><i class="bi bi-question-circle"></i> How it works</button>
     </div>
     <div class="row g-3">
       <div class="col-12 col-md-6" id="orbStrategyCard">
@@ -1788,6 +1914,93 @@ html.hide-etf #etfSwingSection{ display:none !important; }
       <div class="explorer-body table-scroll" style="padding:16px 20px;">
         <div class="idx-grid" id="globalIdxGrid"></div>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ STRATEGY GUIDE MODAL ============ -->
+<div class="modal-overlay" id="strategyGuideOverlay">
+  <div class="modal-box doc">
+    <div class="modal-head">
+      <div>
+        <div style="font-weight:800; font-size:16px;">ORB vs DRB: Breakout Strategy Logic Explained</div>
+        <div class="explorer-meta">How the scanner decides what counts as a breakout</div>
+      </div>
+      <button class="icon-btn" id="strategyGuideClose"><i class="bi bi-x-lg"></i></button>
+    </div>
+    <div class="strategy-doc">
+      <p>Our scanner runs two intraday breakout strategies side by side — <strong>ORB (Opening Range Breakout)</strong> and <strong>DRB (Daily Range Breakout)</strong>. Both flag stocks breaking out of a key price level, but they define that level differently, confirm breaks differently, and are tuned for different moments in the trading day.</p>
+
+      <h4><span class="doc-tag orb">ORB</span> Opening Range Breakout</h4>
+      <p><strong>The level:</strong> The high and low formed during the first 15 minutes of today's session (9:15–9:30 AM), captured fresh once per day right after the window closes.</p>
+      <p><strong>The idea:</strong> The opening 15 minutes reflects where buyers and sellers first agree on value for the day. A decisive move beyond that range signals which side is in control for the session.</p>
+      <p><strong>How a break is confirmed:</strong> Unlike a simple live-price check, ORB does <strong>not</strong> count a break the moment price ticks across the line. Instead:</p>
+      <ol>
+        <li>Price data is resampled into 3-minute candles.</li>
+        <li>Every ~3 minutes, the scanner checks the <strong>most recently closed</strong> 3-minute candle (not the one still forming).</li>
+        <li>A break only counts if that candle's <strong>close</strong> is beyond the opening range high or low.</li>
+      </ol>
+      <div class="doc-callout"><i class="bi bi-info-circle-fill"></i><div>This filters out brief "wick pokes" — a stock spiking across the level for a few seconds and snapping back doesn't get logged as a breakout.</div></div>
+      <p><strong>Reversal handling:</strong> If a stock was confirmed broken and a later 3-minute candle closes back inside the range, that's logged as a distinct <strong>"reversed"</strong> event in the break log — not silently deleted. This keeps the full history of a stock's behavior visible.</p>
+      <p><strong>Why 3-minute candles:</strong> It's a middle ground — fast enough to catch the move early in the session, slow enough to avoid reacting to 1-minute noise.</p>
+
+      <hr>
+
+      <h4><span class="doc-tag drb">DRB</span> Daily Range Breakout</h4>
+      <p><strong>The level:</strong> Yesterday's high and low (the full previous trading session's range) — not today's opening range.</p>
+      <p><strong>The idea:</strong> Rather than reacting to today's first few minutes, DRB asks whether price is breaking into territory it didn't reach <em>at all</em> yesterday — a stronger, longer-horizon breakout signal.</p>
+      <p><strong>How a break is confirmed:</strong> DRB uses a simpler, faster method than ORB — a <strong>live tick comparison</strong>, checked on every price poll:</p>
+      <pre><code>broke_high = live_price &gt; yesterday_high
+broke_low  = live_price &lt; yesterday_low</code></pre>
+      <p>No candle-close confirmation — the moment price crosses yesterday's high/low on a live quote, it counts. This makes DRB more immediate but also more prone to noise than ORB's candle-confirmed approach.</p>
+      <p><strong>The 15-minute "cool-down":</strong> A DRB breakout in the first 15 minutes after market open is deliberately <strong>ignored</strong> (downgraded to WATCH). Right at the open, price is often just reacting to an overnight gap — not a genuine intraday breakout — so the scanner waits until the gap has settled before trusting a DRB signal.</p>
+
+      <hr>
+
+      <h4><span class="doc-tag shared">Shared</span> Filters Applied to Both</h4>
+      <p>A raw price breakout alone isn't treated as tradeable. Every signal — ORB or DRB — is passed through the same quality filters before it's shown as BUY or SELL:</p>
+      <div class="doc-scroll">
+        <table>
+          <thead><tr><th>Filter</th><th>Condition</th><th>Effect</th></tr></thead>
+          <tbody>
+            <tr><td><strong>Trend strength</strong></td><td>ADX(14) &lt; 20</td><td>Signal downgraded to WATCH (no clear trend)</td></tr>
+            <tr><td><strong>Volume confirmation</strong></td><td>RVOL &lt; 1.0</td><td>Signal downgraded to WATCH (below-average volume)</td></tr>
+            <tr><td><strong>Composite score</strong></td><td>7-factor weighted score</td><td>Must score ≥65/100 for BUY, ≤35/100 for SELL</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p style="font-weight:700; color:var(--text-primary); margin-bottom:8px;">The 7-Factor Composite Score</p>
+      <p>Each stock's breakout direction is just one of seven inputs into a score (rescaled to 0–100):</p>
+      <ol>
+        <li>Price above/below EMA(9)</li>
+        <li>Supertrend direction (Uptrend/Downtrend)</li>
+        <li>MACD vs MACD signal line</li>
+        <li>RSI(14) — above 55 bullish, below 45 bearish, neutral between</li>
+        <li>Price above/below the day's pivot point <span class="doc-note">(classic (H+L+C)/3 from yesterday's candle)</span></li>
+        <li>Gap direction (today's open vs. yesterday's close)</li>
+        <li>The breakout itself (ORB or DRB, depending on which scan is running)</li>
+      </ol>
+      <p>This means a breakout on its own is never enough to trigger BUY/SELL — it has to align with trend, momentum, and volume at the same time.</p>
+
+      <hr>
+
+      <h4><i class="bi bi-columns-gap" style="color:var(--text-secondary); font-size:14px;"></i> Quick Comparison</h4>
+      <div class="doc-scroll">
+        <table>
+          <thead><tr><th></th><th>ORB</th><th>DRB</th></tr></thead>
+          <tbody>
+            <tr><td>Level used</td><td>First 15-min opening range (today)</td><td>Previous day's high/low</td></tr>
+            <tr><td>Confirmation</td><td>3-min candle <strong>close</strong> beyond level</td><td>Live tick crossing the level</td></tr>
+            <tr><td>Speed</td><td>Slower, filters out noise</td><td>Faster, more reactive</td></tr>
+            <tr><td>Early-session handling</td><td>N/A — window defines itself at 9:30</td><td>Breakouts ignored for first 15 min (gap filter)</td></tr>
+            <tr><td>Reversal tracking</td><td>Explicit "reversed" log entry</td><td>Re-evaluated on every poll</td></tr>
+            <tr><td>Best suited for</td><td>Trend/momentum days building off the open</td><td>Stocks pushing into genuinely new territory vs. the prior session</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p class="doc-note" style="margin-top:4px;">Both scans still require the same volume (RVOL ≥ 1) and trend-strength (ADX ≥ 20) confirmation, and both feed into the same 7-factor scoring model — the only structural difference is how the breakout level itself is defined and confirmed.</p>
     </div>
   </div>
 </div>
@@ -2552,6 +2765,20 @@ document.getElementById("globalMarketsBtn").addEventListener("click", openGlobal
 document.getElementById("globalMarketsClose").addEventListener("click", closeGlobalMarkets);
 document.getElementById("globalMarketsOverlay").addEventListener("click", function(e){
   if(e.target === this) closeGlobalMarkets();
+});
+
+/* ---------------- Strategy Guide modal ---------------- */
+function openStrategyGuide(){
+  document.getElementById("strategyGuideOverlay").classList.add("show");
+}
+function closeStrategyGuide(){
+  document.getElementById("strategyGuideOverlay").classList.remove("show");
+}
+document.getElementById("strategyGuideBtn").addEventListener("click", openStrategyGuide);
+document.getElementById("strategyGuideInlineBtn").addEventListener("click", openStrategyGuide);
+document.getElementById("strategyGuideClose").addEventListener("click", closeStrategyGuide);
+document.getElementById("strategyGuideOverlay").addEventListener("click", function(e){
+  if(e.target === this) closeStrategyGuide();
 });
 
 /* ---------------- FII/DII ---------------- */
@@ -4365,6 +4592,7 @@ async function fetchLiveData(){
 
 function startBackendPolling(){
   fetchLiveData();
+  fetchMarketBrief();
   if(backendPollTimer) clearInterval(backendPollTimer);
   backendPollTimer = setInterval(fetchLiveData, 20000);
 }
@@ -4376,6 +4604,120 @@ document.getElementById("backendUrlSaveBtn").addEventListener("click", function(
   msg.style.display = "block";
   setTimeout(() => { msg.style.display = "none"; }, 2000);
   startBackendPolling();
+  fetchMarketBrief();
+});
+
+/* =====================================================================
+   AI MARKET BRIEF — auto-refreshes every few minutes; the backend only
+   actually regenerates twice/day (morning + midday slot), so polling
+   here is free — most calls just return the cached text.
+===================================================================== */
+async function fetchMarketBrief(){
+  const base = getBackendUrl();
+  if(!base) return;
+  try {
+    const res = await fetch(base + "/ai/brief");
+    if(!res.ok) return;
+    const data = await res.json();
+    const card = document.getElementById("briefCard");
+    const textEl = document.getElementById("briefText");
+    const timeEl = document.getElementById("briefTime");
+    if(data.text){
+      textEl.textContent = data.text;
+      textEl.classList.remove("brief-error");
+      timeEl.textContent = data.generated_at ? `updated ${data.generated_at}` : "";
+      card.classList.add("show");
+    } else if(data.error){
+      // Quiet fail — most likely OPENROUTER_API_KEY isn't set yet. Don't nag with
+      // a visible error card every load; just stay hidden until it's configured.
+      card.classList.remove("show");
+    }
+    updateAskAiQuota(data.calls_used_today, data.calls_limit);
+  } catch(err){
+    // Backend unreachable — the existing backend-banner already covers that; stay quiet here.
+  }
+}
+fetchMarketBrief();
+setInterval(fetchMarketBrief, 5 * 60 * 1000);
+
+/* =====================================================================
+   ASK AI — dashboard-wide chat box, fed a summary of the whole day's
+   scan server-side. Each question spends one call against the shared
+   50/day OpenRouter quota (the market brief above shares the same pool).
+===================================================================== */
+function updateAskAiQuota(used, limit){
+  const el = document.getElementById("askAiQuota");
+  if(el && typeof used === "number" && typeof limit === "number"){
+    el.textContent = `${used}/${limit} today`;
+  }
+}
+
+const askAiFab = document.getElementById("askAiFab");
+const askAiPanel = document.getElementById("askAiPanel");
+const askAiBody = document.getElementById("askAiBody");
+const askAiInput = document.getElementById("askAiInput");
+const askAiSendBtn = document.getElementById("askAiSendBtn");
+
+askAiFab.addEventListener("click", () => {
+  askAiPanel.classList.toggle("open");
+  if(askAiPanel.classList.contains("open")) askAiInput.focus();
+});
+document.getElementById("askAiCloseBtn").addEventListener("click", () => {
+  askAiPanel.classList.remove("open");
+});
+
+function addAskAiMessage(text, cls){
+  const empty = askAiBody.querySelector(".ask-ai-empty");
+  if(empty) empty.remove();
+  const div = document.createElement("div");
+  div.className = "ask-ai-msg " + cls;
+  div.textContent = text;
+  askAiBody.appendChild(div);
+  askAiBody.scrollTop = askAiBody.scrollHeight;
+  return div;
+}
+
+async function submitAskAiQuestion(){
+  const question = askAiInput.value.trim();
+  if(!question) return;
+  const base = getBackendUrl();
+  if(!base){
+    addAskAiMessage("No backend URL configured — check Settings.", "error");
+    return;
+  }
+  addAskAiMessage(question, "user");
+  askAiInput.value = "";
+  askAiInput.disabled = true;
+  askAiSendBtn.disabled = true;
+  const loadingEl = addAskAiMessage("Thinking…", "loading");
+
+  try {
+    const res = await fetch(base + "/ai/ask", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ question })
+    });
+    const data = await res.json();
+    loadingEl.remove();
+    if(data.answer){
+      addAskAiMessage(data.answer, "answer");
+    } else {
+      addAskAiMessage(data.error || "Something went wrong.", "error");
+    }
+    updateAskAiQuota(data.calls_used_today, data.calls_limit);
+  } catch(err){
+    loadingEl.remove();
+    addAskAiMessage("Couldn't reach the backend — check the server is running.", "error");
+  } finally {
+    askAiInput.disabled = false;
+    askAiSendBtn.disabled = false;
+    askAiInput.focus();
+  }
+}
+
+askAiSendBtn.addEventListener("click", submitAskAiQuestion);
+askAiInput.addEventListener("keydown", (e) => {
+  if(e.key === "Enter") submitAskAiQuestion();
 });
 
 document.getElementById("saveWindowsBtn").addEventListener("click", async function(){
@@ -4794,5 +5136,24 @@ document.querySelectorAll("#etfSwingTable th.sortable").forEach(th => {
 });
 
 </script>
+
+<!-- ASK AI WIDGET -->
+<button class="ask-ai-fab" id="askAiFab" title="Ask AI about today's scan">
+  <i class="bi bi-stars"></i>
+</button>
+<div class="ask-ai-panel" id="askAiPanel">
+  <div class="ask-ai-head">
+    <span class="ask-ai-head-title">Ask AI</span>
+    <span class="ask-ai-quota" id="askAiQuota"></span>
+    <button class="ask-ai-close" id="askAiCloseBtn"><i class="bi bi-x-lg"></i></button>
+  </div>
+  <div class="ask-ai-body" id="askAiBody">
+    <div class="ask-ai-empty">Ask about today's scan — e.g. "what's leading today" or "why is Auto sector weak". Answers are based only on the current live scan, not general market opinions.</div>
+  </div>
+  <div class="ask-ai-input-row">
+    <input type="text" class="ask-ai-input" id="askAiInput" placeholder="Ask about today's scan…" maxlength="500">
+    <button class="ask-ai-send" id="askAiSendBtn"><i class="bi bi-send"></i></button>
+  </div>
+</div>
 </body>
 </html>
