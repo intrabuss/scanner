@@ -624,22 +624,22 @@ html[data-theme="light"] .avatar{ background:linear-gradient(160deg,#E3E7EE,#F3F
    the session (oldest on the left, most recent on the right) — built from our
    own score history client-side, no 3rd-party widget involved. */
 .sector-graph{
-  display:flex; gap:2px; align-items:center; overflow-x:auto; max-width:190px;
+  display:flex; gap:3px; align-items:center; overflow-x:auto; max-width:260px;
   scrollbar-width:none;
 }
 .sector-graph::-webkit-scrollbar{ display:none; }
 .sector-graph-cell{
-  width:10px; height:18px; border-radius:2px; flex-shrink:0;
+  width:18px; height:30px; border-radius:4px; flex-shrink:0;
   background:var(--bg-hover); transition:.15s ease;
 }
 .sector-graph-cell.bull{ background:var(--bull); }
 .sector-graph-cell.bear{ background:var(--bear); }
 .sector-graph-cell.neutral{ background:var(--neutral); opacity:.5; }
-.sector-graph-cell.now{ outline:1.5px solid var(--text-primary); outline-offset:-1.5px; }
+.sector-graph-cell.now{ outline:2px solid var(--text-primary); outline-offset:-2px; }
 .sector-graph-empty{ font-size:11px; color:var(--text-muted); font-style:italic; }
 @media (max-width: 767.98px){
-  .sector-graph{ max-width:120px; }
-  .sector-graph-cell{ width:8px; height:16px; }
+  .sector-graph{ max-width:160px; }
+  .sector-graph-cell{ width:14px; height:24px; }
 }
 
 /* ============ LOGIN GATE ============ */
