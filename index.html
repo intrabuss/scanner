@@ -2056,7 +2056,7 @@ html.hide-etf #etfSwingSection{ display:none !important; }
             <th class="sortable" data-key="chg">% Chg <span class="sort-arrow"><i class="bi bi-caret-down-fill"></i></span></th>
             <th class="sortable" data-key="rovl">ROVL <span class="sort-arrow"><i class="bi bi-caret-down-fill"></i></span></th>
             <th class="sortable" data-key="score">Score <span class="sort-arrow"><i class="bi bi-caret-down-fill"></i></span></th>
-            <th class="col-breaklog">Break Log</th>
+            <th class="sortable" data-key="volume">Volume <span class="sort-arrow"><i class="bi bi-caret-down-fill"></i></span></th>
           </tr>
         </thead>
         <tbody id="lsBody"></tbody>
@@ -4552,7 +4552,7 @@ function renderLongShort(){
           <span class="score-num mono">${Math.round(r.score / 10)}/10</span>
         </div>
       </td>
-      <td class="mono cell-sub break-log-cell">${renderBreakLog(r.breakLog)}</td>
+      <td class="mono cell-sub">${formatVolume(r.volume)}${r.live === false ? ' <span class="cell-sub" style="font-size:10px;">(last close)</span>' : ''}</td>
     </tr>
   `).join("");
 
@@ -5150,7 +5150,7 @@ function mapApiRowToTableRow(r, strategy){
   const status = r.signal === "BUY" ? "bull" : r.signal === "SELL" ? "bear" : "neutral";
   return {
     sym: r.symbol, name: r.name, sector: r.sector,
-    price: r.price, chg: r.chg, rovl: r.rvol,
+    price: r.price, chg: r.chg, rovl: r.rvol, volume: r.volume,
     score: r.score, signal: r.signal, status, live: r.live,
     breakLog: r.break_log || [],
     levelHigh: r.level_high, levelLow: r.level_low, strategy,
