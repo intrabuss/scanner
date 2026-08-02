@@ -1211,6 +1211,11 @@ html.hide-drb .sector-jump{ display:flex; }
         <input type="tel" id="loginMobile" inputmode="numeric" maxlength="10" placeholder="10-digit mobile number" required>
         <div class="form-hint">No OTP needed — your number is checked against the authorized list.</div>
       </div>
+      <div class="form-field" id="loginPinField" style="display:none;">
+        <label for="loginPin">Admin PIN</label>
+        <input type="password" id="loginPin" inputmode="numeric" placeholder="Admin PIN" autocomplete="new-password">
+        <div class="form-hint">Required for the admin number — knowing the number alone isn't enough.</div>
+      </div>
       <div class="live-status-box" id="liveStatusBox" style="display:none;"></div>
       <button type="submit" class="btn-primary" id="loginSubmitBtn"><i class="bi bi-arrow-right-circle"></i> Enter Dashboard</button>
     </form>
@@ -1413,6 +1418,35 @@ html.hide-drb .sector-jump{ display:flex; }
       </div>
     </div>
 
+    <div class="section-head">
+      <div class="section-title">ETF Swing Screener <span class="count">Most fallen · 20d / 3wk / 1mo</span></div>
+      <button class="btn-view" id="etfSwingRefreshBtn" style="width:auto; padding:8px 16px;"><i class="bi bi-arrow-clockwise"></i> Refresh</button>
+    </div>
+    <div class="card-x" style="padding:0; overflow:hidden;">
+      <div style="padding:14px 18px; font-size:11.5px; color:var(--text-muted); border-bottom:1px solid var(--border-soft);">
+        Not intraday — swing/weeks-scale screener. Ranked by biggest fall, filtered to elevated relative volume. Score uses RSI(14), MACD, price vs 200-day average, ADX(14), and bounce-off-recent-low — informational only, not financial advice.
+      </div>
+      <div class="table-scroll">
+        <table class="data-grid" id="etfSwingTable">
+          <thead>
+            <tr>
+              <th class="sortable" data-key="symbol">ETF</th>
+              <th class="sortable" data-key="price">Price</th>
+              <th class="sortable" data-key="chg_20d">20d <span class="sort-arrow"><i class="bi bi-caret-down-fill"></i></span></th>
+              <th class="sortable" data-key="chg_3wk">3wk <span class="sort-arrow"><i class="bi bi-caret-down-fill"></i></span></th>
+              <th class="sortable" data-key="chg_1mo">1mo <span class="sort-arrow"><i class="bi bi-caret-down-fill"></i></span></th>
+              <th class="sortable" data-key="rvol">RVOL <span class="sort-arrow"><i class="bi bi-caret-down-fill"></i></span></th>
+              <th class="sortable" data-key="score">Score</th>
+            </tr>
+          </thead>
+          <tbody id="etfSwingBody"></tbody>
+        </table>
+        <div class="explorer-empty" id="etfSwingEmpty" style="display:none; padding:24px; text-align:center; color:var(--text-muted); font-size:13px;">
+          Click Refresh to load — first load can take ~10-15s (fetching ~400 days of history per ETF).
+        </div>
+      </div>
+    </div>
+
   </main>
 </div>
 
@@ -1460,14 +1494,21 @@ html.hide-drb .sector-jump{ display:flex; }
     <div class="settings-divider"></div>
 
     <div class="modal-section-lbl">Scan Size</div>
-    <div style="font-size:11.5px; color:var(--text-muted); margin-bottom:10px;">Locked to the Nifty 500 universe — scanning beyond it breaks the ORB/DRB break-log cadence.</div>
-    <div class="scan-mode-toggle" id="scanModeSection" style="grid-template-columns:1fr;">
-      <button type="button" class="scan-mode-btn active" id="scanModeNifty500Btn" data-mode="nifty500" disabled style="pointer-events:none;">
-        <div class="scan-mode-title">Nifty 500</div>
-        <div class="scan-mode-sub" id="scanModeNifty500Sub">~500 stocks · ~3 min rebuild</div>
-      </button>
+    <div style="font-size:11.5px; color:var(--text-muted); margin-bottom:10px;">Defaults to Nifty 500. Switching triggers an immediate rebuild in the background — Full Market takes ~20-25 min, Nifty 500 ~3 min.</div>
+    <div id="scanModeWrap">
+      <div class="scan-mode-toggle" id="scanModeSection">
+        <button type="button" class="scan-mode-btn" id="scanModeNifty500Btn" data-mode="nifty500">
+          <div class="scan-mode-title">Nifty 500</div>
+          <div class="scan-mode-sub" id="scanModeNifty500Sub">~500 stocks · ~3 min rebuild</div>
+        </button>
+        <button type="button" class="scan-mode-btn" id="scanModeFullBtn" data-mode="full">
+          <div class="scan-mode-title">Full Market</div>
+          <div class="scan-mode-sub" id="scanModeFullSub">~4,500 stocks · ~20-25 min rebuild</div>
+        </button>
+      </div>
+      <div id="scanModeMsg" style="font-size:11.5px; display:none; margin-top:8px;"></div>
     </div>
-    <div id="scanModeMsg" style="font-size:11.5px; display:none; margin-top:8px;"></div>
+    <div id="scanModeNonAdminMsg" style="font-size:11.5px; color:var(--text-muted); display:none;">Contact your admin to change this.</div>
 
     <div class="settings-divider"></div>
 
@@ -1566,7 +1607,10 @@ html.hide-drb .sector-jump{ display:flex; }
   <div class="modal-box wide">
     <div class="modal-head">
       <div>
-        <div style="font-weight:800; font-size:16px;" id="explorerTitle">ORB Breakout — Trade Explorer</div>
+        <div style="font-weight:800; font-size:16px; display:flex; align-items:center; gap:8px;">
+          <span id="explorerTitle">ORB Breakout — Trade Explorer</span>
+          <span class="idx-tech-label" id="explorerSectorStatus" style="display:none; margin-top:0;"></span>
+        </div>
         <div class="explorer-meta" id="explorerSub">— symbols across — sectors</div>
       </div>
       <button class="icon-btn" id="explorerClose"><i class="bi bi-x-lg"></i></button>
@@ -1897,6 +1941,11 @@ function setSession(s){
 }
 function clearSession(){ localStorage.removeItem(SESSION_KEY); }
 
+function adminHeaders(){
+  const session = getSession();
+  return { "Content-Type": "application/json", "X-Admin-Pin": (session && session.adminPin) || "" };
+}
+
 function isSessionExpired(session){
   if(!session || !session.loginTime) return true;
   return (Date.now() - session.loginTime) > SESSION_MAX_AGE_MS;
@@ -1917,6 +1966,8 @@ function showApp(session){
   document.getElementById("adminSection").style.display = isAdmin ? "block" : "none";
   document.getElementById("liveDataSourceSection").style.display = isAdmin ? "block" : "none";
   document.getElementById("strategyFocusWrap").style.display = isAdmin ? "block" : "none";
+  document.getElementById("scanModeWrap").style.display = isAdmin ? "block" : "none";
+  document.getElementById("scanModeNonAdminMsg").style.display = isAdmin ? "none" : "block";
   if(isAdmin) renderAdminList();
 
   const roleBadge = document.getElementById("roleBadge");
@@ -1947,7 +1998,7 @@ async function renderAdminList(){
     btn.addEventListener("click", async function(){
       this.disabled = true;
       try {
-        const res = await fetch(getBackendUrl() + "/allowed-mobiles/" + encodeURIComponent(this.dataset.mobile), { method: "DELETE" });
+        const res = await fetch(getBackendUrl() + "/allowed-mobiles/" + encodeURIComponent(this.dataset.mobile), { method: "DELETE", headers: adminHeaders() });
         const data = await res.json();
         if(!data.success){ showAdminMsg("Couldn't remove that number. Try again."); return; }
         renderAdminList();
@@ -1977,12 +2028,12 @@ document.getElementById("adminAddBtn").addEventListener("click", async function(
   try {
     const res = await fetch(getBackendUrl() + "/allowed-mobiles", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: adminHeaders(),
       body: JSON.stringify({ mobile })
     });
     const data = await res.json();
     if(!data.success){
-      showAdminMsg(data.error === "invalid_mobile" ? "Enter a valid 10-digit mobile number." : "Couldn't add that number. Try again.");
+      showAdminMsg(data.error === "unauthorized" ? "Admin PIN check failed — try logging out and back in." : data.error === "invalid_mobile" ? "Enter a valid 10-digit mobile number." : "Couldn't add that number. Try again.");
       return;
     }
     input.value = "";
@@ -2219,6 +2270,7 @@ async function checkMobileStatus(mobile){
 let mobileCheckDebounce = null;
 document.getElementById("loginMobile").addEventListener("input", function(){
   const mobile = this.value.trim();
+  document.getElementById("loginPinField").style.display = mobile === ADMIN_MOBILE ? "block" : "none";
   clearTimeout(mobileCheckDebounce);
   if(mobile.length < 10){ checkGeneralHealth(); return; }
   mobileCheckDebounce = setTimeout(() => checkMobileStatus(mobile), 400);
@@ -2262,7 +2314,33 @@ document.getElementById("loginForm").addEventListener("submit", async function(e
     return; // status box already says "contact your admin"
   }
 
-  const session = { mobile };
+  let adminPin = "";
+  if(isAdminLogin){
+    adminPin = document.getElementById("loginPin").value.trim();
+    const base = getBackendUrl();
+    if(!base){
+      showLoginMsg("Set a Live Data Source / backend URL before logging in as admin.", "error");
+      return;
+    }
+    try {
+      const res = await fetch(base + "/admin-login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mobile, pin: adminPin })
+      });
+      const data = await res.json();
+      if(!data.ok){
+        showLoginMsg(data.error === "wrong_pin" ? "Incorrect admin PIN." : "Admin login failed.", "error");
+        return;
+      }
+      if(data.warning) console.warn(data.warning);
+    } catch(err){
+      showLoginMsg("Couldn't reach the backend to verify the admin PIN.", "error");
+      return;
+    }
+  }
+
+  const session = { mobile, adminPin };
   setSession(session);
   showApp(session);
   startBackendPolling();
@@ -3233,6 +3311,7 @@ document.getElementById("globalIdxGrid").innerHTML = globalIndices.map(ix => `
 
 /* ---------------- Render: Sector table (derived from ORB rows) ---------------- */
 let sectorStrengthMap = {};
+let sectorStatusMap = {};
 
 function renderSectorTrend(){
   const bySector = {};
@@ -3266,6 +3345,8 @@ function renderSectorTrend(){
 
   sectorStrengthMap = {};
   sectorAgg.forEach(sc => { sectorStrengthMap[sc.name] = sc.strength; });
+  sectorStatusMap = {};
+  sectorAgg.forEach(sc => { sectorStatusMap[sc.name] = sc.status; });
 
   document.getElementById("sectorCount").textContent = sectorAgg.length + " sectors";
   document.querySelector("#sectorTable tbody").innerHTML = sectorAgg.map(sc => `
@@ -3539,6 +3620,15 @@ function openExplorer(strategy, initialSignal, initialSector){
   const validSector = initialSector && SECTORS.includes(initialSector) ? initialSector : "all";
 
   document.getElementById("explorerTitle").textContent = (isORB ? "ORB Breakout" : "DRB Breakout") + " — Trade Explorer" + (initialSector ? ` · ${initialSector}` : "");
+  const statusBadge = document.getElementById("explorerSectorStatus");
+  const sectorStatus = initialSector ? sectorStatusMap[initialSector] : null;
+  if(sectorStatus){
+    statusBadge.textContent = techLabel(sectorStatus);
+    statusBadge.className = "idx-tech-label " + sectorStatus;
+    statusBadge.style.display = "inline-block";
+  } else {
+    statusBadge.style.display = "none";
+  }
   document.getElementById("explorerSearch").value = "";
   explorerSectorFilter.value = validSector;
   document.getElementById("statBreakoutsLbl").textContent = (isORB ? "ORB" : "DRB") + " Breakouts";
@@ -4280,7 +4370,7 @@ document.getElementById("saveWindowsBtn").addEventListener("click", async functi
   try {
     const res = await fetch(base + "/config", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: adminHeaders(),
       body: JSON.stringify({ orb_window_minutes: parseInt(orbMin), drb_window_minutes: parseInt(drbMin) })
     });
     if(!res.ok) throw new Error("HTTP " + res.status);
@@ -4294,7 +4384,16 @@ document.getElementById("saveWindowsBtn").addEventListener("click", async functi
   setTimeout(() => { msg.style.display = "none"; }, 3000);
 });
 
-/* ---------------- Scan Size (Nifty 500 — locked, read-only info) ---------------- */
+/* ---------------- Scan Size ---------------- */
+let scanModePollTimer = null;
+
+function setScanModeButtonsState(mode, rebuilding){
+  document.querySelectorAll("#scanModeSection .scan-mode-btn").forEach(btn => {
+    btn.classList.toggle("active", btn.dataset.mode === mode);
+    btn.classList.toggle("rebuilding", rebuilding);
+  });
+}
+
 async function refreshScanModeUI(){
   const base = getBackendUrl();
   if(!base) return;
@@ -4304,10 +4403,61 @@ async function refreshScanModeUI(){
     const data = await res.json();
     const sizes = data.scan_mode_sizes || {};
     if(sizes.nifty500 != null) document.getElementById("scanModeNifty500Sub").textContent = `${sizes.nifty500.toLocaleString('en-IN')} stocks · ~3 min rebuild`;
+    if(sizes.full != null) document.getElementById("scanModeFullSub").textContent = `${sizes.full.toLocaleString('en-IN')} stocks · ~20-25 min rebuild`;
+
+    // Reflect whatever the admin actually has selected on the server —
+    // not just a hardcoded default — so this stays accurate after a
+    // page reload, a different device, or a restart.
+    const rebuilding = data.universe_rebuild && data.universe_rebuild.state === "rebuilding";
+    setScanModeButtonsState(data.scan_mode, rebuilding);
+
+    const msg = document.getElementById("scanModeMsg");
+    if(rebuilding){
+      msg.textContent = `Rebuilding for "${data.universe_rebuild.mode === 'nifty500' ? 'Nifty 500' : 'Full Market'}" (started ${data.universe_rebuild.started_at}) — dashboard keeps serving today's existing data meanwhile.`;
+      msg.style.color = "var(--text-muted)";
+      msg.style.display = "block";
+      if(!scanModePollTimer) scanModePollTimer = setInterval(refreshScanModeUI, 15000);
+    } else {
+      if(scanModePollTimer){ clearInterval(scanModePollTimer); scanModePollTimer = null; }
+      msg.style.display = "none";
+    }
   } catch(err){
-    // silent — settings panel just won't show the live size until reachable
+    // silent — settings panel just won't show live state until reachable
   }
 }
+
+document.querySelectorAll("#scanModeSection .scan-mode-btn").forEach(btn => {
+  btn.addEventListener("click", async function(){
+    const mode = this.dataset.mode;
+    const base = getBackendUrl();
+    const msg = document.getElementById("scanModeMsg");
+    if(!base){
+      msg.textContent = "Set your Live Data Source first.";
+      msg.style.color = "var(--bear)";
+      msg.style.display = "block";
+      return;
+    }
+    try {
+      const res = await fetch(base + "/config/scan-mode", {
+        method: "POST",
+        headers: adminHeaders(),
+        body: JSON.stringify({ mode })
+      });
+      const data = await res.json();
+      if(data.error){
+        msg.textContent = data.error;
+        msg.style.color = "var(--bear)";
+        msg.style.display = "block";
+        return;
+      }
+      refreshScanModeUI();
+    } catch(err){
+      msg.textContent = "Couldn't reach the server to switch scan size.";
+      msg.style.color = "var(--bear)";
+      msg.style.display = "block";
+    }
+  });
+});
 
 // Refresh scan-mode info whenever Settings is opened
 document.getElementById("settingsBtn")?.addEventListener("click", refreshScanModeUI);
@@ -4337,6 +4487,27 @@ function applyStrategyFocus(enabledKeys){
   document.querySelectorAll("#strategyFocusList .switch input").forEach(input => {
     input.checked = enabledKeys.includes(input.dataset.key);
   });
+
+  // Backtest strategy dropdown lets you pick ORB/DRB independently of the
+  // cards/sector buttons — gate it too, and bump the selection off a
+  // disabled option so a hidden-but-still-selected value can't linger.
+  const backtestSelect = document.getElementById("backtestStrategy");
+  if(backtestSelect){
+    Array.from(backtestSelect.options).forEach(opt => {
+      opt.disabled = !enabledKeys.includes(opt.value.toLowerCase());
+      opt.hidden = opt.disabled;
+    });
+    if(backtestSelect.selectedOptions[0]?.disabled){
+      const firstEnabled = Array.from(backtestSelect.options).find(o => !o.disabled);
+      if(firstEnabled) backtestSelect.value = firstEnabled.value;
+    }
+  }
+
+  // If the Trade Explorer is currently open showing a strategy that just
+  // got turned off, close it rather than leave disabled data on screen.
+  if(currentExplorerStrategy && !enabledKeys.includes(currentExplorerStrategy.toLowerCase())){
+    document.getElementById("explorerOverlay")?.classList.remove("show");
+  }
 }
 
 function renderStrategyFocusList(){
@@ -4409,6 +4580,97 @@ setInterval(() => {
     showLoginMsg("Your session expired after 3 hours. Please log in again.", "info");
   }
 }, 60000);
+
+/* ---------------- ETF Swing Screener ---------------- */
+let etfSwingData = [];
+let etfSwingSort = { key: "chg_1mo", dir: 1 }; // most fallen (most negative) first by default
+
+function etfChgTxt(v){
+  if(v == null) return '<span class="cell-sub">—</span>';
+  return `<span class="chg-txt ${v >= 0 ? 'up' : 'down'}">${v >= 0 ? '+' : ''}${v.toFixed(2)}%</span>`;
+}
+
+function renderEtfSwingTable(){
+  const tbody = document.getElementById("etfSwingBody");
+  const empty = document.getElementById("etfSwingEmpty");
+  if(!etfSwingData.length){
+    tbody.innerHTML = "";
+    empty.style.display = "block";
+    return;
+  }
+  empty.style.display = "none";
+
+  const sorted = [...etfSwingData].sort((a, b) => {
+    const av = a[etfSwingSort.key], bv = b[etfSwingSort.key];
+    if(av == null) return 1;
+    if(bv == null) return -1;
+    if(typeof av === "string") return av.localeCompare(bv) * etfSwingSort.dir;
+    return (av - bv) * etfSwingSort.dir;
+  });
+
+  tbody.innerHTML = sorted.map(r => `
+    <tr>
+      <td>
+        <div class="sym">${r.symbol}</div>
+        <div class="cell-sub" style="font-size:11px;">${r.name}</div>
+      </td>
+      <td class="mono">${r.price != null ? r.price.toLocaleString('en-IN') : '—'}</td>
+      <td>${etfChgTxt(r.chg_20d)}</td>
+      <td>${etfChgTxt(r.chg_3wk)}</td>
+      <td>${etfChgTxt(r.chg_1mo)}</td>
+      <td><span class="rovl-tag ${r.rvol != null && r.rvol > 1.2 ? 'hot' : 'normal'}">${r.rvol != null ? r.rvol + 'x' : '—'}</span></td>
+      <td><span class="combo-chip ${(r.signal || 'watch').toLowerCase()}" title="RSI ${r.rsi14 != null ? r.rsi14 : '—'} · ${r.above_200dma === true ? 'Above' : r.above_200dma === false ? 'Below' : '—'} 200-day avg">
+        <span class="c-score">${Math.round((r.score || 50) / 10)}/10</span><span class="c-signal">${r.signal || 'WATCH'}</span>
+      </span></td>
+    </tr>
+  `).join("");
+}
+
+async function loadEtfSwing(){
+  const btn = document.getElementById("etfSwingRefreshBtn");
+  const empty = document.getElementById("etfSwingEmpty");
+  const base = getBackendUrl();
+  if(!base){
+    empty.style.display = "block";
+    empty.textContent = "Set your Live Data Source in Settings first.";
+    return;
+  }
+  btn.disabled = true;
+  btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Loading…';
+  document.getElementById("etfSwingBody").innerHTML = "";
+  empty.style.display = "block";
+  empty.textContent = "Loading — first load can take ~10-15s (fetching ~400 days of history per ETF)…";
+  try {
+    const res = await fetch(base + "/scan/etf-swing");
+    if(!res.ok) throw new Error("HTTP " + res.status);
+    const data = await res.json();
+    if(data.error){
+      empty.textContent = data.error === "not_logged_in" ? "Log in to Upstox to load this." : "Couldn't load ETF data right now.";
+      etfSwingData = [];
+    } else {
+      etfSwingData = data.etfs || [];
+      if(!etfSwingData.length) empty.textContent = "No ETF data returned — check the symbols still match Upstox's instrument list.";
+    }
+    renderEtfSwingTable();
+  } catch(err){
+    empty.style.display = "block";
+    empty.textContent = "Couldn't reach the backend for ETF data.";
+    etfSwingData = [];
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="bi bi-arrow-clockwise"></i> Refresh';
+  }
+}
+document.getElementById("etfSwingRefreshBtn").addEventListener("click", loadEtfSwing);
+document.querySelectorAll("#etfSwingTable th.sortable").forEach(th => {
+  th.addEventListener("click", function(){
+    const key = this.dataset.key;
+    if(etfSwingSort.key === key) etfSwingSort.dir *= -1;
+    else { etfSwingSort.key = key; etfSwingSort.dir = key.startsWith("chg_") ? 1 : -1; }
+    renderEtfSwingTable();
+  });
+});
+
 </script>
 </body>
 </html>
