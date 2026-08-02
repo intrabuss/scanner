@@ -272,13 +272,36 @@ img, svg{ max-width:100%; }
   display:inline-flex; align-items:center; gap:6px;
   padding:6px 11px; border-radius:20px;
   font-size:12px; font-weight:600;
-  border:1px solid;
+  border:1px solid; cursor:default; position:relative;
 }
+.status-pill.closed{ cursor:pointer; }
 .status-pill.open{ background:var(--bull-dim); color:var(--bull); border-color:rgba(34,197,94,.35); }
 .status-pill.closed{ background:var(--bear-dim); color:var(--bear); border-color:rgba(239,68,68,.35); }
 .status-dot{ width:6px; height:6px; border-radius:50%; background:currentColor; }
 .status-dot.pulse{ animation:pulse 1.6s infinite ease-in-out; }
 @keyframes pulse{ 0%,100%{ opacity:1; } 50%{ opacity:.35; } }
+
+.market-closed-pop{
+  position:absolute; top:calc(100% + 8px); right:0; z-index:60;
+  width:270px; background:var(--bg-surface); border:1px solid var(--border-med);
+  border-radius:var(--radius-md); box-shadow:0 8px 24px rgba(0,0,0,.35);
+  padding:14px; display:none; cursor:default;
+}
+.market-closed-pop.show{ display:block; }
+.market-closed-pop .mcp-reason{ font-weight:700; color:var(--text-primary); font-size:13px; margin-bottom:2px; }
+.market-closed-pop .mcp-next{ font-size:12px; color:var(--text-secondary); margin-bottom:10px; }
+.market-closed-pop .mcp-list-label{
+  font-size:10.5px; font-weight:700; letter-spacing:.03em; text-transform:uppercase;
+  color:var(--text-muted); margin-bottom:6px; border-top:1px solid var(--border-soft); padding-top:10px;
+}
+.market-closed-pop .mcp-holiday-row{
+  display:flex; justify-content:space-between; gap:8px;
+  font-size:12px; padding:3px 0; color:var(--text-secondary);
+}
+.market-closed-pop .mcp-holiday-row.today{ color:var(--bear); font-weight:700; }
+.market-closed-pop .mcp-holiday-row .mcp-date{ font-family:var(--font-data); color:var(--text-muted); flex-shrink:0; }
+.market-closed-pop .mcp-holiday-row.today .mcp-date{ color:var(--bear); }
+.market-closed-pop .mcp-holidays-scroll{ max-height:220px; overflow-y:auto; }
 
 .calc-pill{
   display:none; align-items:center; gap:7px;
@@ -1586,7 +1609,8 @@ html.hide-etf #etfSwingSection{ display:none !important; }
         </span>
 
         <span class="status-pill open" id="marketStatus">
-          <span class="status-dot pulse"></span> Market Open
+          <span class="status-dot pulse" id="marketStatusDot"></span> <span id="marketStatusLabel">Market Open</span>
+          <div class="market-closed-pop" id="marketClosedPop"></div>
         </span>
 
         <button class="icon-btn" id="marketBriefBtn" title="Market Brief" style="display:none;">
@@ -3241,12 +3265,49 @@ const NSE_HOLIDAYS_2026 = [
   "2026-04-14","2026-05-01","2026-05-28","2026-06-26","2026-09-14","2026-10-02",
   "2026-10-20","2026-11-10","2026-11-24","2026-12-25"
 ];
+// Same dates, with the occasion name — used only for display (the "why is
+// the market closed" popover), not for the trading-day logic above.
+const NSE_HOLIDAY_NAMES_2026 = {
+  "2026-01-15": "Maharashtra Municipal Elections",
+  "2026-01-26": "Republic Day",
+  "2026-03-03": "Holi",
+  "2026-03-26": "Shri Ram Navami",
+  "2026-03-31": "Shri Mahavir Jayanti",
+  "2026-04-03": "Good Friday",
+  "2026-04-14": "Dr. Baba Saheb Ambedkar Jayanti",
+  "2026-05-01": "Maharashtra Day",
+  "2026-05-28": "Bakri Id",
+  "2026-06-26": "Muharram",
+  "2026-09-14": "Ganesh Chaturthi",
+  "2026-10-02": "Mahatma Gandhi Jayanti",
+  "2026-10-20": "Dussehra",
+  "2026-11-10": "Diwali – Balipratipada",
+  "2026-11-24": "Prakash Gurpurb Sri Guru Nanak Dev",
+  "2026-12-25": "Christmas",
+};
 
 function isTradingDay(date){
   const day = date.getDay();
   if(day === 0 || day === 6) return false; // Sun/Sat
   const iso = date.toISOString().slice(0,10);
   return !NSE_HOLIDAYS_2026.includes(iso);
+}
+
+// Why isn't today a trading day? Returns null if it IS a trading day.
+function marketClosedReason(date){
+  const day = date.getDay();
+  const iso = date.toISOString().slice(0,10);
+  if(NSE_HOLIDAY_NAMES_2026[iso]) return NSE_HOLIDAY_NAMES_2026[iso];
+  if(day === 0 || day === 6) return "Weekend";
+  return null;
+}
+
+// Next date (strictly after `date`) that isTradingDay() accepts.
+function nextTradingDay(date){
+  const d = new Date(date);
+  d.setDate(d.getDate() + 1);
+  while(!isTradingDay(d)) d.setDate(d.getDate() + 1);
+  return d;
 }
 
 function shiftToPriorTradingDay(date){
@@ -5447,6 +5508,25 @@ document.getElementById("chartIntervalSelect").addEventListener("change", functi
 });
 
 /* ---------------- Live clock ---------------- */
+function renderMarketClosedPopover(now, reason, next, beforeOpenToday){
+  const pop = document.getElementById("marketClosedPop");
+  const todayIso = now.toISOString().slice(0,10);
+  const nextIso = next.toISOString().slice(0,10);
+  const nextLabel = beforeOpenToday ? "today at 9:15 AM" : next.toLocaleDateString('en-IN', { weekday:'short', day:'2-digit', month:'short' }) + " at 9:15 AM";
+  const rows = NSE_HOLIDAYS_2026.map(iso => {
+    const d = new Date(iso + "T00:00:00");
+    const label = d.toLocaleDateString('en-IN', { weekday:'short', day:'2-digit', month:'short' });
+    const isToday = iso === todayIso;
+    return `<div class="mcp-holiday-row${isToday ? ' today' : ''}"><span>${NSE_HOLIDAY_NAMES_2026[iso]}</span><span class="mcp-date">${label}</span></div>`;
+  }).join("");
+  pop.innerHTML = `
+    <div class="mcp-reason">Closed — ${reason}</div>
+    <div class="mcp-next">Reopens ${nextLabel}</div>
+    <div class="mcp-list-label">NSE Holidays 2026</div>
+    <div class="mcp-holidays-scroll">${rows}</div>
+  `;
+}
+
 function tick(){
   const now = new Date();
   const t = now.toLocaleTimeString('en-IN', { hour12:false });
@@ -5459,11 +5539,32 @@ function tick(){
     (now.getHours() < 15 || (now.getHours() === 15 && now.getMinutes() <= 30));
   const open = isTradingHours;
   const pill = document.getElementById("marketStatus");
+  const reason = marketClosedReason(now); // null if today IS a trading day (still "closed" outside 9:15-15:30 though — that's just after-hours, not a holiday)
   pill.className = "status-pill " + (open ? "open" : "closed");
-  pill.innerHTML = `<span class="status-dot ${open ? 'pulse' : ''}"></span> Market ${open ? "Open" : "Closed"}`;
+  document.getElementById("marketStatusDot").className = "status-dot " + (open ? "pulse" : "");
+  document.getElementById("marketStatusLabel").textContent = open ? "Market Open" : (reason ? `Market Closed — ${reason}` : "Market Closed");
+
+  if(!open){
+    const todayIsTradingDay = isTradingDay(now);
+    const beforeOpen = todayIsTradingDay && (now.getHours() < 9 || (now.getHours() === 9 && now.getMinutes() < 15));
+    const next = beforeOpen ? now : nextTradingDay(now);
+    renderMarketClosedPopover(now, reason || "After hours", next, beforeOpen);
+  }
 }
 tick();
 setInterval(tick, 1000);
+
+document.addEventListener("click", function(e){
+  const pill = document.getElementById("marketStatus");
+  const pop = document.getElementById("marketClosedPop");
+  if(!pill || !pop) return;
+  if(pop.contains(e.target)) return; // clicking inside the popover (e.g. scrolling) shouldn't close it
+  if(pill.contains(e.target) && pill.classList.contains("closed")){
+    pop.classList.toggle("show");
+  } else {
+    pop.classList.remove("show");
+  }
+});
 
 /* =====================================================================
    LIVE BACKEND (permanent server)
