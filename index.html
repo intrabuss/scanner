@@ -702,10 +702,13 @@ html[data-theme="light"] .avatar{ background:linear-gradient(160deg,#E3E7EE,#F3F
   font-size:11px; line-height:1.5; color:var(--text-muted);
 }
 .edu-disclaimer-box i{ font-size:13px; margin-top:1px; flex-shrink:0; color:var(--text-secondary); }
-.dashboard-footer-disclaimer{
-  margin-top:28px; padding:16px 8px 4px; border-top:1px solid var(--border-soft);
-  font-size:10.5px; line-height:1.6; color:var(--text-muted); text-align:center;
+.dashboard-top-disclaimer{
+  display:flex; align-items:flex-start; gap:8px; margin-bottom:16px;
+  padding:10px 14px; border-radius:var(--radius-md);
+  background:var(--bg-surface); border:1px solid var(--border-med);
+  font-size:11px; line-height:1.55; color:var(--text-muted);
 }
+.dashboard-top-disclaimer i{ font-size:14px; margin-top:1px; flex-shrink:0; color:var(--text-secondary); }
 .live-status-box{
   margin-bottom:14px; padding:11px 12px; border-radius:var(--radius-sm);
   font-size:12.5px; font-weight:600; display:flex; align-items:center; gap:8px; line-height:1.4;
@@ -1244,7 +1247,19 @@ html.hide-etf #etfSwingSection{ display:none !important; }
 .brief-head{ display:flex; align-items:center; gap:8px; margin-bottom:4px; }
 .brief-title{ font-size:11.5px; font-weight:700; text-transform:uppercase; letter-spacing:.03em; color:var(--text-secondary); }
 .brief-time{ font-size:11px; color:var(--text-muted); }
-.brief-text{ font-size:13px; line-height:1.5; color:var(--text-primary); }
+.brief-text{ font-size:13px; line-height:1.6; color:var(--text-primary); white-space:pre-wrap; }
+.brief-text-wrap{ position:relative; max-height:110px; overflow:hidden; transition:max-height .25s ease; }
+.brief-text-wrap.expanded{ max-height:none; }
+.brief-text-wrap:not(.expanded)::after{
+  content:""; position:absolute; left:0; right:0; bottom:0; height:36px;
+  background:linear-gradient(180deg, transparent, var(--bg-raised));
+}
+.brief-toggle{
+  margin-top:8px; font-size:12px; font-weight:600; color:var(--brand);
+  display:inline-flex; align-items:center; gap:4px;
+}
+.brief-toggle i{ font-size:11px; transition:transform .2s ease; }
+.brief-toggle.open i{ transform:rotate(180deg); }
 .brief-error{ font-size:12.5px; color:var(--text-muted); font-style:italic; }
 
 /* ===== ASK AI WIDGET ===== */
@@ -1439,15 +1454,23 @@ html.hide-etf #etfSwingSection{ display:none !important; }
 
     <div class="backend-banner" id="backendBanner"></div>
 
+    <div class="dashboard-top-disclaimer">
+      <i class="bi bi-mortarboard"></i>
+      <span>All data, scores, and AI-generated text on this dashboard are for educational and informational purposes only and do not constitute investment advice. Nothing here is a recommendation to buy or sell any security — trade at your own discretion and risk.</span>
+    </div>
+
     <!-- AI MARKET BRIEF -->
     <div class="brief-card" id="briefCard">
       <div class="brief-icon"><i class="bi bi-stars"></i></div>
       <div class="brief-body">
         <div class="brief-head">
-          <span class="brief-title">Market Brief</span>
+          <span class="brief-title">Market Brief · Sector Report</span>
           <span class="brief-time" id="briefTime"></span>
         </div>
-        <div class="brief-text" id="briefText"></div>
+        <div class="brief-text-wrap" id="briefTextWrap">
+          <div class="brief-text" id="briefText"></div>
+        </div>
+        <button type="button" class="brief-toggle" id="briefToggleBtn">Read full report <i class="bi bi-chevron-down"></i></button>
       </div>
     </div>
 
@@ -1650,10 +1673,6 @@ html.hide-etf #etfSwingSection{ display:none !important; }
           </div>
         </div>
       </div>
-    </div>
-
-    <div class="dashboard-footer-disclaimer">
-      All data, scores, and AI-generated text on this dashboard are for educational and informational purposes only and do not constitute investment advice. Nothing here is a recommendation to buy or sell any security — trade at your own discretion and risk.
     </div>
 
   </main>
@@ -4482,11 +4501,11 @@ function renderQuadChart(data){
   });
 }
 
-async function loadChart(symbol){
+async function loadChart(symbol, forcePlain){
   const session = getSession();
   const isAdmin = session && session.mobile === ADMIN_MOBILE;
 
-  if(!isAdmin){
+  if(!isAdmin || forcePlain){
     showChartMsg("Loading chart…", "bi-hourglass-split");
     const container = document.getElementById("tvChartContainer");
     container.classList.remove("chart-quad-grid");
@@ -4611,7 +4630,7 @@ document.getElementById("chartNewsCloseBtn").addEventListener("click", closeChar
 document.getElementById("chartBreaklogToggleBtn").addEventListener("click", () => toggleChartPopover("chartBreaklog"));
 document.getElementById("chartBreaklogCloseBtn").addEventListener("click", closeChartPopovers);
 
-function openChartModal(symbol){
+function openChartModal(symbol, forcePlain){
   currentChartSymbol = symbol;
   const row = findRowForSymbol(symbol);
   const session = getSession();
@@ -4619,14 +4638,15 @@ function openChartModal(symbol){
   document.getElementById("chartTitle").textContent = symbol;
   document.getElementById("chartSub").textContent = row
     ? `${row.name || ""} · ${row.sector || ""} · ₹${row.price.toLocaleString('en-IN')}`
-    : "Live intraday chart";
+    : "Live daily chart";
   document.getElementById("chartOpenTv").href = `https://www.tradingview.com/chart/?symbol=${encodeURIComponent(tvSymbol(symbol))}`;
-  document.getElementById("chartIntervalSelect").style.display = isAdmin ? "none" : "";
+  document.getElementById("chartIntervalSelect").style.display = (isAdmin && !forcePlain) ? "none" : "";
+  if(forcePlain) document.getElementById("chartIntervalSelect").value = "D"; // ETFs: plain daily chart, no ORB/DRB context to pick a shorter default from
   renderChartBreakSummary(row);
   renderChartLevels(row);
   closeChartPopovers();
   document.getElementById("chartOverlay").classList.add("show");
-  loadChart(symbol);
+  loadChart(symbol, forcePlain);
   loadChartNews(symbol);
 }
 function closeChartModal(){
@@ -4822,7 +4842,16 @@ async function fetchMarketBrief(){
     const card = document.getElementById("briefCard");
     const textEl = document.getElementById("briefText");
     const timeEl = document.getElementById("briefTime");
+    const wrapEl = document.getElementById("briefTextWrap");
+    const toggleBtn = document.getElementById("briefToggleBtn");
     if(data.text){
+      if(textEl.textContent !== data.text){
+        // Content actually changed (new slot generated) — collapse back down
+        // rather than leaving it expanded from a stale read of the last report.
+        wrapEl.classList.remove("expanded");
+        toggleBtn.classList.remove("open");
+        toggleBtn.innerHTML = 'Read full report <i class="bi bi-chevron-down"></i>';
+      }
       textEl.textContent = data.text;
       textEl.classList.remove("brief-error");
       timeEl.textContent = data.generated_at ? `updated ${data.generated_at}` : "";
@@ -4839,6 +4868,11 @@ async function fetchMarketBrief(){
 }
 fetchMarketBrief();
 setInterval(fetchMarketBrief, 5 * 60 * 1000);
+document.getElementById("briefToggleBtn").addEventListener("click", function(){
+  const expanded = document.getElementById("briefTextWrap").classList.toggle("expanded");
+  this.classList.toggle("open", expanded);
+  this.innerHTML = expanded ? 'Show less <i class="bi bi-chevron-down"></i>' : 'Read full report <i class="bi bi-chevron-down"></i>';
+});
 
 /* =====================================================================
    ASK AI — dashboard-wide chat box, fed a summary of the whole day's
@@ -5241,7 +5275,7 @@ function renderEtfSwingTable(){
   tbody.innerHTML = sorted.map(r => `
     <tr>
       <td>
-        <div class="sym">${r.symbol}</div>
+        <div class="sym sym-link" onclick="openChartModal('${r.symbol}', true)">${r.symbol} <i class="bi bi-graph-up"></i></div>
         <div class="cell-sub" style="font-size:11px;">${r.name}</div>
       </td>
       <td class="cell-sub">${r.sector || 'Other'}</td>
