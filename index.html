@@ -1473,6 +1473,7 @@ html.hide-etf #etfSwingSection{ display:none !important; }
                 <th class="sortable" data-key="chg_20d">20d <span class="sort-arrow"><i class="bi bi-caret-down-fill"></i></span></th>
                 <th class="sortable" data-key="chg_3wk">3wk <span class="sort-arrow"><i class="bi bi-caret-down-fill"></i></span></th>
                 <th class="sortable" data-key="chg_1mo">1mo <span class="sort-arrow"><i class="bi bi-caret-down-fill"></i></span></th>
+                <th class="sortable" data-key="volume">Volume <span class="sort-arrow"><i class="bi bi-caret-down-fill"></i></span></th>
                 <th class="sortable" data-key="rvol">RVOL <span class="sort-arrow"><i class="bi bi-caret-down-fill"></i></span></th>
                 <th class="sortable" data-key="rsi14">RSI <span class="sort-arrow"><i class="bi bi-caret-down-fill"></i></span></th>
                 <th class="sortable" data-key="score">Score</th>
@@ -4659,6 +4660,14 @@ function etfChgTxt(v){
   return `<span class="chg-txt ${v >= 0 ? 'up' : 'down'}">${v >= 0 ? '+' : ''}${v.toFixed(2)}%</span>`;
 }
 
+function formatVolume(v){
+  if(v == null) return '—';
+  if(v >= 1e7) return (v / 1e7).toFixed(2) + ' Cr';
+  if(v >= 1e5) return (v / 1e5).toFixed(2) + ' L';
+  if(v >= 1e3) return (v / 1e3).toFixed(1) + ' K';
+  return Math.round(v).toString();
+}
+
 function renderEtfSwingTable(){
   const tbody = document.getElementById("etfSwingBody");
   const empty = document.getElementById("etfSwingEmpty");
@@ -4693,6 +4702,7 @@ function renderEtfSwingTable(){
       <td>${etfChgTxt(r.chg_20d)}</td>
       <td>${etfChgTxt(r.chg_3wk)}</td>
       <td>${etfChgTxt(r.chg_1mo)}</td>
+      <td class="mono">${formatVolume(r.volume)}</td>
       <td><span class="rovl-tag ${r.rvol != null && r.rvol > 1.2 ? 'hot' : 'normal'}">${r.rvol != null ? r.rvol + 'x' : '—'}</span></td>
       <td class="mono">${r.rsi14 != null ? r.rsi14 : '—'}</td>
       <td><span class="combo-chip ${(r.signal || 'watch').toLowerCase()}" title="${r.above_200dma === true ? 'Above' : r.above_200dma === false ? 'Below' : '—'} 200-day avg">
@@ -4710,44 +4720,62 @@ function populateEtfSectorFilter(){
   if(sectors.includes(current)) select.value = current;
 }
 
-async function loadEtfSwing(){
+async function loadEtfSwing(silent){
   const btn = document.getElementById("etfSwingRefreshBtn");
   const empty = document.getElementById("etfSwingEmpty");
   const base = getBackendUrl();
   if(!base){
-    empty.style.display = "block";
-    empty.textContent = "Set your Live Data Source in Settings first.";
+    if(!silent){
+      empty.style.display = "block";
+      empty.textContent = "Set your Live Data Source in Settings first.";
+    }
     return;
   }
-  btn.disabled = true;
-  btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Loading…';
-  document.getElementById("etfSwingBody").innerHTML = "";
-  empty.style.display = "block";
-  empty.textContent = "Loading the full NSE ETF universe — this can take a couple of minutes (fetching ~400 days of history per ETF)…";
+  if(!silent){
+    btn.disabled = true;
+    btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Loading…';
+    document.getElementById("etfSwingBody").innerHTML = "";
+    empty.style.display = "block";
+    empty.textContent = "Loading the full NSE ETF universe — this can take a couple of minutes the first time (fetching ~400 days of history per ETF); after that, price/volume stay live on a fast refresh.";
+  }
   try {
     const res = await fetch(base + "/scan/etf-swing");
     if(!res.ok) throw new Error("HTTP " + res.status);
     const data = await res.json();
     if(data.error){
-      empty.textContent = data.error === "not_logged_in" ? "Log in to your data source to load this." : "Couldn't load ETF data right now.";
-      etfSwingData = [];
+      if(!silent){
+        empty.textContent = data.error === "not_logged_in" ? "Log in to your data source to load this." : "Couldn't load ETF data right now.";
+        etfSwingData = [];
+      }
     } else {
       etfSwingData = data.etfs || [];
-      document.getElementById("etfSwingCount").textContent = `${data.universe_size || etfSwingData.length} ETFs found · updated ${data.computed_at || ''}`;
-      if(!etfSwingData.length) empty.textContent = "No ETF data returned — check the symbols still match your data source's instrument list.";
+      document.getElementById("etfSwingCount").textContent = `${data.universe_size || etfSwingData.length} ETFs · live · updated ${data.computed_at || ''}`;
+      if(!etfSwingData.length && !silent) empty.textContent = "No ETF data returned — check the symbols still match your data source's instrument list.";
     }
     populateEtfSectorFilter();
     renderEtfSwingTable();
   } catch(err){
-    empty.style.display = "block";
-    empty.textContent = "Couldn't reach the backend for ETF data.";
-    etfSwingData = [];
+    if(!silent){
+      empty.style.display = "block";
+      empty.textContent = "Couldn't reach the backend for ETF data.";
+      etfSwingData = [];
+    }
   } finally {
-    btn.disabled = false;
-    btn.innerHTML = '<i class="bi bi-arrow-clockwise"></i> Refresh';
+    if(!silent){
+      btn.disabled = false;
+      btn.innerHTML = '<i class="bi bi-arrow-clockwise"></i> Refresh';
+    }
   }
 }
-document.getElementById("etfSwingRefreshBtn").addEventListener("click", loadEtfSwing);
+let etfSwingPollTimer = null;
+document.getElementById("etfSwingRefreshBtn").addEventListener("click", async function(){
+  await loadEtfSwing(false);
+  // Manual load succeeded — start (or keep) a quiet background refresh so
+  // price/volume stay live without re-running the expensive history fetch.
+  if(etfSwingData.length && !etfSwingPollTimer){
+    etfSwingPollTimer = setInterval(() => loadEtfSwing(true), 20000);
+  }
+});
 document.getElementById("etfSwingSectorFilter").addEventListener("change", renderEtfSwingTable);
 document.querySelectorAll("#etfSwingSection .filter-chip").forEach(chip => {
   chip.addEventListener("click", function(){
