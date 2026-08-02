@@ -1379,6 +1379,23 @@ html.hide-etf #etfSwingSection{ display:none !important; }
 .backend-banner.offline{ background:var(--bear-dim); border:1px solid rgba(239,68,68,.35); color:var(--bear); }
 .backend-banner.online{ background:var(--bull-dim); border:1px solid rgba(34,197,94,.35); color:var(--bull); }
 
+.upstox-login-banner{
+  display:none; align-items:center; gap:10px; padding:10px 16px; margin-bottom:16px;
+  border-radius:var(--radius-md); font-size:12.5px; font-weight:600;
+  background:var(--bear-dim); border:1px solid rgba(239,68,68,.35); color:var(--bear);
+  flex-wrap:wrap;
+}
+.upstox-login-banner.show{ display:flex; }
+.upstox-login-banner-btn{
+  margin-left:auto; display:inline-flex; align-items:center; gap:6px;
+  padding:7px 14px; border-radius:6px; background:var(--bear); color:#fff; font-weight:700;
+  font-size:12px; border:none; font-family:var(--font-ui); white-space:nowrap;
+}
+.upstox-login-banner-btn:hover{ opacity:.9; }
+@media (max-width: 640px){
+  .upstox-login-banner-btn{ margin-left:0; width:100%; justify-content:center; }
+}
+
 /* ===== AI MARKET BRIEF ===== */
 .brief-card{
   display:none; gap:12px; padding:14px 16px; margin-bottom:16px;
@@ -1631,6 +1648,12 @@ html.hide-etf #etfSwingSection{ display:none !important; }
     </div>
 
     <div class="backend-banner" id="backendBanner"></div>
+
+    <div class="upstox-login-banner" id="upstoxLoginBanner">
+      <i class="bi bi-exclamation-triangle-fill"></i>
+      <span>Upstox isn't logged in today — showing last known data, not live. <strong>Log in to Upstox</strong> to resume the live feed.</span>
+      <button type="button" class="upstox-login-banner-btn" id="upstoxLoginBannerBtn"><i class="bi bi-box-arrow-up-right"></i> Log in to Upstox</button>
+    </div>
 
     <div class="dashboard-top-disclaimer">
       <i class="bi bi-mortarboard"></i>
@@ -2568,12 +2591,41 @@ function showApp(session){
   // there's a way to reach the login button at all) — but landing on a
   // dashboard with no live data and no visible next step was the actual
   // bug being reported. This surfaces it immediately instead of silently.
-  if(isAdmin){
-    fetch(getBackendUrl() + "/health").then(r => r.json()).then(data => {
-      if(!data.logged_in) openSettings();
-    }).catch(() => {});
+  // Admin is deliberately let in even when Upstox isn't logged in yet (so
+  // there's a way to reach the login control at all) — landing on a
+  // dashboard with no live data and no visible next step was the actual
+  // bug being reported. A persistent banner (not a one-time modal popup,
+  // which is easy to miss or dismiss and forget) stays up until fixed.
+  if(isAdmin) refreshUpstoxLoginBanner();
+}
+
+async function refreshUpstoxLoginBanner(){
+  const banner = document.getElementById("upstoxLoginBanner");
+  if(!banner) return;
+  const session = getSession();
+  if(!session || session.mobile !== ADMIN_MOBILE){ banner.classList.remove("show"); return; }
+  try {
+    const res = await fetch(getBackendUrl() + "/health");
+    const data = await res.json();
+    banner.classList.toggle("show", !data.logged_in);
+  } catch(err){
+    // Can't reach the backend at all — the existing offline backendBanner
+    // already covers that case, no need to also show the login banner.
+    banner.classList.remove("show");
   }
 }
+
+document.getElementById("upstoxLoginBannerBtn").addEventListener("click", function(){
+  const popup = window.open(getBackendUrl() + "/login", "upstoxLogin", "width=480,height=680,menubar=no,toolbar=no");
+  const poll = setInterval(() => {
+    if(!popup || popup.closed){
+      clearInterval(poll);
+      refreshUpstoxLoginBanner();
+      fetchLiveData(); // retry immediately instead of waiting for the next poll cycle
+    }
+  }, 800);
+});
+setInterval(refreshUpstoxLoginBanner, 20000); // catches a login done from Settings, another tab, or the daily routine finishing on its own
 
 /* ---------------- Admin: manage allowed mobile numbers ---------------- */
 async function renderAdminList(){
