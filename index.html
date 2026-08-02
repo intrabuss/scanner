@@ -620,6 +620,28 @@ html[data-theme="light"] .avatar{ background:linear-gradient(160deg,#E3E7EE,#F3F
 
 .trend-arrow{ font-size:15px; }
 
+/* Sector Trend — rolling heatmap strip. One cell per sampled interval through
+   the session (oldest on the left, most recent on the right) — built from our
+   own score history client-side, no 3rd-party widget involved. */
+.sector-graph{
+  display:flex; gap:2px; align-items:center; overflow-x:auto; max-width:190px;
+  scrollbar-width:none;
+}
+.sector-graph::-webkit-scrollbar{ display:none; }
+.sector-graph-cell{
+  width:10px; height:18px; border-radius:2px; flex-shrink:0;
+  background:var(--bg-hover); transition:.15s ease;
+}
+.sector-graph-cell.bull{ background:var(--bull); }
+.sector-graph-cell.bear{ background:var(--bear); }
+.sector-graph-cell.neutral{ background:var(--neutral); opacity:.5; }
+.sector-graph-cell.now{ outline:1.5px solid var(--text-primary); outline-offset:-1.5px; }
+.sector-graph-empty{ font-size:11px; color:var(--text-muted); font-style:italic; }
+@media (max-width: 767.98px){
+  .sector-graph{ max-width:120px; }
+  .sector-graph-cell{ width:8px; height:16px; }
+}
+
 /* ============ LOGIN GATE ============ */
 .login-gate{
   position:fixed; inset:0; z-index:1000; background:var(--bg-base);
@@ -1442,15 +1464,16 @@ html.hide-etf #etfSwingSection{ display:none !important; }
     <!-- SECTOR TREND -->
     <div class="section-head">
       <div class="section-title">Sector Trend <span class="count" id="sectorCount">18 sectors</span></div>
+      <div class="section-sub" id="sectorTimeWindow" style="font-size:11px; color:var(--text-muted); font-family:var(--font-data);"></div>
     </div>
     <div class="card-x table-scroll">
       <table class="data-grid" id="sectorTable">
         <thead>
           <tr>
+            <th>#</th>
             <th>Sector</th>
-            <th>Avg Sector ROVL</th>
             <th>% Change</th>
-            <th>Strength</th>
+            <th>Trend</th>
             <th>Status</th>
             <th>Explore</th>
           </tr>
@@ -2223,6 +2246,7 @@ function showApp(session){
   document.getElementById("scanModeSection").classList.toggle("read-only", !isAdmin);
   document.getElementById("scanModeNonAdminMsg").style.display = isAdmin ? "none" : "block";
   if(isAdmin) renderAdminList();
+  refreshScanModeUI(); // pull the real configured stock counts (e.g. 424 / 4,515) from /health right away
 
   const roleBadge = document.getElementById("roleBadge");
   roleBadge.style.display = "inline-flex";
@@ -3582,6 +3606,102 @@ document.getElementById("globalIdxGrid").innerHTML = globalIndices.map(ix => `
 let sectorStrengthMap = {};
 let sectorStatusMap = {};
 
+/* ---------------- Sector Trend heatmap history ----------------
+   Client-side only — no backend change needed. Every time renderSectorTrend()
+   runs (each live poll), we check whether we've crossed into a new sampling
+   bucket (every 5 min) and if so, snapshot each sector's current status into
+   a rolling strip. Persisted to localStorage keyed by today's date so a page
+   refresh mid-session doesn't lose the strip built up so far; old days' keys
+   are cleaned up on load so this doesn't grow forever. */
+const SECTOR_HIST_KEY_PREFIX = "ib_sector_hist_";
+const SECTOR_HIST_SAMPLE_MINUTES = 5;   // one heatmap cell per 5 min — ~75 cells across a full 6h15m session
+const SECTOR_HIST_MAX_POINTS = 60;      // caps the strip so it can't grow unbounded intraday
+let sectorHistory = {};                 // { sectorName: [{t:"HH:MM", status:"bull"|"bear"|"neutral"}, ...] }
+let lastSectorHistBucket = null;
+
+function todayDateKey(){ return new Date().toISOString().slice(0,10); }
+
+function loadSectorHistory(){
+  const key = SECTOR_HIST_KEY_PREFIX + todayDateKey();
+  try {
+    Object.keys(localStorage)
+      .filter(k => k.startsWith(SECTOR_HIST_KEY_PREFIX) && k !== key)
+      .forEach(k => localStorage.removeItem(k)); // drop prior days' strips
+    const raw = localStorage.getItem(key);
+    sectorHistory = raw ? JSON.parse(raw) : {};
+  } catch(e){ sectorHistory = {}; }
+}
+function saveSectorHistory(){
+  try { localStorage.setItem(SECTOR_HIST_KEY_PREFIX + todayDateKey(), JSON.stringify(sectorHistory)); }
+  catch(e){ /* storage full/unavailable — heatmap just won't persist across refreshes */ }
+}
+loadSectorHistory();
+
+function sectorHistBucketKey(now){
+  const m = now.getMinutes();
+  const bucketMin = m - (m % SECTOR_HIST_SAMPLE_MINUTES);
+  return String(now.getHours()).padStart(2,"0") + ":" + String(bucketMin).padStart(2,"0");
+}
+
+/* ---------------- Sector composite scoring ----------------
+   Implements: CompositeScore = W1*IndicatorScore + W2*ROVL_Diff_Norm
+   - IndicatorScore: breadth of 10 boolean flags (from the backend's per-stock
+     `indicators` object) passing across every stock in the sector, this poll.
+   - ROVL_Diff_Norm: how the sector's avg ROVL compares to the *cross-sector*
+     average ROVL right now, min-max normalized to 0–1 across all sectors.
+   Tune W1/W2 and the STRONG/WEAK thresholds here — nothing else needs to
+   change to re-tune the rotation behavior. */
+const SECTOR_SCORE_W1_INDICATOR = 0.6;   // weight on indicator breadth
+const SECTOR_SCORE_W2_ROVL      = 0.4;   // weight on relative ROVL strength
+const SECTOR_SCORE_STRONG_MIN   = 0.70;
+const SECTOR_SCORE_WEAK_MAX     = 0.30;
+const INDICATOR_KEYS = ["above_ema9","supertrend_up","macd_bull","rsi_above_50","above_pivot","gap_positive","broke_bullish","adx_strong","rvol_strong","chg_positive"];
+
+function sectorIndicatorScore(rows){
+  if(!rows.length) return 0.5; // no data yet this poll — neutral, not a penalty
+  let passed = 0, total = 0;
+  rows.forEach(r => {
+    if(!r.indicators) return;
+    INDICATOR_KEYS.forEach(k => {
+      total++;
+      if(r.indicators[k]) passed++;
+    });
+  });
+  return total ? passed / total : 0.5;
+}
+
+function sampleSectorHistory(sectorAgg){
+  const now = new Date();
+  const bucket = sectorHistBucketKey(now);
+  if(bucket === lastSectorHistBucket) return;
+  lastSectorHistBucket = bucket;
+  sectorAgg.forEach(sc => {
+    const hist = sectorHistory[sc.name] || (sectorHistory[sc.name] = []);
+    if(hist.length && hist[hist.length - 1].t === bucket) return;
+    hist.push({ t: bucket, status: sc.status });
+    if(hist.length > SECTOR_HIST_MAX_POINTS) hist.shift();
+  });
+  saveSectorHistory();
+}
+
+function renderSectorGraph(name){
+  const hist = sectorHistory[name];
+  if(!hist || !hist.length) return `<span class="sector-graph-empty">Building…</span>`;
+  return `<div class="sector-graph">` + hist.map((p, i) =>
+    `<span class="sector-graph-cell ${p.status}${i === hist.length - 1 ? ' now' : ''}" title="${p.t} — ${label(p.status)}"></span>`
+  ).join("") + `</div>`;
+}
+
+function updateSectorTimeWindow(){
+  const el = document.getElementById("sectorTimeWindow");
+  if(!el) return;
+  const allTimes = Object.values(sectorHistory).flat().map(p => p.t);
+  if(!allTimes.length){ el.textContent = ""; return; }
+  const first = allTimes.reduce((a,b) => a < b ? a : b);
+  const last = allTimes.reduce((a,b) => a > b ? a : b);
+  el.textContent = `${first} → ${last}`;
+}
+
 function renderSectorTrend(){
   const bySector = {};
   orbRows.forEach(r => {
@@ -3600,35 +3720,74 @@ function renderSectorTrend(){
     const sells = breaks.length - buys;
     return { count: breaks.length, dir: buys >= sells ? "bull" : "bear" };
   };
-  const sectorAgg = SECTORS.map(name => {
+
+  // Pass 1: raw per-sector inputs (Sector ROVL, indicator breadth, % change)
+  const rawAgg = SECTORS.map(name => {
     const rows = bySector[name] || [];
     const avgRovl = rows.length ? rows.reduce((a,r)=>a+r.rovl,0) / rows.length : 1;
     const avgChg = rows.length ? rows.reduce((a,r)=>a+r.chg,0) / rows.length : 0;
-    const avgScore = rows.length ? rows.reduce((a,r)=>a+r.score,0) / rows.length : 50;
-    const status = avgScore >= 58 ? "bull" : avgScore <= 42 ? "bear" : "neutral";
-    const strength = avgScore >= 62 ? "strong" : avgScore >= 42 ? "moderate" : "weak";
+    const indicatorScore = sectorIndicatorScore(rows);
     const orbBreak = breakInfo(rows);
     const drbBreak = breakInfo(bySectorDrb[name] || []);
-    return { name, avgRovl, avgChg, status, strength, orbBreak, drbBreak };
+    return { name, avgRovl, avgChg, indicatorScore, orbBreak, drbBreak, hasData: rows.length > 0 };
   });
+
+  // Avg_Sector_ROVL — recomputed fresh each cycle, only from sectors with
+  // live data this poll (an empty sector defaulting to 1 would otherwise
+  // quietly drag the whole benchmark toward 1).
+  const withData = rawAgg.filter(sc => sc.hasData);
+  const avgSectorRovl = withData.length
+    ? withData.reduce((a,sc)=>a+sc.avgRovl,0) / withData.length
+    : 1;
+
+  // Min-max normalize ROVL_Diff across the current sector set so it lands in 0–1
+  const diffs = rawAgg.map(sc => sc.avgRovl - avgSectorRovl);
+  const minDiff = Math.min(...diffs), maxDiff = Math.max(...diffs);
+  const spread = maxDiff - minDiff;
+
+  const sectorAgg = rawAgg.map((sc, i) => {
+    const rovlDiff = diffs[i];
+    const rovlDiffNorm = spread > 0 ? (rovlDiff - minDiff) / spread : 0.5;
+    const compositeScore = SECTOR_SCORE_W1_INDICATOR * sc.indicatorScore + SECTOR_SCORE_W2_ROVL * rovlDiffNorm;
+
+    let classification;
+    if(compositeScore >= SECTOR_SCORE_STRONG_MIN && rovlDiff > 0 && sc.indicatorScore >= 0.6) classification = "STRONG";
+    else if(compositeScore <= SECTOR_SCORE_WEAK_MAX) classification = "WEAK";
+    else classification = "NEUTRAL";
+
+    const status = classification === "STRONG" ? "bull" : classification === "WEAK" ? "bear" : "neutral";
+    const strength = classification === "STRONG" ? "strong" : classification === "WEAK" ? "weak" : "moderate";
+
+    return {
+      ...sc, rovlDiff, rovlDiffNorm, compositeScore, classification, status, strength
+    };
+  });
+
+  // Rotation effect: re-sort every cycle so the grid visibly reshuffles as
+  // sectors rotate. Group first by classification (STRONG block, then
+  // NEUTRAL, then WEAK) so a NEUTRAL sector can never sit above a STRONG one
+  // just because its raw CompositeScore edged higher (can happen since STRONG
+  // requires the secondary gate, not just the score threshold) — within each
+  // group, rank by CompositeScore descending.
+  const CLASS_RANK = { STRONG: 0, NEUTRAL: 1, WEAK: 2 };
+  sectorAgg.sort((a,b) => CLASS_RANK[a.classification] - CLASS_RANK[b.classification] || b.compositeScore - a.compositeScore);
 
   sectorStrengthMap = {};
   sectorAgg.forEach(sc => { sectorStrengthMap[sc.name] = sc.strength; });
   sectorStatusMap = {};
   sectorAgg.forEach(sc => { sectorStatusMap[sc.name] = sc.status; });
 
+  sampleSectorHistory(sectorAgg);
+  updateSectorTimeWindow();
+
   document.getElementById("sectorCount").textContent = sectorAgg.length + " sectors";
-  document.querySelector("#sectorTable tbody").innerHTML = sectorAgg.map(sc => `
+  document.querySelector("#sectorTable tbody").innerHTML = sectorAgg.map((sc, i) => `
     <tr class="rail-${sc.status}">
-      <td style="font-weight:600;">
-        ${sc.name}
-        ${sc.orbBreak.count > 0 ? `<span class="sector-break-tag orb ${sc.orbBreak.dir}"><i class="bi bi-arrow-${sc.orbBreak.dir === 'bull' ? 'up' : 'down'}-short"></i>ORB</span>` : ''}
-        ${sc.drbBreak.count > 0 ? `<span class="sector-break-tag drb ${sc.drbBreak.dir}"><i class="bi bi-arrow-${sc.drbBreak.dir === 'bull' ? 'up' : 'down'}-short"></i>DRB</span>` : ''}
-      </td>
-      <td><span class="rovl-tag ${sc.avgRovl > 1.2 ? 'hot' : 'normal'}">${sc.avgRovl.toFixed(2)}${sc.avgRovl > 1.2 ? ' 🔥' : ''}</span></td>
+      <td class="mono cell-sub">${i + 1}</td>
+      <td style="font-weight:600;">${sc.name}</td>
       <td><span class="chg-txt ${sc.avgChg >= 0 ? 'up' : 'down'}">${sc.avgChg >= 0 ? '+' : ''}${sc.avgChg.toFixed(2)}%</span></td>
-      <td><span class="strength-txt ${sc.strength}">${sc.strength === 'moderate' ? 'Neutral' : sc.strength.charAt(0).toUpperCase()+sc.strength.slice(1)}</span></td>
-      <td><span class="badge-status ${sc.status}"><span class="dot"></span>${label(sc.status)}</span></td>
+      <td>${renderSectorGraph(sc.name)}</td>
+      <td><span class="badge-status ${sc.status}" title="Composite ${sc.compositeScore.toFixed(2)} · Indicators ${Math.round(sc.indicatorScore*100)}% · ROVL ${sc.rovlDiff >= 0 ? '+' : ''}${sc.rovlDiff.toFixed(2)} vs avg"><span class="dot"></span>${label(sc.status)}</span></td>
       <td>
         <div class="sector-jump">
           <button type="button" class="sector-jump-btn orb ${sc.orbBreak.count > 0 ? 'has-break ' + sc.orbBreak.dir : ''}" onclick="openExplorer('ORB','all','${sc.name.replace(/'/g,"\\'")}')" title="ORB breakouts in ${sc.name}">ORB${sc.orbBreak.count > 0 ? `<span class="jump-break-badge">${sc.orbBreak.count}</span>` : ''}</button>
@@ -3637,6 +3796,7 @@ function renderSectorTrend(){
       </td>
     </tr>
   `).join("");
+
 }
 
 /* ---------------- Render: Long / Short tables ---------------- */
@@ -4506,7 +4666,8 @@ function mapApiRowToTableRow(r, strategy){
     price: r.price, chg: r.chg, rovl: r.rvol,
     score: r.score, signal: r.signal, status, live: r.live,
     breakLog: r.break_log || [],
-    levelHigh: r.level_high, levelLow: r.level_low, strategy
+    levelHigh: r.level_high, levelLow: r.level_low, strategy,
+    indicators: r.indicators || null
   };
 }
 
