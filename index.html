@@ -1531,25 +1531,6 @@ html.hide-etf #etfSwingSection{ display:none !important; }
       <span>All data, scores, and AI-generated text on this dashboard are for educational and informational purposes only and do not constitute investment advice. Nothing here is a recommendation to buy or sell any security — trade at your own discretion and risk.</span>
     </div>
 
-    <!-- SCAN SIZE — visible to everyone; only admin can actually switch it -->
-    <div class="section-head">
-      <div class="section-title">Scan Size <span class="count">Defaults to Nifty 500</span></div>
-    </div>
-    <div style="margin-bottom:20px;">
-      <div class="scan-mode-toggle" id="scanModeSection">
-        <button type="button" class="scan-mode-btn" id="scanModeNifty500Btn" data-mode="nifty500">
-          <div class="scan-mode-title">Nifty 500</div>
-          <div class="scan-mode-sub" id="scanModeNifty500Sub">~500 stocks · ~3 min rebuild</div>
-        </button>
-        <button type="button" class="scan-mode-btn" id="scanModeFullBtn" data-mode="full">
-          <div class="scan-mode-title">Full Market</div>
-          <div class="scan-mode-sub" id="scanModeFullSub">~4,500 stocks · ~20-25 min rebuild</div>
-        </button>
-      </div>
-      <div id="scanModeMsg" style="font-size:11.5px; display:none; margin-top:8px;"></div>
-      <div id="scanModeNonAdminMsg" style="font-size:11.5px; color:var(--text-muted); margin-top:8px; display:none;">Contact your admin to change this.</div>
-    </div>
-
     <!-- MARKET SNAPSHOT -->
     <div class="section-head">
       <div class="section-title">Market Snapshot</div>
@@ -1817,6 +1798,24 @@ html.hide-etf #etfSwingSection{ display:none !important; }
 
     <div class="settings-divider" id="adminDivider" style="display:none;"></div>
     <div id="adminSection" style="display:none;">
+      <div class="modal-section-lbl">Scan Size <span style="color:var(--text-muted); font-weight:500; text-transform:none; letter-spacing:0;">(admin only) · Defaults to Nifty 500</span></div>
+      <div style="margin-bottom:16px;">
+        <div class="scan-mode-toggle" id="scanModeSection">
+          <button type="button" class="scan-mode-btn" id="scanModeNifty500Btn" data-mode="nifty500">
+            <div class="scan-mode-title">Nifty 500</div>
+            <div class="scan-mode-sub" id="scanModeNifty500Sub">~500 stocks · ~3 min rebuild</div>
+          </button>
+          <button type="button" class="scan-mode-btn" id="scanModeFullBtn" data-mode="full">
+            <div class="scan-mode-title">Full Market</div>
+            <div class="scan-mode-sub" id="scanModeFullSub">~4,500 stocks · ~20-25 min rebuild</div>
+          </button>
+        </div>
+        <div id="scanModeMsg" style="font-size:11.5px; display:none; margin-top:8px;"></div>
+        <div id="scanModeNonAdminMsg" style="font-size:11.5px; color:var(--text-muted); margin-top:8px; display:none;">Contact your admin to change this.</div>
+      </div>
+
+      <div class="settings-divider"></div>
+
       <div class="modal-section-lbl">Manage Access <span style="color:var(--text-muted); font-weight:500; text-transform:none; letter-spacing:0;">(admin only)</span></div>
       <div style="display:flex; gap:8px; margin-bottom:8px;">
         <input type="tel" id="adminNewMobile" inputmode="numeric" maxlength="10" placeholder="Add 10-digit mobile number" style="flex:1; background:var(--bg-raised); border:1px solid var(--border-med); border-radius:var(--radius-sm); padding:9px 10px; color:var(--text-primary); font-size:13px;">
@@ -2429,10 +2428,8 @@ function showApp(session){
   document.getElementById("emailAlertsWrap").style.display = isAdmin ? "block" : "none";
   document.getElementById("explorerAlertTestBtn").style.display = isAdmin ? "" : "none";
   document.getElementById("emailAlertsNonAdminMsg").style.display = isAdmin ? "none" : "block";
-  document.getElementById("scanModeSection").classList.toggle("read-only", !isAdmin);
-  document.getElementById("scanModeNonAdminMsg").style.display = isAdmin ? "none" : "block";
   if(isAdmin) renderAdminList();
-  refreshScanModeUI(); // pull the real configured stock counts (e.g. 424 / 4,515) from /health right away
+  if(isAdmin) refreshScanModeUI(); // pull the real configured stock counts (e.g. 424 / 4,515) from /health right away — admin-only section
 
   const roleBadge = document.getElementById("roleBadge");
   roleBadge.style.display = "inline-flex";
@@ -5266,7 +5263,7 @@ async function fetchLiveData(){
     }
 
     lastSuccessfulFetchAt = Date.now();
-    showBackendBanner("online", `Connected — ${orbRows.length} symbols · ORB + DRB live<span id="backendFreshness"> · updated just now</span>`);
+    showBackendBanner("online", `Connected — ${orbRows.length} symbols<span id="backendFreshness"> · updated just now</span>`);
     contactAdminShownForOutage = false;
     renderAll();
     hasLoadedOnce = true;
