@@ -1130,28 +1130,69 @@ html[data-theme="light"] .avatar{ background:linear-gradient(160deg,#E3E7EE,#F3F
 .btn-danger:hover{ background:rgba(239,68,68,.2); }
 
 /* ============ RISK MANAGEMENT ============ */
-.risk-grid{ display:grid; grid-template-columns:1fr 1fr; gap:24px; padding:20px; }
-@media (max-width: 767.98px){ .risk-grid{ grid-template-columns:1fr; gap:18px; } }
+.modal-box.risk-box{ max-width:600px; padding:0; display:flex; flex-direction:column; max-height:88vh; }
+.modal-box.risk-box .modal-head{ padding:18px 20px; border-bottom:1px solid var(--border-soft); }
+.rm-head-titles{ display:flex; align-items:center; gap:12px; }
+.rm-icon-badge{
+  width:34px; height:34px; border-radius:9px; background:var(--brand-dim); color:var(--brand);
+  display:flex; align-items:center; justify-content:center; font-size:15px; flex-shrink:0;
+}
+.rm-body{ padding:20px; overflow-y:auto; }
+
+/* Hero result — the number someone actually opened this popup to see */
+.rm-hero{
+  display:flex; align-items:center; justify-content:space-between; gap:16px;
+  background:linear-gradient(135deg, var(--brand-dim), transparent 75%);
+  border:1px solid rgba(76,141,255,.3); border-radius:var(--radius-md);
+  padding:16px 18px; margin-bottom:22px;
+}
+.rm-hero .lbl{ font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--text-secondary); }
+.rm-hero .val{ font-size:30px; font-weight:800; color:var(--brand); margin-top:5px; line-height:1; }
+.rm-hero .sub{ font-size:11.5px; color:var(--text-muted); margin-top:6px; }
+.rm-hero-divider{ width:1px; align-self:stretch; background:rgba(76,141,255,.25); }
+.rm-hero-secondary{ text-align:right; }
+.rm-hero-secondary .val2{ font-size:17px; font-weight:700; color:var(--text-primary); margin-top:5px; }
+@media (max-width:520px){
+  .rm-hero{ flex-direction:column; align-items:flex-start; gap:14px; }
+  .rm-hero-divider{ display:none; }
+  .rm-hero-secondary{ text-align:left; }
+}
+
+/* Inputs, as labeled cards rather than a bare label/input list */
+.rm-fields{ display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:22px; }
+.rm-field{
+  background:var(--bg-raised); border:1px solid var(--border-soft); border-radius:var(--radius-md);
+  padding:10px 12px; transition:border-color .15s ease, background .15s ease;
+}
+.rm-field.full{ grid-column:1/-1; }
+.rm-field:focus-within{ border-color:var(--brand); background:var(--brand-dim); }
+.rm-field label{
+  display:flex; align-items:center; gap:6px; font-size:11px; font-weight:600;
+  color:var(--text-secondary); margin-bottom:7px;
+}
+.rm-field label i{ font-size:12px; color:var(--text-muted); }
+.rm-field .rm-inputwrap{ display:flex; align-items:center; gap:4px; }
+.rm-field .rm-inputwrap input{
+  width:100%; background:transparent; border:none; padding:0;
+  color:var(--text-primary); font-size:16px; font-weight:700; font-family:var(--font-data);
+}
+.rm-field .rm-inputwrap input:focus{ outline:none; }
+.rm-field .rm-prefix, .rm-field .rm-suffix{ color:var(--text-muted); font-size:13px; font-weight:600; }
+@media (max-width:520px){ .rm-fields{ grid-template-columns:1fr; } }
+
+.rm-breakdown{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+@media (max-width:520px){ .rm-breakdown{ grid-template-columns:1fr; } }
+.risk-output-item{ padding:14px; border-radius:var(--radius-md); background:var(--bg-raised); border:1px solid var(--border-soft); }
+.risk-output-item .lbl{ font-size:10.5px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.04em; font-weight:700; }
+.risk-output-item .val{ font-weight:700; font-size:17px; margin-top:5px; }
+.risk-output-item.warn{ grid-column:1/-1; border-color:rgba(239,68,68,.3); background:var(--bear-dim); }
+.risk-output-item.warn .val, .risk-output-item.warn .lbl{ color:var(--bear); }
+
 .risk-input-row{
   display:flex; align-items:center; justify-content:space-between; gap:12px;
   padding:11px 0; border-bottom:1px solid var(--border-soft);
 }
-.risk-input-row:last-child{ border-bottom:none; }
 .risk-input-row label{ font-size:12.5px; color:var(--text-secondary); font-weight:600; }
-.risk-input-row .rm-inputwrap{ display:flex; align-items:center; gap:6px; }
-.risk-input-row input{
-  width:110px; text-align:right; background:var(--bg-raised); border:1px solid var(--border-med);
-  border-radius:6px; padding:7px 9px; color:var(--text-primary); font-size:13px;
-}
-.risk-input-row input:focus{ outline:none; border-color:var(--brand); }
-.risk-outputs{ display:grid; grid-template-columns:1fr 1fr; gap:10px; align-content:start; }
-.risk-output-item{ padding:14px; border-radius:var(--radius-md); background:var(--bg-raised); border:1px solid var(--border-soft); }
-.risk-output-item .lbl{ font-size:10.5px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.04em; font-weight:700; }
-.risk-output-item .val{ font-weight:700; font-size:17px; margin-top:5px; }
-.risk-output-item.accent{ border-color:rgba(76,141,255,.35); background:var(--brand-dim); }
-.risk-output-item.accent .val{ color:var(--brand); }
-.risk-output-item.warn{ grid-column:1/-1; border-color:rgba(239,68,68,.3); background:var(--bear-dim); }
-.risk-output-item.warn .val, .risk-output-item.warn .lbl{ color:var(--bear); }
 
 /* ============ TRADE EXPLORER ============ */
 .explorer-stats{
@@ -2194,45 +2235,60 @@ broke_low  = live_price &lt; yesterday_low</code></pre>
 
 <!-- ============ RISK MANAGEMENT MODAL ============ -->
 <div class="modal-overlay" id="riskMgmtOverlay">
-  <div class="modal-box">
+  <div class="modal-box risk-box">
     <div class="modal-head">
-      <div>
-        <div style="font-weight:800; font-size:16px;">Risk Management</div>
-        <div class="explorer-meta">Before entering a trade</div>
+      <div class="rm-head-titles">
+        <div class="rm-icon-badge"><i class="bi bi-shield-check"></i></div>
+        <div>
+          <div style="font-weight:800; font-size:16px;">Risk Management</div>
+          <div class="explorer-meta">Size your position before entering a trade</div>
+        </div>
       </div>
       <button class="icon-btn" id="riskMgmtClose"><i class="bi bi-x-lg"></i></button>
     </div>
-    <div style="padding:16px 20px;">
-      <div class="risk-grid">
+    <div class="rm-body">
+      <div class="rm-hero">
         <div>
-          <div class="risk-input-row">
-            <label>Total Capital</label>
-            <div class="rm-inputwrap"><span class="mono" style="color:var(--text-muted);">₹</span><input type="number" id="rmCapital" class="mono" value="100000" min="0"></div>
-          </div>
-          <div class="risk-input-row">
-            <label>Max Trades / Day</label>
-            <div class="rm-inputwrap"><input type="number" id="rmMaxTrades" class="mono" value="5" min="1"></div>
-          </div>
-          <div class="risk-input-row">
-            <label>Leverage</label>
-            <div class="rm-inputwrap"><input type="number" id="rmLeverage" class="mono" value="5" min="1">×</div>
-          </div>
-          <div class="risk-input-row">
-            <label>Max Risk (% of capital)</label>
-            <div class="rm-inputwrap"><input type="number" id="rmMaxRiskPct" class="mono" value="3" min="0" step="0.5">%</div>
-          </div>
-          <div class="risk-input-row">
-            <label>Current Price (for qty)</label>
-            <div class="rm-inputwrap"><span class="mono" style="color:var(--text-muted);">₹</span><input type="number" id="rmPrice" class="mono" value="500" min="1"></div>
-          </div>
+          <div class="lbl">Quantity at CMP</div>
+          <div class="val mono" id="outQty">0</div>
+          <div class="sub">Shares you can take at the current price</div>
         </div>
-        <div class="risk-outputs">
-          <div class="risk-output-item"><div class="lbl">Capital per Trade</div><div class="val mono" id="outCapPerTrade">₹0</div></div>
-          <div class="risk-output-item accent"><div class="lbl">Buying Power / Trade</div><div class="val mono" id="outBuyingPower">₹0</div></div>
-          <div class="risk-output-item"><div class="lbl">Quantity (at CMP)</div><div class="val mono" id="outQty">0</div></div>
-          <div class="risk-output-item"><div class="lbl">Max Risk (Total)</div><div class="val mono" id="outMaxRisk">₹0</div></div>
-          <div class="risk-output-item warn"><div class="lbl">Risk per Trade</div><div class="val mono" id="outRiskPerTrade">₹0</div></div>
+        <div class="rm-hero-divider"></div>
+        <div class="rm-hero-secondary">
+          <div class="lbl">Buying Power / Trade</div>
+          <div class="val2 mono" id="outBuyingPower">₹0</div>
         </div>
+      </div>
+
+      <div class="modal-section-lbl">Trade Inputs</div>
+      <div class="rm-fields">
+        <div class="rm-field">
+          <label for="rmCapital"><i class="bi bi-wallet2"></i> Total Capital</label>
+          <div class="rm-inputwrap"><span class="mono rm-prefix">₹</span><input type="number" id="rmCapital" class="mono" value="100000" min="0"></div>
+        </div>
+        <div class="rm-field">
+          <label for="rmMaxTrades"><i class="bi bi-stack"></i> Max Trades / Day</label>
+          <div class="rm-inputwrap"><input type="number" id="rmMaxTrades" class="mono" value="5" min="1"></div>
+        </div>
+        <div class="rm-field">
+          <label for="rmLeverage"><i class="bi bi-lightning-charge"></i> Leverage</label>
+          <div class="rm-inputwrap"><input type="number" id="rmLeverage" class="mono" value="5" min="1"><span class="mono rm-suffix">×</span></div>
+        </div>
+        <div class="rm-field">
+          <label for="rmMaxRiskPct"><i class="bi bi-shield-exclamation"></i> Max Risk (% capital)</label>
+          <div class="rm-inputwrap"><input type="number" id="rmMaxRiskPct" class="mono" value="3" min="0" step="0.5"><span class="mono rm-suffix">%</span></div>
+        </div>
+        <div class="rm-field full">
+          <label for="rmPrice"><i class="bi bi-currency-exchange"></i> Current Price (for qty)</label>
+          <div class="rm-inputwrap"><span class="mono rm-prefix">₹</span><input type="number" id="rmPrice" class="mono" value="500" min="1"></div>
+        </div>
+      </div>
+
+      <div class="modal-section-lbl">Breakdown</div>
+      <div class="rm-breakdown">
+        <div class="risk-output-item"><div class="lbl">Capital per Trade</div><div class="val mono" id="outCapPerTrade">₹0</div></div>
+        <div class="risk-output-item"><div class="lbl">Max Risk (Total)</div><div class="val mono" id="outMaxRisk">₹0</div></div>
+        <div class="risk-output-item warn"><div class="lbl">Risk per Trade</div><div class="val mono" id="outRiskPerTrade">₹0</div></div>
       </div>
     </div>
   </div>
