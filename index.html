@@ -1274,6 +1274,30 @@ html.hide-etf #etfSwingSection{ display:none !important; }
 .brief-error{ font-size:12.5px; color:var(--text-muted); font-style:italic; }
 
 /* ===== ASK AI WIDGET ===== */
+#breakToastWrap{
+  position:fixed; top:16px; right:16px; z-index:1200;
+  display:flex; flex-direction:column; gap:8px; pointer-events:none;
+}
+.break-toast{
+  display:flex; align-items:flex-start; gap:10px; width:280px;
+  padding:12px 14px; border-radius:var(--radius-md);
+  background:var(--bg-raised); border:1px solid var(--border-med);
+  box-shadow:0 12px 32px -8px rgba(0,0,0,.5);
+  opacity:0; transform:translateX(20px); transition:opacity .25s ease, transform .25s ease;
+}
+.break-toast.show{ opacity:1; transform:translateX(0); }
+.break-toast.buy{ border-color:rgba(34,197,94,.4); }
+.break-toast.sell{ border-color:rgba(239,68,68,.4); }
+.break-toast-icon{
+  width:26px; height:26px; border-radius:50%; flex-shrink:0; font-size:15px;
+  display:flex; align-items:center; justify-content:center;
+}
+.break-toast.buy .break-toast-icon{ background:var(--bull-dim); color:var(--bull); }
+.break-toast.sell .break-toast-icon{ background:var(--bear-dim); color:var(--bear); }
+.break-toast-top{ font-size:13px; display:flex; align-items:center; gap:6px; }
+.break-toast-strategy{ font-size:10px; font-weight:700; color:var(--text-muted); text-transform:uppercase; }
+.break-toast-detail{ font-size:12px; color:var(--text-secondary); margin-top:2px; font-family:var(--font-data); }
+
 .ask-ai-fab{
   position:fixed; right:20px; bottom:20px; z-index:900;
   width:52px; height:52px; border-radius:50%; border:none; cursor:pointer;
@@ -1746,7 +1770,7 @@ html.hide-etf #etfSwingSection{ display:none !important; }
       <div style="font-size:11.5px; color:var(--text-muted); margin-bottom:10px;">Send the current ETF Buy List on demand. From address is fixed on the server; recipient is configurable here.</div>
       <div class="form-field">
         <label for="emailToInput">Send To</label>
-        <input type="email" id="emailToInput" placeholder="you@example.com">
+        <input type="email" id="emailToInput" multiple placeholder="you@example.com, another@example.com">
       </div>
       <div style="display:flex; gap:8px; margin-top:10px;">
         <button class="btn-view" id="emailToSaveBtn" style="width:auto; padding:9px 16px;"><i class="bi bi-check-lg"></i> Save Address</button>
@@ -2219,6 +2243,9 @@ broke_low  = live_price &lt; yesterday_low</code></pre>
     </div>
   </div>
 </div>
+
+<!-- BREAK ALERT TOASTS -->
+<div id="breakToastWrap"></div>
 
 <!-- ASK AI WIDGET -->
 <button class="ask-ai-fab" id="askAiFab" title="Ask AI about today's scan">
@@ -3993,20 +4020,59 @@ function playAlertBell(){
   }
 }
 
+function showBreakToast(strategy, symbol, price, dir, qty){
+  const wrap = document.getElementById("breakToastWrap");
+  const isBuy = dir === "up";
+  const toast = document.createElement("div");
+  toast.className = "break-toast " + (isBuy ? "buy" : "sell");
+  toast.innerHTML = `
+    <div class="break-toast-icon"><i class="bi ${isBuy ? 'bi-arrow-up-short' : 'bi-arrow-down-short'}"></i></div>
+    <div class="break-toast-body">
+      <div class="break-toast-top"><strong>${symbol}</strong> <span class="break-toast-strategy">${strategy}</span></div>
+      <div class="break-toast-detail">₹${price.toLocaleString('en-IN')} · ${isBuy ? 'BUY' : 'SELL'} · Qty ${qty.toLocaleString('en-IN')}</div>
+    </div>`;
+  wrap.appendChild(toast);
+  setTimeout(() => { toast.classList.add("show"); }, 10);
+  setTimeout(() => {
+    toast.classList.remove("show");
+    setTimeout(() => toast.remove(), 300);
+  }, 6000);
+}
+
+function fireBreakNotification(strategy, symbol, price, dir, qty){
+  playAlertBell();
+  showBreakToast(strategy, symbol, price, dir, qty);
+  const isBuy = dir === "up";
+  if("Notification" in window && Notification.permission === "granted"){
+    try {
+      new Notification(`${symbol} — ${isBuy ? "BUY" : "SELL"} (${strategy})`, {
+        body: `₹${price.toLocaleString('en-IN')} · Qty ${qty.toLocaleString('en-IN')}`,
+        tag: `${strategy}-${symbol}`,
+      });
+    } catch(e){}
+  }
+}
+
 function checkForNewBreaksAndAlert(strategy, rows){
   const seen = seenBreaks[strategy];
-  let sawNew = false;
+  const newBreaks = [];
   rows.forEach(r => {
     (r.breakLog || []).forEach(e => {
       if(e.dir !== "up" && e.dir !== "down") return; // skip "reversed" entries
       const key = `${r.sym}|${e.time}|${e.dir}`;
       if(seen.has(key)) return;
       seen.add(key);
-      if(breakBaselineSet[strategy]) sawNew = true; // only alert on breaks seen AFTER the baseline pass
+      if(breakBaselineSet[strategy]) newBreaks.push({ symbol: r.sym, price: r.price, dir: e.dir });
     });
   });
   breakBaselineSet[strategy] = true;
-  if(sawNew && alertEnabled[strategy]) playAlertBell();
+  if(newBreaks.length && alertEnabled[strategy]){
+    const buyingPower = getBuyingPowerPerTrade();
+    newBreaks.forEach(b => {
+      const qty = Math.max(0, Math.floor(buyingPower / b.price));
+      fireBreakNotification(strategy, b.symbol, b.price, b.dir, qty);
+    });
+  }
 }
 
 function updateExplorerAlertToggleUI(){
@@ -4022,7 +4088,10 @@ document.getElementById("explorerAlertToggle").addEventListener("click", functio
   alertEnabled[strategy] = !alertEnabled[strategy];
   localStorage.setItem("breakAlertEnabled", JSON.stringify(alertEnabled));
   updateExplorerAlertToggleUI();
-  if(alertEnabled[strategy]) playAlertBell(); // quick confirmation chime so you know it's actually on
+  if(alertEnabled[strategy]){
+    if("Notification" in window && Notification.permission === "default") Notification.requestPermission();
+    playAlertBell(); // quick confirmation chime so you know it's actually on
+  }
 });
 
 let explorerSort = { key: "rovl", dir: -1 };
@@ -4406,12 +4475,12 @@ function hideChartMsg(){
   document.getElementById("chartMsg").classList.remove("show");
 }
 
-function chartColorOverrides(){
+function buildChartEmbedUrl(symbol, intervalMin, includeEmas){
   const isLight = document.documentElement.getAttribute("data-theme") === "light";
   // Match the embedded TradingView candles/grid/background to our own design tokens
   // (bull #22C55E, bear #EF4444) instead of TradingView's default red/green, so the
   // chart doesn't look like a bolted-on widget against the rest of the dashboard.
-  return {
+  const overrides = {
     "paneProperties.background": isLight ? "#FFFFFF" : "#10141B",
     "paneProperties.backgroundType": "solid",
     "paneProperties.vertGridProperties.color": isLight ? "#E3E7EE" : "#1A2029",
@@ -4424,80 +4493,43 @@ function chartColorOverrides(){
     "mainSeriesProperties.candleStyle.wickUpColor": "#22C55E",
     "mainSeriesProperties.candleStyle.wickDownColor": "#EF4444"
   };
-}
 
-// TradingView's simple iframe embed (widgetembed URL + studies_overrides) can
-// only apply ONE override value per indicator TYPE — it has no way to give
-// three instances of the same EMA study three different lengths (this is
-// exactly why 9/20/50 wasn't rendering correctly before). Getting genuinely
-// distinct EMAs requires the full JS widget constructor plus its
-// createStudy() API, which supports true per-instance overrides. That means
-// loading tv.js and building a real TradingView.widget() instead of an
-// <iframe src="...">.
-let tvScriptPromise = null;
-function loadTradingViewScript(){
-  if(window.TradingView) return Promise.resolve();
-  if(tvScriptPromise) return tvScriptPromise;
-  tvScriptPromise = new Promise((resolve, reject) => {
-    const script = document.createElement("script");
-    script.src = "https://s3.tradingview.com/tv.js";
-    script.onload = resolve;
-    script.onerror = reject;
-    document.head.appendChild(script);
-  });
-  return tvScriptPromise;
-}
+  // Reverted from the JS-widget/createStudy approach — that would be the
+  // only way to get 3 genuinely distinct EMA lengths (9/20/50), but it
+  // broke chart loading entirely once actually tested live, and this
+  // sandbox has no way to render TradingView content to verify a fix
+  // before shipping it. This iframe embed is the version confirmed to
+  // reliably load charts. It only supports ONE correctly-configured EMA
+  // instance (TradingView's studies_overrides applies per indicator TYPE,
+  // not per instance) — using the verified-correct override key this
+  // time: "moving average exponential.length", not the earlier wrong
+  // "MAExp@tv-basicstudies.length" guess.
+  const studies = includeEmas ? ["MAExp@tv-basicstudies"] : [];
+  const studiesOverrides = includeEmas ? {
+    "moving average exponential.length": 20,
+    "moving average exponential.plot.color": "#3B82F6"
+  } : {};
 
-async function renderPlainTvChart(symbol, intervalMin, includeEmas){
-  const container = document.getElementById("tvChartContainer");
-  container.classList.remove("chart-quad-grid");
-  container.innerHTML = "";
-  const isLight = document.documentElement.getAttribute("data-theme") === "light";
-
-  try {
-    await loadTradingViewScript();
-  } catch(e){
-    showChartMsg("Couldn't load the chart engine — check your connection and try again.", "bi-wifi-off");
-    return;
-  }
-
-  const widget = new TradingView.widget({
-    autosize: true,
+  const params = new URLSearchParams({
     symbol: tvSymbol(symbol),
     interval: intervalMin,
-    timezone: "Asia/Kolkata",
+    hidesidetoolbar: "0",
+    symboledit: "1",
+    saveimage: "0",
+    toolbarbg: isLight ? "F3F5F8" : "141922",
+    studies: JSON.stringify(studies),
     theme: isLight ? "light" : "dark",
     style: "1",
-    locale: "en",
-    toolbar_bg: isLight ? "#F3F5F8" : "#141922",
-    enable_publishing: false,
-    hide_side_toolbar: false,
-    withdateranges: true,
-    hideideas: true,
-    save_image: false,
-    studies: includeEmas ? ["MAExp@tv-basicstudies"] : [],
-    studies_overrides: includeEmas ? {
-      "moving average exponential.length": 9,
-      "moving average exponential.plot.color": "#F59E0B"
-    } : {},
-    overrides: chartColorOverrides(),
-    container_id: "tvChartContainer",
+    timezone: "Asia/Kolkata",
+    withdateranges: "1",
+    hideideas: "1",
+    studies_overrides: JSON.stringify(studiesOverrides),
+    overrides: JSON.stringify(overrides),
+    enabled_features: "[]",
+    disabled_features: "[]",
+    locale: "en"
   });
-
-  widget.onChartReady(() => {
-    hideChartMsg();
-    if(!includeEmas) return;
-    // The base EMA(9) came in via studies/studies_overrides above (the one
-    // reliable path for a single instance). The 20 and 50 lengths get added
-    // as separate instances via createStudy, which is the only API that
-    // actually accepts a distinct length per instance of the same indicator.
-    try {
-      widget.activeChart().createStudy("Moving Average Exponential", false, false, { length: 20 }, { "plot.color": "#3B82F6" });
-      widget.activeChart().createStudy("Moving Average Exponential", false, false, { length: 50 }, { "plot.color": "#EC4899" });
-    } catch(e){
-      console.warn("EMA 20/50 overlay failed:", e);
-    }
-  });
+  return `https://s.tradingview.com/widgetembed/?${params.toString()}`;
 }
 
 /* =====================================================================
@@ -4708,8 +4740,12 @@ function renderQuadChart(data){
 async function loadChart(symbol, forcePlain){
   if(forcePlain){
     showChartMsg("Loading chart…", "bi-hourglass-split");
+    const container = document.getElementById("tvChartContainer");
+    container.classList.remove("chart-quad-grid");
     const intervalMin = document.getElementById("chartIntervalSelect").value;
-    await renderPlainTvChart(symbol, intervalMin, true);
+    container.innerHTML = `<iframe src="${buildChartEmbedUrl(symbol, intervalMin, true)}" allowtransparency="true"></iframe>`;
+    document.getElementById("tvChartContainer").querySelector("iframe").addEventListener("load", hideChartMsg);
+    setTimeout(hideChartMsg, 1500); // fallback in case the iframe's own load event doesn't fire
     return;
   }
 
