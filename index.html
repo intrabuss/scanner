@@ -378,6 +378,21 @@ html[data-theme="light"] .avatar{ background:linear-gradient(160deg,#E3E7EE,#F3F
   gap:12px;
 }
 @media (max-width: 1199.98px){ .idx-grid{ grid-template-columns:repeat(3, 1fr); } }
+
+/* Sector Indices — real NSE index bars, sorted strongest to weakest */
+.sidx-row{
+  display:grid; grid-template-columns:170px 1fr 60px; align-items:center; gap:10px;
+  padding:6px 0;
+}
+.sidx-name{ font-size:12.5px; font-weight:600; color:var(--text-secondary); text-align:right; }
+.sidx-bar-track{ position:relative; height:18px; }
+.sidx-bar{ position:absolute; top:0; height:100%; border-radius:3px; transition:width .2s ease; }
+.sidx-bar.up{ background:var(--bull); left:50%; }
+.sidx-bar.down{ background:var(--bear); right:50%; }
+.sidx-center-line{ position:absolute; left:50%; top:-2px; bottom:-2px; width:1px; background:var(--border-med); }
+.sidx-chg{ font-size:12.5px; font-weight:700; font-family:var(--font-data); }
+.sidx-chg.up{ color:var(--bull); }
+.sidx-chg.down{ color:var(--bear); }
 @media (max-width: 575.98px){ .idx-grid{ grid-template-columns:repeat(2, 1fr); gap:10px; } }
 
 .idx-card{
@@ -1658,6 +1673,16 @@ html.hide-etf #etfSwingSection{ display:none !important; }
     </div>
     <div class="idx-grid" id="idxGrid"></div>
 
+    <!-- REAL SECTOR INDICES (official NSE data — Nifty Auto, Nifty Bank, etc.) -->
+    <div class="section-head">
+      <div class="section-title">Sector Indices <span class="count" id="sectorIdxCount"></span></div>
+      <div class="section-sub" style="font-size:11px; color:var(--text-muted);">Official NSE sectoral indices — live index values, not a computed average</div>
+    </div>
+    <div class="card-x" id="sectorIdxCard" style="padding:14px 18px;">
+      <div id="sectorIdxBars"></div>
+      <div id="sectorIdxEmpty" style="display:none; font-size:12px; color:var(--text-muted); padding:8px 0;">No sector index data yet.</div>
+    </div>
+
     <!-- SECTOR TREND -->
     <div class="section-head">
       <div class="section-title">Sector Trend <span class="count" id="sectorCount">18 sectors</span></div>
@@ -1667,6 +1692,9 @@ html.hide-etf #etfSwingSection{ display:none !important; }
           <i class="bi bi-bell"></i> Alerts per sector — bell icon in each row
         </div>
       </div>
+    </div>
+    <div class="section-sub" style="font-size:11px; color:var(--text-muted); margin:-6px 0 10px;">
+      <i class="bi bi-info-circle"></i> % Change here is the average across the individual stocks we've tagged into each sector — not an official index value. For the real thing, see Sector Indices above.
     </div>
     <div class="card-x table-scroll">
       <table class="data-grid" id="sectorTable">
@@ -5793,6 +5821,58 @@ setInterval(() => {
   const el = document.getElementById("backendFreshness");
   if(el && lastSuccessfulFetchAt) el.textContent = " · " + freshnessTickerText();
 }, 1000);
+
+function renderSectorIndices(rows){
+  const barsEl = document.getElementById("sectorIdxBars");
+  const emptyEl = document.getElementById("sectorIdxEmpty");
+  const countEl = document.getElementById("sectorIdxCount");
+  if(!barsEl) return;
+  if(!rows || !rows.length){
+    barsEl.innerHTML = "";
+    emptyEl.style.display = "block";
+    if(countEl) countEl.textContent = "";
+    return;
+  }
+  emptyEl.style.display = "none";
+  if(countEl) countEl.textContent = rows.length + " indices";
+  const sorted = [...rows].sort((a,b) => b.chg - a.chg);
+  const maxAbs = Math.max(...sorted.map(r => Math.abs(r.chg)), 0.1);
+  barsEl.innerHTML = sorted.map(r => {
+    const dir = r.chg >= 0 ? "up" : "down";
+    const widthPct = Math.min((Math.abs(r.chg) / maxAbs) * 50, 50); // half-track max, bar grows from center
+    return `<div class="sidx-row">
+      <div class="sidx-name">${r.name}</div>
+      <div class="sidx-bar-track">
+        <div class="sidx-center-line"></div>
+        <div class="sidx-bar ${dir}" style="width:${widthPct}%"></div>
+      </div>
+      <div class="sidx-chg ${dir}">${r.chg >= 0 ? '+' : ''}${r.chg.toFixed(2)}%</div>
+    </div>`;
+  }).join("");
+}
+
+let sectorIndicesInFlight = false;
+async function fetchSectorIndices(){
+  if(sectorIndicesInFlight) return;
+  sectorIndicesInFlight = true;
+  const base = getBackendUrl();
+  if(!base){ sectorIndicesInFlight = false; return; }
+  try {
+    const res = await fetch(base + "/sector-indices");
+    if(res.ok){
+      const data = await res.json();
+      renderSectorIndices(data);
+    }
+  } catch(err){
+    // Silent — this panel just keeps showing its last known values, same
+    // as everything else does when a poll fails; the main backendBanner
+    // already covers the "can't reach backend at all" case.
+  } finally {
+    sectorIndicesInFlight = false;
+  }
+}
+fetchSectorIndices();
+setInterval(throttleWhenHidden(fetchSectorIndices, 120000), 20000);
 
 let fetchLiveDataInFlight = false;
 async function fetchLiveData(){
