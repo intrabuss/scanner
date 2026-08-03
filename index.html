@@ -4420,14 +4420,29 @@ function renderSectorTrend(){
   sectorAgg.filter(sc => sc.hasData).forEach(sc => sampleSectorBreadth([sc], { [sc.name]: breadthBySector[sc.name] }));
   updateSectorTimeWindow();
 
+  // Bar width scales against the biggest mover currently in view, so the
+  // strongest sector fills half the track and everything else is relative
+  // to it — same visual language as the original bars-only design.
+  const maxAbsChg = Math.max(...sectorAgg.map(sc => Math.abs(sc.avgChg)), 0.1);
+
   document.querySelector("#sectorIdxTable tbody").innerHTML = sectorAgg.map((sc, i) => {
     const noData = sc.classification === "NO_DATA";
     const internalFilter = internalSectorFilterFor(sc.name);
+    const dir = sc.avgChg >= 0 ? "up" : "down";
+    const barWidthPct = Math.min((Math.abs(sc.avgChg) / maxAbsChg) * 50, 50);
     return `
     <tr class="rail-${sc.status}">
       <td class="mono cell-sub">${i + 1}</td>
       <td style="font-weight:600;">${sc.name}</td>
-      <td><span class="chg-txt ${sc.avgChg >= 0 ? 'up' : 'down'}">${sc.avgChg >= 0 ? '+' : ''}${sc.avgChg.toFixed(2)}%</span></td>
+      <td>
+        <div class="sidx-row" style="grid-template-columns:1fr 60px; padding:0;">
+          <div class="sidx-bar-track">
+            <div class="sidx-center-line"></div>
+            <div class="sidx-bar ${dir}" style="width:${barWidthPct}%"></div>
+          </div>
+          <div class="sidx-chg ${dir}">${sc.avgChg >= 0 ? '+' : ''}${sc.avgChg.toFixed(2)}%</div>
+        </div>
+      </td>
       <td>${noData ? '<span class="cell-sub" style="font-size:11px;" title="No stock-level detail mapped to this index yet">—</span>' : renderSectorBreadth(sc.name)}</td>
       <td>${noData ? '<span class="cell-sub" style="font-size:11px;">—</span>' : `<span class="badge-status ${sc.status}" title="Composite ${sc.compositeScore.toFixed(2)} · Indicators ${Math.round(sc.indicatorScore*100)}% · ROVL ${sc.rovlDiff >= 0 ? '+' : ''}${sc.rovlDiff.toFixed(2)} vs avg"><span class="dot"></span>${label(sc.status)}</span>`}</td>
       <td>
