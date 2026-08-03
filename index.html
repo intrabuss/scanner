@@ -5921,7 +5921,13 @@ function startBackendPolling(){
   fetchLiveData();
   fetchMarketBrief();
   if(backendPollTimer) clearInterval(backendPollTimer);
-  backendPollTimer = setInterval(throttleWhenHidden(fetchLiveData, 60000), 20000);
+  // Was 20s when every poll meant a fresh Upstox REST call server-side.
+  // Now that get_live_rows() just reads the WebSocket feed's in-memory
+  // tick cache (no network call per request), that constraint is gone —
+  // tightened to 3s. Kept conservative rather than going to ~1s since the
+  // droplet is only 1 vCPU and this hasn't been load-tested for real;
+  // worth tuning further once you've seen it hold up under a live session.
+  backendPollTimer = setInterval(throttleWhenHidden(fetchLiveData, 60000), 3000);
 }
 
 document.getElementById("backendUrlSaveBtn").addEventListener("click", function(){
