@@ -685,27 +685,7 @@ tr.pinned-row{ background:var(--brand-dim); }
 
 .trend-arrow{ font-size:15px; }
 
-/* Sector Trend — rolling heatmap strip. One cell per sampled interval through
-   the session (oldest on the left, most recent on the right) — built from our
-   own score history client-side, no 3rd-party widget involved. */
-.sector-graph{
-  display:flex; gap:3px; align-items:center; overflow-x:auto; max-width:260px;
-  scrollbar-width:none;
-}
-.sector-graph::-webkit-scrollbar{ display:none; }
-.sector-graph-cell{
-  width:18px; height:30px; border-radius:4px; flex-shrink:0;
-  background:var(--bg-hover); transition:.15s ease;
-}
-.sector-graph-cell.bull{ background:var(--bull); }
-.sector-graph-cell.bear{ background:var(--bear); }
-.sector-graph-cell.neutral{ background:var(--neutral); opacity:.5; }
-.sector-graph-cell.now{ outline:2px solid var(--text-primary); outline-offset:-2px; }
 .sector-graph-empty{ font-size:11px; color:var(--text-muted); font-style:italic; }
-@media (max-width: 767.98px){
-  .sector-graph{ max-width:160px; }
-  .sector-graph-cell{ width:14px; height:24px; }
-}
 
 /* Sector Breadth module — independent of the composite score/classification
    above (which stays the single source of truth for BUY/SELL/WATCH and
@@ -1695,7 +1675,6 @@ html.hide-etf #etfSwingSection{ display:none !important; }
             <th>#</th>
             <th>Sector</th>
             <th>% Change</th>
-            <th>Trend</th>
             <th>Breadth <i class="bi bi-info-circle" style="font-size:11px; opacity:.6;" title="Live indicator breadth — separate live-vs-daily-technical read, updates every 3 min. Can differ from the Status badge, which only moves when the composite score crosses its thresholds."></i></th>
             <th>Status</th>
             <th>Explore</th>
@@ -4081,42 +4060,7 @@ document.getElementById("globalIdxGrid").innerHTML = globalIndices.map(ix => `
 let sectorStrengthMap = {};
 let sectorStatusMap = {};
 
-/* ---------------- Sector Trend heatmap history ----------------
-   Client-side only — no backend change needed. Every time renderSectorTrend()
-   runs (each live poll), we check whether we've crossed into a new sampling
-   bucket (every 5 min) and if so, snapshot each sector's current status into
-   a rolling strip. Persisted to localStorage keyed by today's date so a page
-   refresh mid-session doesn't lose the strip built up so far; old days' keys
-   are cleaned up on load so this doesn't grow forever. */
-const SECTOR_HIST_KEY_PREFIX = "ib_sector_hist_";
-const SECTOR_HIST_SAMPLE_MINUTES = 5;   // one heatmap cell per 5 min — ~75 cells across a full 6h15m session
-const SECTOR_HIST_MAX_POINTS = 60;      // caps the strip so it can't grow unbounded intraday
-let sectorHistory = {};                 // { sectorName: [{t:"HH:MM", status:"bull"|"bear"|"neutral"}, ...] }
-let lastSectorHistBucket = null;
-
 function todayDateKey(){ return new Date().toISOString().slice(0,10); }
-
-function loadSectorHistory(){
-  const key = SECTOR_HIST_KEY_PREFIX + todayDateKey();
-  try {
-    Object.keys(localStorage)
-      .filter(k => k.startsWith(SECTOR_HIST_KEY_PREFIX) && k !== key)
-      .forEach(k => localStorage.removeItem(k)); // drop prior days' strips
-    const raw = localStorage.getItem(key);
-    sectorHistory = raw ? JSON.parse(raw) : {};
-  } catch(e){ sectorHistory = {}; }
-}
-function saveSectorHistory(){
-  try { localStorage.setItem(SECTOR_HIST_KEY_PREFIX + todayDateKey(), JSON.stringify(sectorHistory)); }
-  catch(e){ /* storage full/unavailable — heatmap just won't persist across refreshes */ }
-}
-loadSectorHistory();
-
-function sectorHistBucketKey(now){
-  const m = now.getMinutes();
-  const bucketMin = m - (m % SECTOR_HIST_SAMPLE_MINUTES);
-  return String(now.getHours()).padStart(2,"0") + ":" + String(bucketMin).padStart(2,"0");
-}
 
 /* ---------------- Sector composite scoring ----------------
    Implements: CompositeScore = W1*IndicatorScore + W2*ROVL_Diff_Norm
@@ -4143,28 +4087,6 @@ function sectorIndicatorScore(rows){
     });
   });
   return total ? passed / total : 0.5;
-}
-
-function sampleSectorHistory(sectorAgg){
-  const now = new Date();
-  const bucket = sectorHistBucketKey(now);
-  if(bucket === lastSectorHistBucket) return;
-  lastSectorHistBucket = bucket;
-  sectorAgg.forEach(sc => {
-    const hist = sectorHistory[sc.name] || (sectorHistory[sc.name] = []);
-    if(hist.length && hist[hist.length - 1].t === bucket) return;
-    hist.push({ t: bucket, status: sc.status });
-    if(hist.length > SECTOR_HIST_MAX_POINTS) hist.shift();
-  });
-  saveSectorHistory();
-}
-
-function renderSectorGraph(name){
-  const hist = sectorHistory[name];
-  if(!hist || !hist.length) return `<span class="sector-graph-empty">Building…</span>`;
-  return `<div class="sector-graph">` + hist.map((p, i) =>
-    `<span class="sector-graph-cell ${p.status}${i === hist.length - 1 ? ' now' : ''}" title="${p.t} — ${label(p.status)}"></span>`
-  ).join("") + `</div>`;
 }
 
 /* ---------------- Sector Breadth module ----------------
@@ -4298,7 +4220,7 @@ function renderSectorBreadth(name){
 function updateSectorTimeWindow(){
   const el = document.getElementById("sectorTimeWindow");
   if(!el) return;
-  const allTimes = Object.values(sectorHistory).flat().map(p => p.t);
+  const allTimes = Object.values(sectorBreadthHistory).flat().map(p => p.t);
   if(!allTimes.length){ el.textContent = ""; return; }
   const first = allTimes.reduce((a,b) => a < b ? a : b);
   const last = allTimes.reduce((a,b) => a > b ? a : b);
@@ -4388,7 +4310,6 @@ function renderSectorTrend(){
   sectorStatusMap = {};
   sectorAgg.forEach(sc => { sectorStatusMap[sc.name] = sc.status; });
 
-  sampleSectorHistory(sectorAgg);
   sampleSectorBreadth(sectorAgg, breadthBySector);
   updateSectorTimeWindow();
 
@@ -4398,7 +4319,6 @@ function renderSectorTrend(){
       <td class="mono cell-sub">${i + 1}</td>
       <td style="font-weight:600;">${sc.name}</td>
       <td><span class="chg-txt ${sc.avgChg >= 0 ? 'up' : 'down'}">${sc.avgChg >= 0 ? '+' : ''}${sc.avgChg.toFixed(2)}%</span></td>
-      <td>${renderSectorGraph(sc.name)}</td>
       <td>${renderSectorBreadth(sc.name)}</td>
       <td><span class="badge-status ${sc.status}" title="Composite ${sc.compositeScore.toFixed(2)} · Indicators ${Math.round(sc.indicatorScore*100)}% · ROVL ${sc.rovlDiff >= 0 ? '+' : ''}${sc.rovlDiff.toFixed(2)} vs avg"><span class="dot"></span>${label(sc.status)}</span></td>
       <td>
@@ -5079,6 +4999,7 @@ const INDEX_TV_MAP = {
 let currentChartSymbol = null;
 let currentChartForcePlain = false;
 let currentChartIsEtf = false;
+let chartRefreshTimer = null; // periodic re-fetch while the chart modal is open (grid view only) — see openChartModal
 let chartViewMode = "grid"; // "grid" or "tradingview" — user-switchable for stocks, always "tradingview" for ETFs
 let currentChartNewsTitles = [];
 
@@ -5589,6 +5510,19 @@ function openChartModal(symbol, forcePlain){
   document.getElementById("chartOverlay").classList.add("show");
   loadChart(symbol, currentChartForcePlain);
   loadChartNews(symbol);
+
+  // Refresh the chart data periodically while the modal stays open, so the
+  // live-price-spliced last candle (from the backend) actually gets pulled
+  // in as the price moves — otherwise you'd only ever see the price as of
+  // the moment you opened the chart. Grid view only: the TradingView iframe
+  // is a separate embedded widget with its own live updates, no need to
+  // force-reload it (that would also lose any zoom/pan the person did).
+  if(chartRefreshTimer) clearInterval(chartRefreshTimer);
+  chartRefreshTimer = setInterval(() => {
+    if(currentChartSymbol === symbol && !effectiveForcePlain()){
+      loadChart(symbol, currentChartForcePlain);
+    }
+  }, 5000);
 }
 function effectiveForcePlain(){
   return currentChartIsEtf || chartViewMode === "tradingview";
@@ -5619,6 +5553,7 @@ function closeChartModal(){
   document.getElementById("chartNewsList").innerHTML = "";
   closeChartPopovers();
   currentChartSymbol = null;
+  if(chartRefreshTimer){ clearInterval(chartRefreshTimer); chartRefreshTimer = null; }
 }
 document.getElementById("chartClose").addEventListener("click", closeChartModal);
 document.getElementById("chartOverlay").addEventListener("click", function(e){
