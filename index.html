@@ -1694,6 +1694,9 @@ html.hide-etf #etfSwingSection{ display:none !important; }
         </button>
 
         <span class="role-badge user" id="roleBadge" style="display:none;"></span>
+        <button class="icon-btn" id="headerLogoutBtn" title="Log out" style="display:none;">
+          <i class="bi bi-box-arrow-right"></i>
+        </button>
       </div>
     </div>
 
@@ -1769,7 +1772,7 @@ html.hide-etf #etfSwingSection{ display:none !important; }
         <div class="card-x table-scroll">
           <table class="data-grid" id="longTable">
             <thead>
-              <tr><th>Symbol</th><th>Sector</th><th>% Chg</th><th>LTP</th><th>ROVL</th><th>Status</th></tr>
+              <tr><th>Symbol</th><th>Sector</th><th>% Chg</th><th>LTP</th><th>ROVL</th><th>Technical Score</th></tr>
             </thead>
             <tbody></tbody>
           </table>
@@ -1784,7 +1787,7 @@ html.hide-etf #etfSwingSection{ display:none !important; }
         <div class="card-x table-scroll">
           <table class="data-grid" id="shortTable">
             <thead>
-              <tr><th>Symbol</th><th>Sector</th><th>% Chg</th><th>LTP</th><th>ROVL</th><th>Status</th></tr>
+              <tr><th>Symbol</th><th>Sector</th><th>% Chg</th><th>LTP</th><th>ROVL</th><th>Technical Score</th></tr>
             </thead>
             <tbody></tbody>
           </table>
@@ -2026,6 +2029,18 @@ html.hide-etf #etfSwingSection{ display:none !important; }
 
       <div class="settings-divider"></div>
 
+      <div class="modal-section-lbl">Add Stock to Sector <span style="color:var(--text-muted); font-weight:500; text-transform:none; letter-spacing:0;">(admin only)</span></div>
+      <div style="font-size:11.5px; color:var(--text-muted); margin-bottom:8px;">Symbol is checked against NSE's real instrument list before saving — a typo or delisted ticker won't silently sit in the map doing nothing.</div>
+      <div style="display:flex; gap:8px; margin-bottom:8px;">
+        <input type="text" id="adminNewStockSymbol" maxlength="20" placeholder="Symbol e.g. TCS" style="flex:1; background:var(--bg-raised); border:1px solid var(--border-med); border-radius:var(--radius-sm); padding:9px 10px; color:var(--text-primary); font-size:13px; text-transform:uppercase;">
+        <select id="adminNewStockSector" class="explorer-select" style="flex:1;"></select>
+        <button class="icon-btn" id="adminAddStockBtn" title="Add stock"><i class="bi bi-plus-lg"></i></button>
+      </div>
+      <div id="adminStockMsg" style="font-size:11.5px; color:var(--bear); margin-bottom:8px; display:none;"></div>
+      <div id="adminStockList" style="display:flex; flex-direction:column; gap:6px; max-height:170px; overflow-y:auto;"></div>
+
+      <div class="settings-divider"></div>
+
       <div class="modal-section-lbl">Backtest a Past Date <span style="color:var(--text-muted); font-weight:500; text-transform:none; letter-spacing:0;">(admin only)</span></div>
       <div style="font-size:11.5px; color:var(--text-muted); margin-bottom:8px;">Full universe takes a few minutes — use Quick Test first to confirm it's working.</div>
       <div style="display:flex; gap:8px; margin-bottom:8px;">
@@ -2202,7 +2217,7 @@ html.hide-etf #etfSwingSection{ display:none !important; }
             <th class="sortable" data-key="sym">Symbol <span class="sort-arrow"><i class="bi bi-caret-down-fill"></i></span></th>
             <th class="sortable" data-key="name">Company <span class="sort-arrow"><i class="bi bi-caret-down-fill"></i></span></th>
             <th class="sortable" data-key="sector">Sector <span class="sort-arrow"><i class="bi bi-caret-down-fill"></i></span></th>
-            <th>Strength</th>
+            <th>Technical Score</th>
             <th class="sortable" data-key="price">Price <span class="sort-arrow"><i class="bi bi-caret-down-fill"></i></span></th>
             <th class="sortable" data-key="chg">% Chg <span class="sort-arrow"><i class="bi bi-caret-down-fill"></i></span></th>
             <th class="sortable" data-key="rovl">ROVL <span class="sort-arrow"><i class="bi bi-caret-down-fill"></i></span></th>
@@ -2590,7 +2605,7 @@ function showApp(session){
   document.getElementById("emailAlertsWrap").style.display = isAdmin ? "block" : "none";
   document.getElementById("explorerAlertTestBtn").style.display = isAdmin ? "" : "none";
   document.getElementById("emailAlertsNonAdminMsg").style.display = isAdmin ? "none" : "block";
-  if(isAdmin) renderAdminList();
+  if(isAdmin) { renderAdminList(); renderAdminStockList(); }
   if(isAdmin) refreshScanModeUI(); // pull the real configured stock counts (e.g. 424 / 4,515) from /health right away — admin-only section
 
   const roleBadge = document.getElementById("roleBadge");
@@ -2599,6 +2614,7 @@ function showApp(session){
   roleBadge.innerHTML = isAdmin
     ? '<i class="bi bi-shield-fill-check"></i> Admin'
     : '<i class="bi bi-person-fill"></i> User';
+  document.getElementById("headerLogoutBtn").style.display = "";
 
   // ETF data used to only ever load if you manually hit the Refresh button
   // inside that section — meaning if you never opened it, it silently
@@ -2709,6 +2725,89 @@ document.getElementById("adminAddBtn").addEventListener("click", async function(
     renderAdminList();
   } catch(e){
     showAdminMsg("Couldn't reach the server. Check your connection and try again.");
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+/* ---------------- Admin: add stocks to a sector ---------------- */
+const ADMIN_STOCK_SECTORS = ["Automobile", "Cement & Cement Products", "Chemicals", "Construction", "Consumer Goods", "Energy", "Fertilisers & Pesticides", "Financial Services", "Healthcare Services", "IT", "Industrial Manufacturing", "Media & Entertainment", "Metals", "Paper", "Pharma", "Services", "Telecom", "Textiles"];
+document.getElementById("adminNewStockSector").innerHTML = ADMIN_STOCK_SECTORS.map(s => `<option value="${s}">${s}</option>`).join("");
+
+function showAdminStockMsg(text, isError){
+  const el = document.getElementById("adminStockMsg");
+  el.textContent = text;
+  el.style.color = isError === false ? "var(--bull)" : "var(--bear)";
+  el.style.display = "block";
+  setTimeout(() => { el.style.display = "none"; }, 3000);
+}
+
+async function renderAdminStockList(){
+  const listEl = document.getElementById("adminStockList");
+  listEl.innerHTML = `<div class="admin-mobile-loading">Loading…</div>`;
+  try {
+    const res = await fetch(getBackendUrl() + "/admin/stock-overrides");
+    const data = await res.json();
+    const overrides = data.overrides || {};
+    const entries = Object.entries(overrides);
+    if(!entries.length){
+      listEl.innerHTML = `<div class="admin-mobile-loading">No admin-added stocks yet.</div>`;
+      return;
+    }
+    listEl.innerHTML = entries.map(([sym, sector]) => `
+      <div class="admin-mobile-row">
+        <span class="mono">${sym} <span class="cell-sub" style="font-size:11px;">${sector}</span></span>
+        <button class="rm-x" data-symbol="${sym}" title="Remove"><i class="bi bi-x-lg"></i></button>
+      </div>
+    `).join("");
+    document.querySelectorAll("#adminStockList .rm-x").forEach(btn => {
+      btn.addEventListener("click", async function(){
+        this.disabled = true;
+        try {
+          const res = await fetch(getBackendUrl() + "/admin/stock-overrides/" + encodeURIComponent(this.dataset.symbol), { method: "DELETE", headers: adminHeaders() });
+          const data = await res.json();
+          if(!data.success){ showAdminStockMsg("Couldn't remove that stock. Try again.", true); return; }
+          renderAdminStockList();
+        } catch(e){
+          showAdminStockMsg("Couldn't reach the server. Try again.", true);
+        }
+      });
+    });
+  } catch(e){
+    listEl.innerHTML = `<div class="admin-mobile-loading">Couldn't reach the server — check your connection and reopen this panel.</div>`;
+  }
+}
+
+document.getElementById("adminAddStockBtn").addEventListener("click", async function(){
+  const symbolInput = document.getElementById("adminNewStockSymbol");
+  const symbol = symbolInput.value.trim().toUpperCase();
+  const sector = document.getElementById("adminNewStockSector").value;
+  if(!symbol || !/^[A-Z0-9&\-]{1,20}$/.test(symbol)){
+    showAdminStockMsg("Enter a valid stock symbol.", true);
+    return;
+  }
+  const btn = this;
+  btn.disabled = true;
+  try {
+    const res = await fetch(getBackendUrl() + "/admin/add-stock", {
+      method: "POST",
+      headers: adminHeaders(),
+      body: JSON.stringify({ symbol, sector })
+    });
+    const data = await res.json();
+    if(!data.success){
+      const msg = data.error === "unauthorized" ? "Admin PIN check failed — try logging out and back in."
+        : data.error === "symbol_not_found_on_nse" ? `"${symbol}" isn't a real NSE symbol — check the spelling.`
+        : data.error === "invalid_sector" ? "Pick a valid sector."
+        : "Couldn't add that stock. Try again.";
+      showAdminStockMsg(msg, true);
+      return;
+    }
+    symbolInput.value = "";
+    showAdminStockMsg(data.note || "Added.", false);
+    renderAdminStockList();
+  } catch(e){
+    showAdminStockMsg("Couldn't reach the server. Check your connection and try again.", true);
   } finally {
     btn.disabled = false;
   }
@@ -3109,12 +3208,14 @@ document.getElementById("settingsOverlay").addEventListener("click", function(e)
 });
 document.getElementById("themeDarkBtn").addEventListener("click", () => applyTheme("dark"));
 document.getElementById("themeLightBtn").addEventListener("click", () => applyTheme("light"));
-document.getElementById("logoutBtn").addEventListener("click", function(){
+function performLogout(){
   clearSession();
   closeSettings();
   showGate();
   if(backendPollTimer) clearInterval(backendPollTimer);
-});
+}
+document.getElementById("logoutBtn").addEventListener("click", performLogout);
+document.getElementById("headerLogoutBtn").addEventListener("click", performLogout);
 
 /* =====================================================================
    MARKET DATA — expiry metadata is static; value/chg/status now come from the live backend
@@ -3909,12 +4010,11 @@ function renderSectorTrend(){
         </div>
       </td>
       <td>${noData ? '<span class="cell-sub" style="font-size:11px;">—</span>' : `<span class="tech-score-chip" title="${nameTooltip}">${scoreOutOf10}/10</span>`}</td>
-      <td>${noData ? '<span class="cell-sub" style="font-size:11px;">—</span>' : `<span class="badge-status ${sc.status}" title="Composite ${sc.compositeScore.toFixed(2)} · Indicators ${Math.round(sc.indicatorScore*100)}% · ROVL ${sc.rovlDiff >= 0 ? '+' : ''}${sc.rovlDiff.toFixed(2)} vs avg"><span class="dot"></span>${label(sc.status)}</span>`}</td>
       <td>
         ${!internalFilter ? '<span class="cell-sub" style="font-size:11px;">—</span>' : `
         <div class="sector-jump">
-          <button type="button" class="sector-jump-btn orb ${sc.orbBreak.count > 0 ? 'has-break ' + sc.orbBreak.dir : ''}" onclick="openExplorer('ORB','all','${internalFilter.replace(/'/g,"\\'")}')" title="ORB breakouts (Financial Services list — bank-only filtering isn't split yet)">ORB${sc.orbBreak.count > 0 ? `<span class="jump-break-badge">${sc.orbBreak.count}</span>` : ''}</button>
-          <button type="button" class="sector-jump-btn drb ${sc.drbBreak.count > 0 ? 'has-break ' + sc.drbBreak.dir : ''}" onclick="openExplorer('DRB','all','${internalFilter.replace(/'/g,"\\'")}')" title="DRB breakouts">DRB${sc.drbBreak.count > 0 ? `<span class="jump-break-badge">${sc.drbBreak.count}</span>` : ''}</button>
+          <button type="button" class="sector-jump-btn orb ${sc.orbBreak.count > 0 ? 'has-break ' + sc.orbBreak.dir : ''}" onclick="openExplorer('ORB','all','${internalFilter.replace(/'/g,"\\'")}','${sc.name.replace(/'/g,"\\'")}',${sc.avgChg})" title="ORB breakouts (Financial Services list — bank-only filtering isn't split yet)">ORB${sc.orbBreak.count > 0 ? `<span class="jump-break-badge">${sc.orbBreak.count}</span>` : ''}</button>
+          <button type="button" class="sector-jump-btn drb ${sc.drbBreak.count > 0 ? 'has-break ' + sc.drbBreak.dir : ''}" onclick="openExplorer('DRB','all','${internalFilter.replace(/'/g,"\\'")}','${sc.name.replace(/'/g,"\\'")}',${sc.avgChg})" title="DRB breakouts">DRB${sc.drbBreak.count > 0 ? `<span class="jump-break-badge">${sc.drbBreak.count}</span>` : ''}</button>
           <button type="button" class="sector-alert-bell ${alertEnabledSectors.has(sc.name) ? 'on' : ''}" data-sector="${sc.name.replace(/"/g,'&quot;')}" title="${alertEnabledSectors.has(sc.name) ? 'ORB alerts ON for ' + sc.name + ' — click to turn off' : 'Turn on ORB alerts for ' + sc.name}"><i class="bi bi-bell${alertEnabledSectors.has(sc.name) ? '-fill' : ''}"></i></button>
         </div>`}
       </td>
@@ -3942,16 +4042,19 @@ function renderSectorTrend(){
 /* ---------------- Render: Long / Short tables ---------------- */
 function renderOppTable(bodyId, rows){
   const body = document.querySelector(bodyId);
-  body.innerHTML = rows.map(r => `
+  body.innerHTML = rows.map(r => {
+    const techScore = r.indicators ? INDICATOR_KEYS.filter(k => r.indicators[k]).length : null;
+    return `
     <tr class="rail-${r.status}${pinnedSymbols.has(r.sym) ? ' pinned-row' : ''}">
       <td><div class="sym sym-link" onclick="openChartModal('${r.sym}')">${r.sym} <i class="bi bi-graph-up"></i></div>${rowActionIconsHtml(r.sym, r.price)}</td>
       <td class="cell-sub">${r.sector}</td>
       <td><span class="chg-txt ${r.chg >= 0 ? 'up' : 'down'}">${r.chg >= 0 ? '+' : ''}${r.chg.toFixed(2)}%</span></td>
       <td class="mono">${r.price.toLocaleString('en-IN')}</td>
       <td><span class="rovl-tag ${r.rovl > 1.2 ? 'hot' : 'normal'}">${r.rovl}${r.rovl > 1.2 ? ' 🔥' : ''}</span></td>
-      <td><span class="badge-status ${r.status}"><span class="dot"></span>${label(r.status)}</span></td>
+      <td>${techScore === null ? '<span class="cell-sub" style="font-size:11px;">—</span>' : `<span class="tech-score-chip">${techScore}/10</span>`}</td>
     </tr>
-  `).join("");
+  `;
+  }).join("");
 }
 
 function renderAll(){
@@ -4411,7 +4514,7 @@ function toggleExpCard(i){
 }
 window.toggleExpCard = toggleExpCard;
 
-function openExplorer(strategy, initialSignal, initialSector){
+function openExplorer(strategy, initialSignal, initialSector, realIndexName, realIndexChg){
   const isORB = strategy === "ORB";
   currentExplorerStrategy = strategy;
   explorerData = isORB ? orbRows : drbRows;
@@ -4421,10 +4524,18 @@ function openExplorer(strategy, initialSignal, initialSector){
 
   const validSector = initialSector && SECTORS.includes(initialSector) ? initialSector : "all";
 
-  document.getElementById("explorerTitle").textContent = (isORB ? "ORB Breakout" : "DRB Breakout") + " — Trade Explorer" + (initialSector ? ` · ${initialSector}` : "");
+  const titleSuffix = realIndexName ? ` · ${realIndexName}` : (initialSector ? ` · ${initialSector}` : "");
+  document.getElementById("explorerTitle").textContent = (isORB ? "ORB Breakout" : "DRB Breakout") + " — Trade Explorer" + titleSuffix;
   const statusBadge = document.getElementById("explorerSectorStatus");
   const sectorStatus = initialSector ? sectorStatusMap[initialSector] : null;
-  if(sectorStatus){
+  if(typeof realIndexChg === "number"){
+    // Show the real, official index % change here — same number as the
+    // Sector Indices table, not a re-derived or different figure.
+    const dir = realIndexChg >= 0 ? "up" : "down";
+    statusBadge.textContent = `${realIndexChg >= 0 ? '+' : ''}${realIndexChg.toFixed(2)}%${sectorStatus ? ' · ' + techLabel(sectorStatus) : ''}`;
+    statusBadge.className = "idx-tech-label " + (sectorStatus || dir);
+    statusBadge.style.display = "inline-block";
+  } else if(sectorStatus){
     statusBadge.textContent = techLabel(sectorStatus);
     statusBadge.className = "idx-tech-label " + sectorStatus;
     statusBadge.style.display = "inline-block";
@@ -4510,12 +4621,14 @@ function renderLongShort(){
 
   document.getElementById("lsEmpty").style.display = rows.length ? "none" : "block";
 
-  document.getElementById("lsBody").innerHTML = rows.map(r => `
+  document.getElementById("lsBody").innerHTML = rows.map(r => {
+    const techScore = r.indicators ? INDICATOR_KEYS.filter(k => r.indicators[k]).length : null;
+    return `
     <tr class="rail-${lsDirection === 'long' ? 'bull' : 'bear'}${pinnedSymbols.has(r.sym) ? ' pinned-row' : ''}">
       <td><div class="sym sym-link" onclick="openChartModal('${r.sym}')">${r.sym} <i class="bi bi-graph-up"></i></div>${rowActionIconsHtml(r.sym, r.price)}</td>
       <td class="cell-sub">${r.name}</td>
       <td class="cell-sub">${r.sector}</td>
-      <td>${strengthBadge(r.sector)}</td>
+      <td>${techScore === null ? '<span class="cell-sub" style="font-size:11px;">—</span>' : `<span class="tech-score-chip">${techScore}/10</span>`}</td>
       <td class="mono">${r.price.toLocaleString('en-IN')}</td>
       <td><span class="chg-txt ${r.chg >= 0 ? 'up' : 'down'}">${r.chg >= 0 ? '+' : ''}${r.chg.toFixed(2)}%</span></td>
       <td><span class="rovl-tag ${r.rovl > 1.2 ? 'hot' : 'normal'}">${r.rovl}${r.rovl > 1.2 ? ' 🔥' : ''}</span></td>
@@ -4527,7 +4640,8 @@ function renderLongShort(){
       </td>
       <td class="mono cell-sub">${formatVolume(r.volume)}${r.live === false ? ' <span class="cell-sub" style="font-size:10px;">(last close)</span>' : ''}</td>
     </tr>
-  `).join("");
+  `;
+  }).join("");
 
   document.querySelectorAll("#lsTable thead th.sortable").forEach(th => {
     th.classList.toggle("sorted", th.dataset.key === lsSort.key);
@@ -4580,13 +4694,10 @@ document.querySelectorAll("#lsTable thead th.sortable").forEach(th => {
 });
 
 /* =====================================================================
-   PRICE CHART MODAL — TradingView embedded chart
-   -------------------------------------------------------------------
-   Uses TradingView's free "Advanced Chart" widget (the same one you get
-   from tradingview.com/widget) loaded as an iframe. It's TradingView's
-   own real-time candles, zoom, and drawing tools — no backend candle
-   endpoint needed. The one thing it can't do is have code draw your
-   ORB high/low lines onto it automatically (that widget is a closed
+   PRICE CHART MODAL — IntraBuss's own chart engine (see IB CHART section
+   below). No TradingView, no embedded iframe — every candle, EMA, and
+   ORB line here is drawn on <canvas> from real Upstox data.
+===================================================================== */
 let currentChartSymbol = null;
 let currentChartIsEtf = false;
 let chartRefreshTimer = null; // periodic re-fetch while the chart modal is open — see openChartModal
@@ -4670,7 +4781,7 @@ function drawQuadPanel(canvas, candles, opts){
   const ctx = canvas.getContext("2d");
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.clearRect(0, 0, w, h);
-  if(!candles || !candles.length) return;
+  if(!candles || !candles.length) return [];
 
   const bull = cssVar("--bull") || "#22C55E";
   const bear = cssVar("--bear") || "#EF4444";
@@ -4885,11 +4996,12 @@ function renderQuadChart(data, isEtf){
   container.classList.add("chart-quad-grid");
   container.innerHTML = "";
 
-  // ETFs get 15-min + Daily (2 panels) — enough for swing-timing entries
-  // without the full 4-panel intraday grid stocks use for ORB/DRB context.
-  const panelsToRender = isEtf ? CHART_PANELS.filter(p => p.key === "15min" || p.key === "daily") : CHART_PANELS;
+  // Both stocks and ETFs now show exactly 2 panels side by side: 15-min
+  // (with ORB high/low lines for stocks — harmless no-op for ETFs, which
+  // simply have no ORB data) and Daily. Replaces the old 4-panel grid.
+  const panelsToRender = CHART_PANELS.filter(p => p.key === "15min" || p.key === "daily");
   container.classList.toggle("chart-quad-single", false);
-  container.classList.toggle("chart-quad-double", isEtf);
+  container.classList.toggle("chart-quad-double", true);
 
   const marketFrozen = !isTradingDay(new Date()) || (() => {
     const now = new Date();
@@ -4904,7 +5016,7 @@ function renderQuadChart(data, isEtf){
     const showStaleNote = data.stale_intraday && panel.key !== "daily";
     const box = document.createElement("div");
     box.className = "chart-quad-panel";
-    const panelLabel = isEtf ? (panel.key === "daily" ? "Daily" : "15min") : panel.label;
+    const panelLabel = panel.label;
     box.innerHTML = `
       <div class="chart-quad-panel-head">${panelLabel}${showStaleNote ? ` <span class="chart-quad-stale">· last session (${data.intraday_as_of})</span>` : ''}</div>
       <div class="chart-quad-ema-legend"></div>
