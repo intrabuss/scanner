@@ -385,18 +385,23 @@ html[data-theme="light"] .avatar{ background:linear-gradient(160deg,#E3E7EE,#F3F
 }
 @media (max-width: 1199.98px){ .idx-grid{ grid-template-columns:repeat(3, 1fr); } }
 
+/* Sector Indices table — fixed layout so the % Change bar column
+   gets a wide, fixed share of the row (see colgroup in markup)
+   instead of shrinking to fit the other columns' content. */
+#sectorIdxTable{ table-layout:fixed; }
+
 /* Sector Indices — real NSE index bars, sorted strongest to weakest */
 .sidx-row{
   display:grid; grid-template-columns:170px 1fr 60px; align-items:center; gap:10px;
-  padding:6px 0;
+  padding:10px 0;
 }
 .sidx-name{ font-size:12.5px; font-weight:600; color:var(--text-secondary); text-align:right; }
-.sidx-bar-track{ position:relative; height:18px; }
-.sidx-bar{ position:absolute; top:0; height:100%; border-radius:3px; transition:width .2s ease; }
+.sidx-bar-track{ position:relative; height:28px; }
+.sidx-bar{ position:absolute; top:0; height:100%; border-radius:6px; transition:width .2s ease; box-shadow:0 1px 3px rgba(0,0,0,.15); }
 .sidx-bar.up{ background:var(--bull); left:50%; }
 .sidx-bar.down{ background:var(--bear); right:50%; }
-.sidx-center-line{ position:absolute; left:50%; top:-2px; bottom:-2px; width:1px; background:var(--border-med); }
-.sidx-chg{ font-size:12.5px; font-weight:700; font-family:var(--font-data); }
+.sidx-center-line{ position:absolute; left:50%; top:-4px; bottom:-4px; width:1px; background:var(--border-med); }
+.sidx-chg{ font-size:14px; font-weight:800; font-family:var(--font-data); }
 .sidx-chg.up{ color:var(--bull); }
 .sidx-chg.down{ color:var(--bear); }
 .tech-score-chip{
@@ -429,6 +434,12 @@ html[data-theme="light"] .avatar{ background:linear-gradient(160deg,#E3E7EE,#F3F
 .idx-tech-label.bull{ background:var(--bull-dim); color:var(--bull); }
 .idx-tech-label.bear{ background:var(--bear-dim); color:var(--bear); }
 .idx-tech-label.neutral{ background:var(--neutral-dim); color:var(--neutral); }
+.explorer-sector-chg{
+  display:inline-flex; align-items:center; gap:3px; margin-top:0; font-size:12px; font-weight:800;
+  font-family:var(--font-data); padding:2px 9px; border-radius:6px; letter-spacing:-.01em;
+}
+.explorer-sector-chg.up{ background:var(--bull-dim); color:var(--bull); }
+.explorer-sector-chg.down{ background:var(--bear-dim); color:var(--bear); }
 .idx-expiry{ margin-top:6px; padding-top:6px; border-top:1px solid var(--border-soft); font-size:10.5px; color:var(--text-muted); letter-spacing:.02em; }
 .idx-change.bull{ color:var(--bull); }
 .idx-change.bear{ color:var(--bear); }
@@ -900,9 +911,25 @@ tr.pinned-row{ background:var(--brand-dim); }
 .role-badge{
   display:inline-flex; align-items:center; gap:5px; padding:3px 9px; border-radius:6px;
   font-size:10.5px; font-weight:700; letter-spacing:.03em; text-transform:uppercase;
+  cursor:pointer; border:none; transition:.15s ease;
 }
 .role-badge.admin{ background:var(--brand-dim); color:var(--brand); border:1px solid rgba(76,141,255,.35); }
 .role-badge.user{ background:var(--bg-hover); color:var(--text-secondary); border:1px solid var(--border-med); }
+.role-badge:hover{ filter:brightness(1.15); }
+
+.user-menu-wrap{ position:relative; display:inline-flex; }
+.user-menu-dropdown{
+  display:none; position:absolute; top:calc(100% + 8px); right:0; z-index:950;
+  min-width:190px; background:var(--bg-card, #12161d); border:1px solid var(--border-med);
+  border-radius:10px; padding:10px; box-shadow:0 10px 30px rgba(0,0,0,.35);
+}
+.user-menu-dropdown.open{ display:block; }
+.user-menu-session{
+  font-size:11px; color:var(--text-muted); padding:2px 4px 10px; border-bottom:1px solid var(--border-med); margin-bottom:8px;
+}
+.user-menu-dropdown .btn-danger{
+  width:100%; display:flex; align-items:center; justify-content:center; gap:7px;
+}
 
 /* ============ MODALS ============ */
 .modal-overlay{
@@ -1693,7 +1720,13 @@ html.hide-etf #etfSwingSection{ display:none !important; }
           <i class="bi bi-arrow-clockwise"></i>
         </button>
 
-        <span class="role-badge user" id="roleBadge" style="display:none;"></span>
+        <div class="user-menu-wrap" id="userMenuWrap" style="display:none;">
+          <button type="button" class="role-badge user" id="roleBadge"></button>
+          <div class="user-menu-dropdown" id="userMenuDropdown">
+            <div class="user-menu-session">Signed in as <strong class="mono" id="userMenuMobile">—</strong></div>
+            <button class="btn-danger" id="logoutBtn"><i class="bi bi-box-arrow-right"></i> Log Out</button>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -1740,22 +1773,24 @@ html.hide-etf #etfSwingSection{ display:none !important; }
         </div>
       </div>
     </div>
-    <div style="display:flex; gap:8px; margin-bottom:10px;">
-      <button type="button" class="sidx-tab active" id="sidxTabSector" onclick="switchSectorIdxTab('sector')">Sector Data</button>
-      <button type="button" class="sidx-tab" id="sidxTabBroader" onclick="switchSectorIdxTab('broader')">Broader Index</button>
-    </div>
-    <div class="section-sub" style="font-size:11px; color:var(--text-muted); margin:-2px 0 10px;">
-      <i class="bi bi-info-circle"></i> % Change is the real, official NSE index value. Breadth/Status/Explore come from the stocks we've mapped into each index — some indices (marked "—") don't have stock-level detail mapped yet.
+    <div class="section-sub" style="font-size:11px; color:var(--text-muted); margin:0 0 10px;">
+      <i class="bi bi-info-circle"></i> % Change is the real, official NSE index value. Breadth/Explore come from the stocks we've mapped into each index — some indices (marked "—") don't have stock-level detail mapped yet.
     </div>
     <div class="card-x table-scroll">
       <table class="data-grid" id="sectorIdxTable">
+        <colgroup>
+          <col style="width:44px;">
+          <col style="width:150px;">
+          <col style="width:46%;">
+          <col style="width:120px;">
+          <col style="width:130px;">
+        </colgroup>
         <thead>
           <tr>
             <th>#</th>
             <th>Sector <i class="bi bi-info-circle" style="font-size:11px; opacity:.6;" title="Hover a sector name for its indicator breakdown"></i></th>
             <th>% Change</th>
             <th>Technical Score</th>
-            <th>Status</th>
             <th>Explore</th>
           </tr>
         </thead>
@@ -1774,7 +1809,7 @@ html.hide-etf #etfSwingSection{ display:none !important; }
         <div class="card-x table-scroll">
           <table class="data-grid" id="longTable">
             <thead>
-              <tr><th>Symbol</th><th>Sector</th><th>% Chg</th><th>LTP</th><th>ROVL</th><th>Status</th></tr>
+              <tr><th>Symbol</th><th>Sector</th><th>% Chg</th><th>LTP</th><th>ROVL</th><th>Technical Score</th></tr>
             </thead>
             <tbody></tbody>
           </table>
@@ -1789,7 +1824,7 @@ html.hide-etf #etfSwingSection{ display:none !important; }
         <div class="card-x table-scroll">
           <table class="data-grid" id="shortTable">
             <thead>
-              <tr><th>Symbol</th><th>Sector</th><th>% Chg</th><th>LTP</th><th>ROVL</th><th>Status</th></tr>
+              <tr><th>Symbol</th><th>Sector</th><th>% Chg</th><th>LTP</th><th>ROVL</th><th>Technical Score</th></tr>
             </thead>
             <tbody></tbody>
           </table>
@@ -1995,12 +2030,6 @@ html.hide-etf #etfSwingSection{ display:none !important; }
       <button class="theme-opt" id="themeLightBtn"><i class="bi bi-sun-fill"></i>Light</button>
     </div>
 
-    <div class="settings-divider"></div>
-
-    <div class="modal-section-lbl">Session</div>
-    <div class="settings-session">Signed in as <strong class="mono" id="settingsUserMobile">—</strong></div>
-    <button class="btn-danger" id="logoutBtn"><i class="bi bi-box-arrow-right"></i> Log Out</button>
-
     <div class="settings-divider" id="adminDivider" style="display:none;"></div>
     <div id="adminSection" style="display:none;">
       <div class="modal-section-lbl">Scan Size <span style="color:var(--text-muted); font-weight:500; text-transform:none; letter-spacing:0;">(admin only) · Defaults to Nifty 500</span></div>
@@ -2081,6 +2110,7 @@ html.hide-etf #etfSwingSection{ display:none !important; }
       <div>
         <div style="font-weight:800; font-size:16px; display:flex; align-items:center; gap:8px;">
           <span id="explorerTitle">ORB Breakout — Trade Explorer</span>
+          <span class="explorer-sector-chg" id="explorerSectorChg" style="display:none;"></span>
           <span class="idx-tech-label" id="explorerSectorStatus" style="display:none; margin-top:0;"></span>
         </div>
         <div class="explorer-meta" id="explorerSub">— symbols across — sectors</div>
@@ -2207,7 +2237,6 @@ html.hide-etf #etfSwingSection{ display:none !important; }
             <th class="sortable" data-key="sym">Symbol <span class="sort-arrow"><i class="bi bi-caret-down-fill"></i></span></th>
             <th class="sortable" data-key="name">Company <span class="sort-arrow"><i class="bi bi-caret-down-fill"></i></span></th>
             <th class="sortable" data-key="sector">Sector <span class="sort-arrow"><i class="bi bi-caret-down-fill"></i></span></th>
-            <th>Strength</th>
             <th class="sortable" data-key="price">Price <span class="sort-arrow"><i class="bi bi-caret-down-fill"></i></span></th>
             <th class="sortable" data-key="chg">% Chg <span class="sort-arrow"><i class="bi bi-caret-down-fill"></i></span></th>
             <th class="sortable" data-key="rovl">ROVL <span class="sort-arrow"><i class="bi bi-caret-down-fill"></i></span></th>
@@ -2585,7 +2614,7 @@ function maskMobile(mobile){
 function showApp(session){
   document.getElementById("loginGate").style.display = "none";
   document.getElementById("appShell").style.display = "grid";
-  document.getElementById("settingsUserMobile").textContent = maskMobile(session.mobile);
+  document.getElementById("userMenuMobile").textContent = maskMobile(session.mobile);
 
   const isAdmin = session.mobile === ADMIN_MOBILE;
   document.getElementById("adminDivider").style.display = isAdmin ? "block" : "none";
@@ -2598,8 +2627,8 @@ function showApp(session){
   if(isAdmin) renderAdminList();
   if(isAdmin) refreshScanModeUI(); // pull the real configured stock counts (e.g. 424 / 4,515) from /health right away — admin-only section
 
+  document.getElementById("userMenuWrap").style.display = "inline-flex";
   const roleBadge = document.getElementById("roleBadge");
-  roleBadge.style.display = "inline-flex";
   roleBadge.className = "role-badge " + (isAdmin ? "admin" : "user");
   roleBadge.innerHTML = isAdmin
     ? '<i class="bi bi-shield-fill-check"></i> Admin'
@@ -3114,8 +3143,19 @@ document.getElementById("settingsOverlay").addEventListener("click", function(e)
 });
 document.getElementById("themeDarkBtn").addEventListener("click", () => applyTheme("dark"));
 document.getElementById("themeLightBtn").addEventListener("click", () => applyTheme("light"));
+
+/* ---------------- Topbar user/admin badge: logout dropdown ---------------- */
+document.getElementById("roleBadge").addEventListener("click", function(e){
+  e.stopPropagation();
+  document.getElementById("userMenuDropdown").classList.toggle("open");
+});
+document.addEventListener("click", function(e){
+  const wrap = document.getElementById("userMenuWrap");
+  if(wrap && !wrap.contains(e.target)) document.getElementById("userMenuDropdown").classList.remove("open");
+});
 document.getElementById("logoutBtn").addEventListener("click", function(){
   clearSession();
+  document.getElementById("userMenuDropdown").classList.remove("open");
   closeSettings();
   showGate();
   if(backendPollTimer) clearInterval(backendPollTimer);
@@ -4093,6 +4133,7 @@ document.getElementById("globalIdxGrid").innerHTML = globalIndices.map(ix => `
 /* ---------------- Render: Sector table (derived from ORB rows) ---------------- */
 let sectorStrengthMap = {};
 let sectorStatusMap = {};
+let sectorChgMap = {};
 
 function todayDateKey(){ return new Date().toISOString().slice(0,10); }
 
@@ -4342,27 +4383,27 @@ function internalSectorFilterFor(realIndexName){
   const entry = Object.entries(SECTOR_TO_REAL_INDEX).find(([, real]) => real === realIndexName);
   return entry ? entry[0] : null;
 }
-
-let sectorIdxTab = "sector"; // "sector" | "broader"
-let sectorIdxRealData = { sector: [], broader: [] };
-
-function switchSectorIdxTab(tab){
-  sectorIdxTab = tab;
-  document.getElementById("sidxTabSector").classList.toggle("active", tab === "sector");
-  document.getElementById("sidxTabBroader").classList.toggle("active", tab === "broader");
-  renderSectorTrend();
+// Accurate per-row tooltip for the ORB/DRB explore buttons — only mentions
+// a fallback/approximation when one is actually being used for this real
+// index; otherwise just names the actual sector's stocks being opened.
+function breakoutTooltipFor(realIndexName, kind){
+  const label = kind === "ORB" ? "ORB breakouts" : "DRB breakouts";
+  if(realIndexName === "Nifty PSU Bank" || realIndexName === "Nifty Private Bank" || realIndexName === "Nifty Bank"){
+    return `${label} — Financial Services list (bank-only filtering isn't split yet)`;
+  }
+  if(realIndexName === "Nifty Realty") return `${label} — Construction list (no dedicated Realty tag yet)`;
+  if(realIndexName === "Nifty Consumer Durables") return `${label} — Consumer Goods list (no dedicated tag yet)`;
+  return `${label} — ${realIndexName} stocks`;
 }
+
+let sectorIdxRealData = { sector: [] };
 
 async function fetchSectorIndexData(){
   const base = getBackendUrl();
   if(!base) return;
   try {
-    const [sectorRes, broaderRes] = await Promise.all([
-      fetch(base + "/sector-indices"),
-      fetch(base + "/broader-indices"),
-    ]);
+    const sectorRes = await fetch(base + "/sector-indices");
     sectorIdxRealData.sector = sectorRes.ok ? await sectorRes.json() : [];
-    sectorIdxRealData.broader = broaderRes.ok ? await broaderRes.json() : [];
     renderSectorTrend();
   } catch(err){
     // Silent — keeps showing last known values, same pattern as the
@@ -4393,7 +4434,7 @@ function renderSectorTrend(){
     return { count: breaks.length, dir: buys >= sells ? "bull" : "bear" };
   };
 
-  const realRows = sectorIdxTab === "sector" ? sectorIdxRealData.sector : sectorIdxRealData.broader;
+  const realRows = sectorIdxRealData.sector;
   document.getElementById("sectorIdxEmpty").style.display = realRows.length ? "none" : "block";
   document.getElementById("sectorIdxCount").textContent = realRows.length ? realRows.length + " indices" : "";
   if(!realRows.length){
@@ -4449,9 +4490,11 @@ function renderSectorTrend(){
 
   sectorStrengthMap = {};
   sectorStatusMap = {};
+  sectorChgMap = {};
   sectorAgg.forEach(sc => {
     sectorStrengthMap[sc.name] = sc.strength;
     sectorStatusMap[sc.name] = sc.status;
+    sectorChgMap[sc.name] = sc.avgChg;
   });
 
   // Bar width scales against the biggest mover currently in view, so the
@@ -4481,12 +4524,11 @@ function renderSectorTrend(){
         </div>
       </td>
       <td>${noData ? '<span class="cell-sub" style="font-size:11px;">—</span>' : `<span class="tech-score-chip" title="${nameTooltip}">${scoreOutOf10}/10</span>`}</td>
-      <td>${noData ? '<span class="cell-sub" style="font-size:11px;">—</span>' : `<span class="badge-status ${sc.status}" title="Composite ${sc.compositeScore.toFixed(2)} · Indicators ${Math.round(sc.indicatorScore*100)}% · ROVL ${sc.rovlDiff >= 0 ? '+' : ''}${sc.rovlDiff.toFixed(2)} vs avg"><span class="dot"></span>${label(sc.status)}</span>`}</td>
       <td>
         ${!internalFilter ? '<span class="cell-sub" style="font-size:11px;">—</span>' : `
         <div class="sector-jump">
-          <button type="button" class="sector-jump-btn orb ${sc.orbBreak.count > 0 ? 'has-break ' + sc.orbBreak.dir : ''}" onclick="openExplorer('ORB','all','${internalFilter.replace(/'/g,"\\'")}')" title="ORB breakouts (Financial Services list — bank-only filtering isn't split yet)">ORB${sc.orbBreak.count > 0 ? `<span class="jump-break-badge">${sc.orbBreak.count}</span>` : ''}</button>
-          <button type="button" class="sector-jump-btn drb ${sc.drbBreak.count > 0 ? 'has-break ' + sc.drbBreak.dir : ''}" onclick="openExplorer('DRB','all','${internalFilter.replace(/'/g,"\\'")}')" title="DRB breakouts">DRB${sc.drbBreak.count > 0 ? `<span class="jump-break-badge">${sc.drbBreak.count}</span>` : ''}</button>
+          <button type="button" class="sector-jump-btn orb ${sc.orbBreak.count > 0 ? 'has-break ' + sc.orbBreak.dir : ''}" onclick="openExplorer('ORB','all','${internalFilter.replace(/'/g,"\\'")}')" title="${breakoutTooltipFor(sc.name, 'ORB')}">ORB${sc.orbBreak.count > 0 ? `<span class="jump-break-badge">${sc.orbBreak.count}</span>` : ''}</button>
+          <button type="button" class="sector-jump-btn drb ${sc.drbBreak.count > 0 ? 'has-break ' + sc.drbBreak.dir : ''}" onclick="openExplorer('DRB','all','${internalFilter.replace(/'/g,"\\'")}')" title="${breakoutTooltipFor(sc.name, 'DRB')}">DRB${sc.drbBreak.count > 0 ? `<span class="jump-break-badge">${sc.drbBreak.count}</span>` : ''}</button>
           <button type="button" class="sector-alert-bell ${alertEnabledSectors.has(sc.name) ? 'on' : ''}" data-sector="${sc.name.replace(/"/g,'&quot;')}" title="${alertEnabledSectors.has(sc.name) ? 'ORB alerts ON for ' + sc.name + ' — click to turn off' : 'Turn on ORB alerts for ' + sc.name}"><i class="bi bi-bell${alertEnabledSectors.has(sc.name) ? '-fill' : ''}"></i></button>
         </div>`}
       </td>
@@ -4521,7 +4563,7 @@ function renderOppTable(bodyId, rows){
       <td><span class="chg-txt ${r.chg >= 0 ? 'up' : 'down'}">${r.chg >= 0 ? '+' : ''}${r.chg.toFixed(2)}%</span></td>
       <td class="mono">${r.price.toLocaleString('en-IN')}</td>
       <td><span class="rovl-tag ${r.rovl > 1.2 ? 'hot' : 'normal'}">${r.rovl}${r.rovl > 1.2 ? ' 🔥' : ''}</span></td>
-      <td><span class="badge-status ${r.status}"><span class="dot"></span>${label(r.status)}</span></td>
+      <td><span class="tech-score-chip" title="Technical score">${Math.round(r.score / 10)}/10</span></td>
     </tr>
   `).join("");
 }
@@ -4994,8 +5036,23 @@ function openExplorer(strategy, initialSignal, initialSector){
   const validSector = initialSector && SECTORS.includes(initialSector) ? initialSector : "all";
 
   document.getElementById("explorerTitle").textContent = (isORB ? "ORB Breakout" : "DRB Breakout") + " — Trade Explorer" + (initialSector ? ` · ${initialSector}` : "");
+  // sectorChgMap/sectorStatusMap are keyed by the real index name (e.g.
+  // "Nifty IT"), but initialSector here is the internal sector tag (e.g.
+  // "IT") — resolve it back to the real index name before looking either
+  // up, otherwise both badges silently fail to match and stay hidden.
+  const realIndexName = initialSector ? SECTOR_TO_REAL_INDEX[initialSector] : null;
+  const chgBadge = document.getElementById("explorerSectorChg");
+  const sectorChg = realIndexName ? sectorChgMap[realIndexName] : null;
+  if(sectorChg !== null && sectorChg !== undefined){
+    const dir = sectorChg >= 0 ? "up" : "down";
+    chgBadge.textContent = (sectorChg >= 0 ? "+" : "") + sectorChg.toFixed(2) + "%";
+    chgBadge.className = "explorer-sector-chg " + dir;
+    chgBadge.style.display = "inline-flex";
+  } else {
+    chgBadge.style.display = "none";
+  }
   const statusBadge = document.getElementById("explorerSectorStatus");
-  const sectorStatus = initialSector ? sectorStatusMap[initialSector] : null;
+  const sectorStatus = realIndexName ? sectorStatusMap[realIndexName] : null;
   if(sectorStatus){
     statusBadge.textContent = techLabel(sectorStatus);
     statusBadge.className = "idx-tech-label " + sectorStatus;
@@ -5087,7 +5144,6 @@ function renderLongShort(){
       <td><div class="sym sym-link" onclick="openChartModal('${r.sym}')">${r.sym} <i class="bi bi-graph-up"></i></div>${rowActionIconsHtml(r.sym, r.price)}</td>
       <td class="cell-sub">${r.name}</td>
       <td class="cell-sub">${r.sector}</td>
-      <td>${strengthBadge(r.sector)}</td>
       <td class="mono">${r.price.toLocaleString('en-IN')}</td>
       <td><span class="chg-txt ${r.chg >= 0 ? 'up' : 'down'}">${r.chg >= 0 ? '+' : ''}${r.chg.toFixed(2)}%</span></td>
       <td><span class="rovl-tag ${r.rovl > 1.2 ? 'hot' : 'normal'}">${r.rovl}${r.rovl > 1.2 ? ' 🔥' : ''}</span></td>
