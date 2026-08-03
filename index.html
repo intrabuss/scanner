@@ -399,6 +399,11 @@ html[data-theme="light"] .avatar{ background:linear-gradient(160deg,#E3E7EE,#F3F
 .sidx-chg{ font-size:12.5px; font-weight:700; font-family:var(--font-data); }
 .sidx-chg.up{ color:var(--bull); }
 .sidx-chg.down{ color:var(--bear); }
+.tech-score-chip{
+  display:inline-block; font-family:var(--font-data); font-size:12.5px; font-weight:700;
+  padding:3px 9px; border-radius:6px; background:var(--bg-raised); color:var(--text-secondary);
+  border:1px solid var(--border-soft); cursor:help;
+}
 @media (max-width: 575.98px){ .idx-grid{ grid-template-columns:repeat(2, 1fr); gap:10px; } }
 
 .idx-card{
@@ -1747,9 +1752,9 @@ html.hide-etf #etfSwingSection{ display:none !important; }
         <thead>
           <tr>
             <th>#</th>
-            <th>Sector</th>
+            <th>Sector <i class="bi bi-info-circle" style="font-size:11px; opacity:.6;" title="Hover a sector name for its indicator breakdown"></i></th>
             <th>% Change</th>
-            <th>Breadth <i class="bi bi-info-circle" style="font-size:11px; opacity:.6;" title="Live indicator breadth from the stocks mapped to this index — updates every 3 min."></i></th>
+            <th>Technical Score</th>
             <th>Status</th>
             <th>Explore</th>
           </tr>
@@ -4118,6 +4123,23 @@ function sectorIndicatorScore(rows){
   return total ? passed / total : 0.5;
 }
 
+// Plain-text breakdown for a hover title attribute — how many stocks pass
+// each of the 10 named indicators, plus the overall score. Replaces the
+// old 11-box Breadth display: same underlying numbers, shown on hover
+// instead of as a permanent column, since the detail is really only
+// needed occasionally, not at a glance every time.
+function buildIndicatorTooltip(rows, indicatorScore){
+  const withIndicators = rows.filter(r => r.indicators);
+  if(!withIndicators.length) return "No live indicator data yet this poll.";
+  const lines = [`${Math.round(indicatorScore * 10)}/10 — ${withIndicators.length} stock${withIndicators.length === 1 ? '' : 's'} in this index:`];
+  INDICATOR_KEYS.forEach(k => {
+    const passed = withIndicators.filter(r => r.indicators[k]).length;
+    const label = BREADTH_INDICATOR_LABELS[k] || k;
+    lines.push(`${passed > withIndicators.length / 2 ? '✓' : '✗'} ${label}: ${passed}/${withIndicators.length}`);
+  });
+  return lines.join("\n");
+}
+
 /* ---------------- Sector Breadth module ----------------
    Independent from the composite score/classification above — reads only
    sectorStatusMap[name] for color; every other number here is computed
@@ -4287,18 +4309,36 @@ const SECTOR_TO_REAL_INDEX = {
 };
 const PSU_BANK_SYMBOLS = new Set(["SBIN","BANKBARODA","BANKINDIA","CANBK","CENTRALBK","INDIANB","IOB","MAHABANK","PNB","UCOBANK","UNIONBANK","ANDHRABANK","ALBK","CORPBANK","ORIENTBANK","SYNDIBANK"]);
 const PRIVATE_BANK_SYMBOLS = new Set(["AXISBANK","BANDHANBNK","AUBANK","CUB","DCBBANK","FEDERALBNK","HDFCBANK","ICICIBANK","IDFCFIRSTB","INDUSINDBK","J&KBANK","KARURVYSYA","KOTAKBANK","KTKBANK","RBLBANK","SOUTHBANK","YESBANK","LAKSHVILAS","UJJIVAN","EQUITAS"]);
+// "Nifty Bank" is the combined index — every PSU + Private bank together.
+// Previously entirely unmapped (only the split-out PSU/Private buckets
+// existed), which is exactly why it showed "—" for everything.
+const ALL_BANK_SYMBOLS = new Set([...PSU_BANK_SYMBOLS, ...PRIVATE_BANK_SYMBOLS]);
+// Cross-verified against 3+ independent sources (Tickertape, NSE factsheet,
+// TradingView) earlier — not a guess. A couple of tail-end constituents
+// with source disagreement (likely from different rebalancing dates) were
+// left out rather than risk an unverified name.
+const REALTY_SYMBOLS = new Set(["DLF","LODHA","PHOENIXLTD","OBEROIRLTY","PRESTIGE","GODREJPROP","BRIGADE","ANANTRAJ","SOBHA"]);
+const CONSUMER_DURABLES_SYMBOLS = new Set(["TITAN","DIXON","HAVELLS","VOLTAS","KALYANKJIL","BLUESTARCO","AMBER","CROMPTON","KAJARIACER","CENTURYPLY","WHIRLPOOL","VGUARD","BATAINDIA","CERA","PGEL"]);
 
-function realIndexForRow(r){
-  if(PSU_BANK_SYMBOLS.has(r.sym)) return "Nifty PSU Bank";
-  if(PRIVATE_BANK_SYMBOLS.has(r.sym)) return "Nifty Private Bank";
-  return SECTOR_TO_REAL_INDEX[r.sector] || null;
+function realIndicesForRow(r){
+  const matches = [];
+  if(PSU_BANK_SYMBOLS.has(r.sym)) matches.push("Nifty PSU Bank");
+  if(PRIVATE_BANK_SYMBOLS.has(r.sym)) matches.push("Nifty Private Bank");
+  if(ALL_BANK_SYMBOLS.has(r.sym)) matches.push("Nifty Bank");
+  if(REALTY_SYMBOLS.has(r.sym)) matches.push("Nifty Realty");
+  if(CONSUMER_DURABLES_SYMBOLS.has(r.sym)) matches.push("Nifty Consumer Durables");
+  if(matches.length) return matches;
+  const mapped = SECTOR_TO_REAL_INDEX[r.sector];
+  return mapped ? [mapped] : [];
 }
 // Which of our internal sector tag(s) feed the Explore button's filter for
 // a given real index — the inverse of the map above, plus the bank split.
 function internalSectorFilterFor(realIndexName){
-  if(realIndexName === "Nifty PSU Bank" || realIndexName === "Nifty Private Bank"){
+  if(realIndexName === "Nifty PSU Bank" || realIndexName === "Nifty Private Bank" || realIndexName === "Nifty Bank"){
     return "Financial Services"; // best available filter — Explorer can't isolate the bank subset yet, so this opens the broader Financial Services list
   }
+  if(realIndexName === "Nifty Realty") return "Construction"; // these stocks are tagged Construction internally, no dedicated Realty tag yet
+  if(realIndexName === "Nifty Consumer Durables") return "Consumer Goods"; // same idea — tagged Consumer Goods internally
   const entry = Object.entries(SECTOR_TO_REAL_INDEX).find(([, real]) => real === realIndexName);
   return entry ? entry[0] : null;
 }
@@ -4333,17 +4373,17 @@ async function fetchSectorIndexData(){
 function renderSectorTrend(){
   const bySector = {};
   orbRows.forEach(r => {
-    const real = realIndexForRow(r);
-    if(!real) return;
-    if(!bySector[real]) bySector[real] = [];
-    bySector[real].push(r);
+    realIndicesForRow(r).forEach(real => {
+      if(!bySector[real]) bySector[real] = [];
+      bySector[real].push(r);
+    });
   });
   const bySectorDrb = {};
   drbRows.forEach(r => {
-    const real = realIndexForRow(r);
-    if(!real) return;
-    if(!bySectorDrb[real]) bySectorDrb[real] = [];
-    bySectorDrb[real].push(r);
+    realIndicesForRow(r).forEach(real => {
+      if(!bySectorDrb[real]) bySectorDrb[real] = [];
+      bySectorDrb[real].push(r);
+    });
   });
   const breakInfo = (rows) => {
     const breaks = rows.filter(r => r.signal !== "WATCH");
@@ -4414,9 +4454,6 @@ function renderSectorTrend(){
     sectorStatusMap[sc.name] = sc.status;
   });
 
-  sectorAgg.filter(sc => sc.hasData).forEach(sc => sampleSectorBreadth([sc], { [sc.name]: breadthBySector[sc.name] }));
-  updateSectorTimeWindow();
-
   // Bar width scales against the biggest mover currently in view, so the
   // strongest sector fills half the track and everything else is relative
   // to it — same visual language as the original bars-only design.
@@ -4427,10 +4464,13 @@ function renderSectorTrend(){
     const internalFilter = internalSectorFilterFor(sc.name);
     const dir = sc.avgChg >= 0 ? "up" : "down";
     const barWidthPct = Math.min((Math.abs(sc.avgChg) / maxAbsChg) * 50, 50);
+    const stockRows = bySector[sc.name] || [];
+    const nameTooltip = noData ? "No stock-level detail mapped to this index yet" : buildIndicatorTooltip(stockRows, sc.indicatorScore);
+    const scoreOutOf10 = noData ? null : Math.round(sc.indicatorScore * 10);
     return `
     <tr class="rail-${sc.status}">
       <td class="mono cell-sub">${i + 1}</td>
-      <td style="font-weight:600;">${sc.name}</td>
+      <td style="font-weight:600; cursor:help;" title="${nameTooltip}">${sc.name}</td>
       <td>
         <div class="sidx-row" style="grid-template-columns:1fr 60px; padding:0;">
           <div class="sidx-bar-track">
@@ -4440,7 +4480,7 @@ function renderSectorTrend(){
           <div class="sidx-chg ${dir}">${sc.avgChg >= 0 ? '+' : ''}${sc.avgChg.toFixed(2)}%</div>
         </div>
       </td>
-      <td>${noData ? '<span class="cell-sub" style="font-size:11px;" title="No stock-level detail mapped to this index yet">—</span>' : renderSectorBreadth(sc.name)}</td>
+      <td>${noData ? '<span class="cell-sub" style="font-size:11px;">—</span>' : `<span class="tech-score-chip" title="${nameTooltip}">${scoreOutOf10}/10</span>`}</td>
       <td>${noData ? '<span class="cell-sub" style="font-size:11px;">—</span>' : `<span class="badge-status ${sc.status}" title="Composite ${sc.compositeScore.toFixed(2)} · Indicators ${Math.round(sc.indicatorScore*100)}% · ROVL ${sc.rovlDiff >= 0 ? '+' : ''}${sc.rovlDiff.toFixed(2)} vs avg"><span class="dot"></span>${label(sc.status)}</span>`}</td>
       <td>
         ${!internalFilter ? '<span class="cell-sub" style="font-size:11px;">—</span>' : `
