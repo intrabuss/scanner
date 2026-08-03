@@ -989,6 +989,11 @@ tr.pinned-row{ background:var(--brand-dim); }
 }
 .chart-toolbar .chart-legend .lg-item{ display:flex; align-items:center; gap:5px; }
 .chart-toolbar .chart-legend i{ font-size:13px; }
+.chart-market-status-badge{
+  font-size:11px; font-weight:700; padding:4px 10px; border-radius:20px;
+  background:var(--bear-dim); color:var(--bear); border:1px solid rgba(239,68,68,.35);
+  white-space:nowrap;
+}
 .chart-toolbar .btn-link-tv{
   display:flex; align-items:center; gap:6px; font-size:12px; font-weight:600;
   color:var(--text-secondary); text-decoration:none; padding:8px 12px;
@@ -1106,6 +1111,9 @@ tr.pinned-row{ background:var(--brand-dim); }
 }
 #tvChartContainer.chart-quad-grid.chart-quad-single{
   grid-template-columns:1fr; grid-template-rows:1fr;
+}
+#tvChartContainer.chart-quad-grid.chart-quad-double{
+  grid-template-columns:1fr 1fr; grid-template-rows:1fr;
 }
 @media (max-width:760px){
   #tvChartContainer.chart-quad-grid{ grid-template-columns:1fr; grid-template-rows:none; overflow-y:auto; }
@@ -2456,34 +2464,16 @@ broke_low  = live_price &lt; yesterday_low</code></pre>
       <button class="icon-btn" id="chartClose"><i class="bi bi-x-lg"></i></button>
     </div>
     <div class="chart-toolbar">
-      <select class="explorer-select" id="chartIntervalSelect" style="display:none;">
-        <option value="1">1m</option>
-        <option value="3">3m</option>
-        <option value="5">5m</option>
-        <option value="15">15m</option>
-        <option value="30">30m</option>
-        <option value="45">45m</option>
-        <option value="60">1h</option>
-        <option value="120">2h</option>
-        <option value="180">3h</option>
-        <option value="240">4h</option>
-        <option value="D" selected>1D</option>
-        <option value="W">1W</option>
-        <option value="M">1M</option>
-      </select>
       <button class="icon-btn" id="chartReloadBtn" title="Reload"><i class="bi bi-arrow-clockwise"></i></button>
-      <button class="chart-view-toggle" id="chartViewToggleBtn" title="Switch between the 4-panel grid and a live TradingView chart (with EMA 9/20/50)">
-        <i class="bi bi-graph-up"></i> <span id="chartViewToggleLbl">TradingView</span>
-      </button>
       <button class="chart-popover-toggle" id="chartBreaklogToggleBtn" title="Today's break log"><i class="bi bi-clock-history"></i> Breaks</button>
       <button class="chart-popover-toggle" id="chartNewsToggleBtn" title="Latest news"><i class="bi bi-newspaper"></i> News</button>
       <div class="chart-legend">
         <span class="lg-item"><i class="bi bi-arrow-up-short" style="color:var(--bull);"></i>Buy break</span>
         <span class="lg-item"><i class="bi bi-arrow-down-short" style="color:var(--bear);"></i>Sell break</span>
+        <span class="lg-item"><span style="display:inline-block; width:10px; height:2px; background:#3B82F6; margin-right:3px; vertical-align:middle;"></span>15min ORB</span>
+        <span class="lg-item"><span style="display:inline-block; width:10px; height:2px; background:#F59E0B; margin-right:3px; vertical-align:middle;"></span>30min ORB</span>
       </div>
-      <a class="btn-link-tv" id="chartOpenTv" href="#" target="_blank" rel="noopener">
-        <i class="bi bi-box-arrow-up-right"></i> Open on TradingView
-      </a>
+      <span class="chart-market-status-badge" id="chartMarketStatusBadge" style="display:none;"></span>
     </div>
     <div class="chart-levels" id="chartLevels" style="display:none;">
       <span class="lvl-chip high"><i class="bi bi-arrow-bar-up"></i> <span id="chartLevelHighLbl">High</span> <span class="mono" id="chartLevelHigh">—</span></span>
@@ -2609,6 +2599,13 @@ function showApp(session){
   roleBadge.innerHTML = isAdmin
     ? '<i class="bi bi-shield-fill-check"></i> Admin'
     : '<i class="bi bi-person-fill"></i> User';
+
+  // ETF data used to only ever load if you manually hit the Refresh button
+  // inside that section — meaning if you never opened it, it silently
+  // never loaded, and the background price/volume poller never started
+  // either. Auto-triggered here instead, same as everything else on the
+  // dashboard already loads on entry.
+  loadEtfSwingAndStartPolling(false);
 
   // Admin is deliberately let in even when Upstox isn't logged in yet (so
   // there's a way to reach the login button at all) — but landing on a
@@ -5122,38 +5119,10 @@ document.querySelectorAll("#lsTable thead th.sortable").forEach(th => {
    own real-time candles, zoom, and drawing tools — no backend candle
    endpoint needed. The one thing it can't do is have code draw your
    ORB high/low lines onto it automatically (that widget is a closed
-   box we don't control) — so instead we show the day's breakout times
-   from break_log underneath the chart, and you drop the lines yourself
-   with TradingView's own horizontal-line tool (Alt+H). If you'd rather
-   have the lines drawn for you automatically, that needs the separate
-   self-drawn candlestick chart (Lightweight Charts) approach instead.
-
-   Index symbols use different tickers on TradingView than on Upstox,
-   so they're mapped explicitly below — extend INDEX_TV_MAP if you add
-   more indices to SECTOR_INDEX_MAP / INDEX_INSTRUMENTS on the backend.
-===================================================================== */
-const INDEX_TV_MAP = {
-  "NIFTY 50": "NSE:NIFTY",
-  "BANKNIFTY": "NSE:BANKNIFTY",
-  "FINNIFTY": "NSE:CNXFINANCE",
-  "MIDCAP": "NSE:NIFTYMIDCAP100",
-  "SENSEX": "BSE:SENSEX",
-  "INDIA VIX": "NSE:INDIAVIX"
-};
-
 let currentChartSymbol = null;
-let currentChartForcePlain = false;
 let currentChartIsEtf = false;
-let chartRefreshTimer = null; // periodic re-fetch while the chart modal is open (grid view only) — see openChartModal
-let chartViewMode = "grid"; // "grid" or "tradingview" — user-switchable for stocks, always "tradingview" for ETFs
+let chartRefreshTimer = null; // periodic re-fetch while the chart modal is open — see openChartModal
 let currentChartNewsTitles = [];
-
-function tvSymbol(symbol){
-  // Forcing an "NSE:" prefix broke resolution for some tickers entirely
-  // (TradingView showed a completely unrelated stock instead of erroring
-  // cleanly) — plain symbol lookup is what actually works, so back to that.
-  return INDEX_TV_MAP[symbol] || symbol;
-}
 
 function findRowForSymbol(symbol){
   return orbRows.find(r => r.sym === symbol) || drbRows.find(r => r.sym === symbol) || null;
@@ -5167,63 +5136,6 @@ function showChartMsg(text, icon){
 }
 function hideChartMsg(){
   document.getElementById("chartMsg").classList.remove("show");
-}
-
-function buildChartEmbedUrl(symbol, intervalMin, includeEmas){
-  const isLight = document.documentElement.getAttribute("data-theme") === "light";
-  // Match the embedded TradingView candles/grid/background to our own design tokens
-  // (bull #22C55E, bear #EF4444) instead of TradingView's default red/green, so the
-  // chart doesn't look like a bolted-on widget against the rest of the dashboard.
-  const overrides = {
-    "paneProperties.background": isLight ? "#FFFFFF" : "#10141B",
-    "paneProperties.backgroundType": "solid",
-    "paneProperties.vertGridProperties.color": isLight ? "#E3E7EE" : "#1A2029",
-    "paneProperties.horzGridProperties.color": isLight ? "#E3E7EE" : "#1A2029",
-    "scalesProperties.textColor": isLight ? "#5B6373" : "#8D96A6",
-    "mainSeriesProperties.candleStyle.upColor": "#22C55E",
-    "mainSeriesProperties.candleStyle.downColor": "#EF4444",
-    "mainSeriesProperties.candleStyle.borderUpColor": "#22C55E",
-    "mainSeriesProperties.candleStyle.borderDownColor": "#EF4444",
-    "mainSeriesProperties.candleStyle.wickUpColor": "#22C55E",
-    "mainSeriesProperties.candleStyle.wickDownColor": "#EF4444"
-  };
-
-  // Reverted from the JS-widget/createStudy approach — that would be the
-  // only way to get 3 genuinely distinct EMA lengths (9/20/50), but it
-  // broke chart loading entirely once actually tested live, and this
-  // sandbox has no way to render TradingView content to verify a fix
-  // before shipping it. This iframe embed is the version confirmed to
-  // reliably load charts. It only supports ONE correctly-configured EMA
-  // instance (TradingView's studies_overrides applies per indicator TYPE,
-  // not per instance) — using the verified-correct override key this
-  // time: "moving average exponential.length", not the earlier wrong
-  // "MAExp@tv-basicstudies.length" guess.
-  const studies = includeEmas ? ["MAExp@tv-basicstudies"] : [];
-  const studiesOverrides = includeEmas ? {
-    "moving average exponential.length": 20,
-    "moving average exponential.plot.color": "#3B82F6"
-  } : {};
-
-  const params = new URLSearchParams({
-    symbol: tvSymbol(symbol),
-    interval: intervalMin,
-    hidesidetoolbar: "0",
-    symboledit: "1",
-    saveimage: "0",
-    toolbarbg: isLight ? "F3F5F8" : "141922",
-    studies: JSON.stringify(studies),
-    theme: isLight ? "light" : "dark",
-    style: "1",
-    timezone: "Asia/Kolkata",
-    withdateranges: "1",
-    hideideas: "1",
-    studies_overrides: JSON.stringify(studiesOverrides),
-    overrides: JSON.stringify(overrides),
-    enabled_features: "[]",
-    disabled_features: "[]",
-    locale: "en"
-  });
-  return `https://s.tradingview.com/widgetembed/?${params.toString()}`;
 }
 
 /* =====================================================================
@@ -5301,11 +5213,17 @@ function drawQuadPanel(canvas, candles, opts){
   const priceH = h * 0.68, volTop = priceH + 10, volH = h - volTop;
   const orbHigh = opts.showOrb ? opts.orbHigh : null;
   const orbLow = opts.showOrb ? opts.orbLow : null;
+  const orbHigh15 = opts.showOrb ? opts.orbHigh15 : null;
+  const orbLow15 = opts.showOrb ? opts.orbLow15 : null;
+  const orbHigh30 = opts.showOrb ? opts.orbHigh30 : null;
+  const orbLow30 = opts.showOrb ? opts.orbLow30 : null;
 
   let lo = Math.min(...candles.map(c => c.l));
   let hi = Math.max(...candles.map(c => c.h));
   if(orbHigh != null) hi = Math.max(hi, orbHigh);
   if(orbLow != null) lo = Math.min(lo, orbLow);
+  [orbHigh15, orbHigh30].forEach(v => { if(v != null) hi = Math.max(hi, v); });
+  [orbLow15, orbLow30].forEach(v => { if(v != null) lo = Math.min(lo, v); });
 
   // Compute EMA series up front so their range is included in lo/hi
   // (otherwise a fast-moving EMA line would clip off the top/bottom of
@@ -5382,6 +5300,19 @@ function drawQuadPanel(canvas, candles, opts){
     ctx.beginPath(); ctx.moveTo(0, y(orbLow)); ctx.lineTo(w, y(orbLow)); ctx.stroke();
     ctx.restore();
   }
+  // Fixed 15-min / 30-min opening-range reference lines — always shown
+  // alongside the (admin-configurable) primary ORB line above, distinct
+  // colors so they're never confused with the bull/bear break lines.
+  const drawFixedOrbLine = (level, color) => {
+    if(level == null) return;
+    ctx.save();
+    ctx.strokeStyle = color; ctx.setLineDash([2, 3]); ctx.lineWidth = 1;
+    ctx.globalAlpha = 0.75;
+    ctx.beginPath(); ctx.moveTo(0, y(level)); ctx.lineTo(w, y(level)); ctx.stroke();
+    ctx.restore();
+  };
+  drawFixedOrbLine(orbHigh15, "#3B82F6"); drawFixedOrbLine(orbLow15, "#3B82F6");
+  drawFixedOrbLine(orbHigh30, "#F59E0B"); drawFixedOrbLine(orbLow30, "#F59E0B");
 
   // candles
   candles.forEach((c, i) => {
@@ -5452,7 +5383,7 @@ function timeToMinutes(t){
   return 0; // daily labels ("dd Mon") don't need this — markers aren't drawn on the daily panel
 }
 
-function attachQuadTooltip(canvas, tooltip){
+function attachQuadTooltip(canvas, tooltip, panelKey){
   canvas.addEventListener("mousemove", e => {
     const d = canvas._chartData;
     if(!d || !d.candles.length) return;
@@ -5461,7 +5392,13 @@ function attachQuadTooltip(canvas, tooltip){
     let idx = Math.floor(mx / d.slot);
     idx = Math.max(0, Math.min(d.candles.length - 1, idx));
     const c = d.candles[idx];
-    tooltip.innerHTML = `<span class="lbl">${c.t}</span> O ${c.o} H ${c.h} L ${c.l} C ${c.c}`;
+    // Intraday panels (5min/15min/60min) only ever hold today's session —
+    // their "t" is just "HH:MM", so prefix today's date explicitly rather
+    // than leaving the date implicit. The daily panel's "t" is already a
+    // date ("dd Mon"), nothing to prefix.
+    const isDaily = panelKey === "daily";
+    const dateLabel = isDaily ? c.t : new Date().toLocaleDateString('en-IN', { day:'2-digit', month:'short' }) + ", " + c.t;
+    tooltip.innerHTML = `<span class="lbl">${dateLabel}</span> O ${c.o} H ${c.h} L ${c.l} C ${c.c}`;
     tooltip.style.display = "block";
     tooltip.style.left = Math.min(mx + 12, canvas.clientWidth - tooltip.offsetWidth - 6) + "px";
     tooltip.style.top = "6px";
@@ -5480,19 +5417,28 @@ function renderQuadChart(data, isEtf){
   container.classList.add("chart-quad-grid");
   container.innerHTML = "";
 
-  // ETFs get a single, larger daily panel (9/20/50 EMA) instead of the
-  // full 4-panel intraday+daily grid — ETF swing analysis doesn't have
-  // ORB/intraday relevance the way stock ORB/DRB trading does.
-  const panelsToRender = isEtf ? CHART_PANELS.filter(p => p.key === "daily") : CHART_PANELS;
-  if(isEtf) container.classList.add("chart-quad-single");
+  // ETFs get 15-min + Daily (2 panels) — enough for swing-timing entries
+  // without the full 4-panel intraday grid stocks use for ORB/DRB context.
+  const panelsToRender = isEtf ? CHART_PANELS.filter(p => p.key === "15min" || p.key === "daily") : CHART_PANELS;
+  container.classList.toggle("chart-quad-single", false);
+  container.classList.toggle("chart-quad-double", isEtf);
+
+  const marketFrozen = !isTradingDay(new Date()) || (() => {
+    const now = new Date();
+    const h = now.getHours(), m = now.getMinutes();
+    const afterOpen = h > 9 || (h === 9 && m >= 15);
+    const beforeClose = h < 15 || (h === 15 && m <= 30);
+    return !(afterOpen && beforeClose);
+  })();
 
   panelsToRender.forEach(panel => {
     const candles = (data.timeframes && data.timeframes[panel.key]) || [];
     const showStaleNote = data.stale_intraday && panel.key !== "daily";
     const box = document.createElement("div");
     box.className = "chart-quad-panel";
+    const panelLabel = isEtf ? (panel.key === "daily" ? "Daily" : "15min") : panel.label;
     box.innerHTML = `
-      <div class="chart-quad-panel-head">${isEtf ? "Daily" : panel.label}${showStaleNote ? ` <span class="chart-quad-stale">· last session (${data.intraday_as_of})</span>` : ''}</div>
+      <div class="chart-quad-panel-head">${panelLabel}${showStaleNote ? ` <span class="chart-quad-stale">· last session (${data.intraday_as_of})</span>` : ''}</div>
       <div class="chart-quad-ema-legend"></div>
       <div class="chart-quad-panel-canvas-wrap">
         <canvas></canvas>
@@ -5503,7 +5449,12 @@ function renderQuadChart(data, isEtf){
     const legendEl = box.querySelector(".chart-quad-ema-legend");
     const tooltip = box.querySelector(".chart-quad-tooltip");
     const emaLengths = isEtf ? EMA_LENGTHS_ETF : EMA_LENGTHS;
-    const opts = { orbHigh: data.orb_high, orbLow: data.orb_low, markers: data.markers, showOrb: panel.showOrb, emaLengths };
+    const opts = {
+      orbHigh: data.orb_high, orbLow: data.orb_low,
+      orbHigh15: data.orb_high_15, orbLow15: data.orb_low_15,
+      orbHigh30: data.orb_high_30, orbLow30: data.orb_low_30,
+      markers: data.markers, showOrb: panel.showOrb, emaLengths,
+    };
     const draw = () => {
       const drawn = drawQuadPanel(canvas, candles, opts);
       const drawnLengths = new Set(drawn.map(s => s.length));
@@ -5513,23 +5464,20 @@ function renderQuadChart(data, isEtf){
       }).join("");
     };
     draw();
-    attachQuadTooltip(canvas, tooltip);
+    attachQuadTooltip(canvas, tooltip, panel.key);
     window.addEventListener("resize", debounce(draw, 150));
   });
+
+  const badge = document.getElementById("chartMarketStatusBadge");
+  if(marketFrozen){
+    badge.style.display = "inline-block";
+    badge.textContent = "Market Closed — showing last known data";
+  } else {
+    badge.style.display = "none";
+  }
 }
 
-async function loadChart(symbol, forcePlain){
-  if(forcePlain){
-    showChartMsg("Loading chart…", "bi-hourglass-split");
-    const container = document.getElementById("tvChartContainer");
-    container.classList.remove("chart-quad-grid");
-    const intervalMin = document.getElementById("chartIntervalSelect").value;
-    container.innerHTML = `<iframe src="${buildChartEmbedUrl(symbol, intervalMin, true)}" allowtransparency="true"></iframe>`;
-    document.getElementById("tvChartContainer").querySelector("iframe").addEventListener("load", hideChartMsg);
-    setTimeout(hideChartMsg, 1500); // fallback in case the iframe's own load event doesn't fire
-    return;
-  }
-
+async function loadChart(symbol){
   showChartMsg("Loading chart…", "bi-hourglass-split");
   const container = document.getElementById("tvChartContainer");
   container.classList.add("chart-quad-grid");
@@ -5558,7 +5506,14 @@ function renderChartBreakSummary(row){
     el.innerHTML = '<span style="color:var(--text-muted); font-size:12px;">No breaks logged yet today.</span>';
     return;
   }
-  el.innerHTML = row.breakLog.map(e => `
+  // breakCount is the TRUE total for the day — the chips below can be fewer
+  // (the log itself is capped for display), so this label makes sure "8
+  // breaks today, here are the most recent" is clear rather than implying
+  // the chip count IS the day's total.
+  const countLabel = row.breakCount > row.breakLog.length
+    ? `<span style="color:var(--text-muted); font-size:11px; margin-right:8px;">${row.breakCount} breaks today (showing last ${row.breakLog.length}):</span>`
+    : `<span style="color:var(--text-muted); font-size:11px; margin-right:8px;">${row.breakCount} break${row.breakCount === 1 ? '' : 's'} today:</span>`;
+  el.innerHTML = countLabel + row.breakLog.map(e => `
     <span class="brk-chip ${e.dir}"><i class="bi ${e.dir === 'up' ? 'bi-arrow-up-short' : 'bi-arrow-down-short'}"></i>${e.time} · ${e.rvol}x</span>
   `).join("");
 }
@@ -5646,66 +5601,36 @@ document.getElementById("chartNewsCloseBtn").addEventListener("click", closeChar
 document.getElementById("chartBreaklogToggleBtn").addEventListener("click", () => toggleChartPopover("chartBreaklog"));
 document.getElementById("chartBreaklogCloseBtn").addEventListener("click", closeChartPopovers);
 
-function openChartModal(symbol, forcePlain){
+function openChartModal(symbol, isEtf){
   currentChartSymbol = symbol;
-  currentChartIsEtf = !!forcePlain;
-  chartViewMode = "grid"; // both stocks and ETFs default to the own chart now
-  currentChartForcePlain = effectiveForcePlain();
+  currentChartIsEtf = !!isEtf;
   const row = findRowForSymbol(symbol);
   document.getElementById("chartTitle").textContent = symbol;
   document.getElementById("chartSub").textContent = row
     ? `${row.name || ""} · ${row.sector || ""} · ₹${row.price.toLocaleString('en-IN')}`
     : "Live daily chart";
-  document.getElementById("chartOpenTv").href = `https://www.tradingview.com/chart/?symbol=${encodeURIComponent(tvSymbol(symbol))}`;
-  // ETFs can still switch to TradingView via the same toggle stocks use —
-  // they just default to the own chart (single daily panel, EMA 9/20/50)
-  // instead of being TradingView-only.
-  document.getElementById("chartViewToggleBtn").style.display = "";
-  updateChartViewToggleUI();
-  applyChartViewVisibility();
-  document.getElementById("chartBreaklogToggleBtn").style.display = forcePlain ? "none" : "";
+  document.getElementById("chartBreaklogToggleBtn").style.display = isEtf ? "none" : "";
   renderChartBreakSummary(row);
   renderChartLevels(row);
   closeChartPopovers();
   document.getElementById("chartOverlay").classList.add("show");
-  loadChart(symbol, currentChartForcePlain);
+  loadChart(symbol);
   loadChartNews(symbol);
 
-  // Refresh the chart data periodically while the modal stays open, so the
-  // live-price-spliced last candle (from the backend) actually gets pulled
-  // in as the price moves — otherwise you'd only ever see the price as of
-  // the moment you opened the chart. Grid view only: the TradingView iframe
-  // is a separate embedded widget with its own live updates, no need to
-  // force-reload it (that would also lose any zoom/pan the person did).
+  // Refresh periodically while the modal stays open, so the live-price-
+  // spliced last candle actually gets pulled in as the price moves.
+  // Skipped entirely once the market's closed — nothing new to fetch, and
+  // repeatedly redrawing would just be wasted work (and risk resetting any
+  // zoom/pan) for data that isn't going to change until next session.
   if(chartRefreshTimer) clearInterval(chartRefreshTimer);
   chartRefreshTimer = setInterval(() => {
-    if(currentChartSymbol === symbol && !effectiveForcePlain()){
-      loadChart(symbol, currentChartForcePlain);
-    }
+    if(currentChartSymbol !== symbol) return;
+    const now = new Date();
+    const h = now.getHours(), m = now.getMinutes();
+    const inSession = isTradingDay(now) && (h > 9 || (h === 9 && m >= 15)) && (h < 15 || (h === 15 && m <= 30));
+    if(inSession) loadChart(symbol);
   }, 5000);
 }
-function effectiveForcePlain(){
-  return chartViewMode === "tradingview";
-}
-function applyChartViewVisibility(){
-  const plain = effectiveForcePlain();
-  document.getElementById("chartIntervalSelect").style.display = plain ? "" : "none";
-  if(plain) document.getElementById("chartIntervalSelect").value = "D"; // default to 1-day, as requested
-}
-function updateChartViewToggleUI(){
-  const btn = document.getElementById("chartViewToggleBtn");
-  const lbl = document.getElementById("chartViewToggleLbl");
-  const onTv = chartViewMode === "tradingview";
-  btn.classList.toggle("active", onTv);
-  lbl.textContent = onTv ? "4 Grid" : "TradingView"; // shows what clicking it will switch TO
-}
-document.getElementById("chartViewToggleBtn").addEventListener("click", function(){
-  chartViewMode = chartViewMode === "tradingview" ? "grid" : "tradingview";
-  currentChartForcePlain = effectiveForcePlain();
-  updateChartViewToggleUI();
-  applyChartViewVisibility();
-  loadChart(currentChartSymbol, currentChartForcePlain);
-});
 function closeChartModal(){
   document.getElementById("chartOverlay").classList.remove("show");
   document.getElementById("tvChartContainer").innerHTML = "";
@@ -5719,10 +5644,7 @@ document.getElementById("chartOverlay").addEventListener("click", function(e){
   if(e.target === this) closeChartModal();
 });
 document.getElementById("chartReloadBtn").addEventListener("click", function(){
-  if(currentChartSymbol) loadChart(currentChartSymbol, currentChartForcePlain);
-});
-document.getElementById("chartIntervalSelect").addEventListener("change", function(){
-  if(currentChartSymbol) loadChart(currentChartSymbol, currentChartForcePlain);
+  if(currentChartSymbol) loadChart(currentChartSymbol);
 });
 
 /* ---------------- Row action icons: copy / pin / size-this-trade ---------------- */
@@ -5942,6 +5864,7 @@ function mapApiRowToTableRow(r, strategy){
     price: r.price, chg: r.chg, rovl: r.rvol, volume: r.volume,
     score: r.score, signal: r.signal, status, live: r.live,
     breakLog: r.break_log || [],
+    breakCount: r.break_count || 0,
     levelHigh: r.level_high, levelLow: r.level_low, strategy,
     indicators: r.indicators || null
   };
@@ -6561,7 +6484,10 @@ function renderEtfSwingTable(){
   }
   empty.style.display = "none";
 
+  const SIGNAL_RANK = { BUY: 0, SELL: 1, WATCH: 2 };
   const sorted = [...filtered].sort((a, b) => {
+    const rankDiff = (SIGNAL_RANK[a.signal || "WATCH"] ?? 2) - (SIGNAL_RANK[b.signal || "WATCH"] ?? 2);
+    if(rankDiff !== 0) return rankDiff;
     const av = a[etfSwingSort.key], bv = b[etfSwingSort.key];
     if(av == null) return 1;
     if(bv == null) return -1;
@@ -6646,13 +6572,16 @@ async function loadEtfSwing(silent){
   }
 }
 let etfSwingPollTimer = null;
-document.getElementById("etfSwingRefreshBtn").addEventListener("click", async function(){
-  await loadEtfSwing(false);
-  // Manual load succeeded — start (or keep) a quiet background refresh so
+async function loadEtfSwingAndStartPolling(silent){
+  await loadEtfSwing(silent);
+  // Load succeeded — start (or keep) a quiet background refresh so
   // price/volume stay live without re-running the expensive history fetch.
   if(etfSwingData.length && !etfSwingPollTimer){
     etfSwingPollTimer = setInterval(throttleWhenHidden(() => loadEtfSwing(true), 90000), 20000);
   }
+}
+document.getElementById("etfSwingRefreshBtn").addEventListener("click", function(){
+  loadEtfSwingAndStartPolling(false);
 });
 document.getElementById("etfSwingSectorFilter").addEventListener("change", renderEtfSwingTable);
 document.querySelectorAll("#etfSwingSection .filter-chip").forEach(chip => {
