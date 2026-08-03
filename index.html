@@ -363,6 +363,12 @@ html[data-theme="light"] .avatar{ background:linear-gradient(160deg,#E3E7EE,#F3F
 .section-title .count{ color:var(--text-muted); font-weight:500; margin-left:6px; text-transform:none; letter-spacing:0; }
 .section-link{ font-size:12px; color:var(--brand); font-weight:600; display:flex; align-items:center; gap:4px; }
 
+.sidx-tab{
+  padding:7px 16px; border-radius:20px; font-size:12.5px; font-weight:600;
+  background:var(--bg-raised); border:1px solid var(--border-soft); color:var(--text-secondary);
+}
+.sidx-tab.active{ background:var(--brand-dim); border-color:var(--brand); color:var(--brand); }
+
 /* ============ CARD BASE ============ */
 .card-x{
   background:var(--bg-surface);
@@ -802,6 +808,31 @@ tr.pinned-row{ background:var(--brand-dim); }
   font-size:11px; line-height:1.55; color:var(--text-muted);
 }
 .dashboard-top-disclaimer i{ font-size:14px; margin-top:1px; flex-shrink:0; color:var(--text-secondary); }
+
+.market-news-bar{
+  display:flex; align-items:center; gap:12px;
+  background:var(--bg-surface); border:1px solid var(--border-soft); border-radius:var(--radius-md);
+  padding:9px 14px; margin-bottom:16px; overflow:hidden;
+}
+.market-news-label{
+  flex-shrink:0; display:flex; align-items:center; gap:6px;
+  font-size:11px; font-weight:700; letter-spacing:.04em; text-transform:uppercase;
+  color:var(--bear); white-space:nowrap;
+}
+.market-news-track-wrap{ flex:1; overflow:hidden; position:relative; }
+.market-news-track{
+  display:flex; gap:32px; white-space:nowrap;
+  animation:market-news-scroll 45s linear infinite;
+}
+.market-news-track:hover{ animation-play-state:paused; }
+@keyframes market-news-scroll{
+  0%{ transform:translateX(0); }
+  100%{ transform:translateX(-50%); }
+}
+.market-news-item{ font-size:12.5px; color:var(--text-secondary); white-space:nowrap; }
+.market-news-item a{ color:inherit; text-decoration:none; }
+.market-news-item a:hover{ color:var(--brand); }
+.market-news-item .mn-source{ color:var(--text-muted); margin-left:6px; }
 .live-status-box{
   margin-bottom:14px; padding:11px 12px; border-radius:var(--radius-sm);
   font-size:12.5px; font-weight:600; display:flex; align-items:center; gap:8px; line-height:1.4;
@@ -1072,6 +1103,9 @@ tr.pinned-row{ background:var(--brand-dim); }
 #tvChartContainer.chart-quad-grid{
   display:grid; grid-template-columns:1fr 1fr; grid-template-rows:1fr 1fr;
   gap:14px; padding:14px; height:100%; overflow:auto;
+}
+#tvChartContainer.chart-quad-grid.chart-quad-single{
+  grid-template-columns:1fr; grid-template-rows:1fr;
 }
 @media (max-width:760px){
   #tvChartContainer.chart-quad-grid{ grid-template-columns:1fr; grid-template-rows:none; overflow-y:auto; }
@@ -1637,10 +1671,6 @@ html.hide-etf #etfSwingSection{ display:none !important; }
           <div class="market-closed-pop" id="holidayListPop"></div>
         </button>
 
-        <button class="icon-btn" id="marketBriefBtn" title="Market Brief" style="display:none;">
-          <i class="bi bi-stars"></i>
-        </button>
-
         <div class="clock-block d-none d-sm-block">
           <div class="clock-time mono" id="clockTime">09:41:22</div>
           <div class="clock-date" id="clockDate">Fri, 31 Jul 2026</div>
@@ -1664,7 +1694,18 @@ html.hide-etf #etfSwingSection{ display:none !important; }
 
     <div class="dashboard-top-disclaimer">
       <i class="bi bi-mortarboard"></i>
-      <span>All data, scores, and AI-generated text on this dashboard are for educational and informational purposes only and do not constitute investment advice. Nothing here is a recommendation to buy or sell any security — trade at your own discretion and risk.</span>
+      <span>All data and scores on this dashboard are for educational and informational purposes only and do not constitute investment advice. Nothing here is a recommendation to buy or sell any security — trade at your own discretion and risk.</span>
+    </div>
+
+    <!-- LIVE MARKET NEWS — real published headlines (Google News RSS),
+         replacing the old AI-generated Market Brief/Ask AI features. -->
+    <div class="market-news-bar" id="marketNewsBar">
+      <div class="market-news-label"><i class="bi bi-broadcast"></i> Market News</div>
+      <div class="market-news-track-wrap">
+        <div class="market-news-track" id="marketNewsTrack">
+          <span class="market-news-item cell-sub">Loading live headlines…</span>
+        </div>
+      </div>
     </div>
 
     <!-- MARKET SNAPSHOT -->
@@ -1673,43 +1714,41 @@ html.hide-etf #etfSwingSection{ display:none !important; }
     </div>
     <div class="idx-grid" id="idxGrid"></div>
 
-    <!-- REAL SECTOR INDICES (official NSE data — Nifty Auto, Nifty Bank, etc.) -->
+    <!-- SECTOR INDICES (real NSE data) — replaces the old computed-average
+         Sector Trend table entirely. % Change is the real, official index
+         value; Breadth/Status/Explore are still our own computation from
+         the stocks we've mapped into each real index — see the note below
+         the tabs for exactly which indices have that stock-level detail. -->
     <div class="section-head">
       <div class="section-title">Sector Indices <span class="count" id="sectorIdxCount"></span></div>
-      <div class="section-sub" style="font-size:11px; color:var(--text-muted);">Official NSE sectoral indices — live index values, not a computed average</div>
-    </div>
-    <div class="card-x" id="sectorIdxCard" style="padding:14px 18px;">
-      <div id="sectorIdxBars"></div>
-      <div id="sectorIdxEmpty" style="display:none; font-size:12px; color:var(--text-muted); padding:8px 0;">No sector index data yet.</div>
-    </div>
-
-    <!-- SECTOR TREND -->
-    <div class="section-head">
-      <div class="section-title">Sector Trend <span class="count" id="sectorCount">18 sectors</span></div>
       <div style="display:flex; align-items:center; gap:12px;">
-        <div class="section-sub" id="sectorTimeWindow" style="font-size:11px; color:var(--text-muted); font-family:var(--font-data);"></div>
         <div class="section-sub" style="font-size:11px; color:var(--text-muted); display:flex; align-items:center; gap:5px;">
           <i class="bi bi-bell"></i> Alerts per sector — bell icon in each row
         </div>
       </div>
     </div>
-    <div class="section-sub" style="font-size:11px; color:var(--text-muted); margin:-6px 0 10px;">
-      <i class="bi bi-info-circle"></i> % Change here is the average across the individual stocks we've tagged into each sector — not an official index value. For the real thing, see Sector Indices above.
+    <div style="display:flex; gap:8px; margin-bottom:10px;">
+      <button type="button" class="sidx-tab active" id="sidxTabSector" onclick="switchSectorIdxTab('sector')">Sector Data</button>
+      <button type="button" class="sidx-tab" id="sidxTabBroader" onclick="switchSectorIdxTab('broader')">Broader Index</button>
+    </div>
+    <div class="section-sub" style="font-size:11px; color:var(--text-muted); margin:-2px 0 10px;">
+      <i class="bi bi-info-circle"></i> % Change is the real, official NSE index value. Breadth/Status/Explore come from the stocks we've mapped into each index — some indices (marked "—") don't have stock-level detail mapped yet.
     </div>
     <div class="card-x table-scroll">
-      <table class="data-grid" id="sectorTable">
+      <table class="data-grid" id="sectorIdxTable">
         <thead>
           <tr>
             <th>#</th>
             <th>Sector</th>
             <th>% Change</th>
-            <th>Breadth <i class="bi bi-info-circle" style="font-size:11px; opacity:.6;" title="Live indicator breadth — separate live-vs-daily-technical read, updates every 3 min. Can differ from the Status badge, which only moves when the composite score crosses its thresholds."></i></th>
+            <th>Breadth <i class="bi bi-info-circle" style="font-size:11px; opacity:.6;" title="Live indicator breadth from the stocks mapped to this index — updates every 3 min."></i></th>
             <th>Status</th>
             <th>Explore</th>
           </tr>
         </thead>
         <tbody></tbody>
       </table>
+      <div id="sectorIdxEmpty" style="display:none; font-size:12px; color:var(--text-muted); padding:16px;">No sector index data yet.</div>
     </div>
 
     <!-- LONG / SHORT -->
@@ -2406,22 +2445,6 @@ broke_low  = live_price &lt; yesterday_low</code></pre>
   </div>
 </div>
 
-<!-- ============ MARKET BRIEF MODAL ============ -->
-<div class="modal-overlay" id="marketBriefOverlay">
-  <div class="modal-box">
-    <div class="modal-head">
-      <div>
-        <div style="font-weight:800; font-size:16px;"><i class="bi bi-stars"></i> Market Brief · Sector Report</div>
-        <div class="explorer-meta" id="briefTime"></div>
-      </div>
-      <button class="icon-btn" id="marketBriefClose"><i class="bi bi-x-lg"></i></button>
-    </div>
-    <div class="explorer-body table-scroll" style="padding:16px 20px;">
-      <div class="brief-text" id="briefText"></div>
-    </div>
-  </div>
-</div>
-
 <!-- ============ PRICE CHART MODAL (TradingView embedded chart) ============ -->
 <div class="modal-overlay" id="chartOverlay">
   <div class="modal-box wide chart-box">
@@ -2496,25 +2519,6 @@ broke_low  = live_price &lt; yesterday_low</code></pre>
 
 <!-- BREAK ALERT TOASTS -->
 <div id="breakToastWrap"></div>
-
-<!-- ASK AI WIDGET -->
-<button class="ask-ai-fab" id="askAiFab" title="Ask AI about today's scan">
-  <i class="bi bi-stars"></i>
-</button>
-<div class="ask-ai-panel" id="askAiPanel">
-  <div class="ask-ai-head">
-    <span class="ask-ai-head-title">Ask AI</span>
-    <span class="ask-ai-quota" id="askAiQuota"></span>
-    <button class="ask-ai-close" id="askAiCloseBtn"><i class="bi bi-x-lg"></i></button>
-  </div>
-  <div class="ask-ai-body" id="askAiBody">
-    <div class="ask-ai-empty">Ask about today's scan — e.g. "what's leading today" or "why is Auto sector weak". Answers are based only on the current live scan, not general market opinions.</div>
-  </div>
-  <div class="ask-ai-input-row">
-    <input type="text" class="ask-ai-input" id="askAiInput" placeholder="Ask about today's scan…" maxlength="500">
-    <button class="ask-ai-send" id="askAiSendBtn"><i class="bi bi-send"></i></button>
-  </div>
-</div>
 
 <script>
 /* =====================================================================
@@ -4255,16 +4259,94 @@ function updateSectorTimeWindow(){
   el.textContent = `${first} → ${last}`;
 }
 
+/* ---------------- Sector Indices (real NSE data) ----------------
+   Replaces the old computed-average Sector Trend table. % Change comes
+   from the backend's real index endpoints. Breadth/Status/Explore are
+   still our own computation — reusing the exact same composite-scoring
+   math as before — but now grouped by REAL index name instead of our
+   own internal sector tags.
+
+   Most of our internal tags map cleanly 1:1 onto a real index (Automobile
+   -> Nifty Auto, IT -> Nifty IT, etc). Banking doesn't: our internal
+   "Financial Services" tag lumps PSU banks, private banks, NBFCs,
+   insurers, and AMCs together, but real NSE indices split PSU Bank and
+   Private Bank out separately. This override list — well-established,
+   stable public categorization, not a fabricated guess — pulls those
+   specific stocks out of the generic Financial Services bucket into
+   their real index. Indices with no stock mapping at all (Realty,
+   Consumer Durables, Financial Services 25/50, etc.) show real %
+   change only — Breadth/Status/Explore read "—" rather than guess. */
+const SECTOR_TO_REAL_INDEX = {
+  "Automobile": "Nifty Auto",
+  "IT": "Nifty IT",
+  "Pharma": "Nifty Pharma",
+  "Healthcare Services": "Nifty Healthcare Index",
+  "Metals": "Nifty Metal",
+  "Media & Entertainment": "Nifty Media",
+  "Energy": "Nifty Energy",
+  "Construction": "Nifty Construction",
+  "Consumer Goods": "Nifty FMCG",
+  "Financial Services": "Nifty Financial Services",
+};
+const PSU_BANK_SYMBOLS = new Set(["SBIN","BANKBARODA","BANKINDIA","CANBK","CENTRALBK","INDIANB","IOB","MAHABANK","PNB","UCOBANK","UNIONBANK","ANDHRABANK","ALBK","CORPBANK","ORIENTBANK","SYNDIBANK"]);
+const PRIVATE_BANK_SYMBOLS = new Set(["AXISBANK","BANDHANBNK","AUBANK","CUB","DCBBANK","FEDERALBNK","HDFCBANK","ICICIBANK","IDFCFIRSTB","INDUSINDBK","J&KBANK","KARURVYSYA","KOTAKBANK","KTKBANK","RBLBANK","SOUTHBANK","YESBANK","LAKSHVILAS","UJJIVAN","EQUITAS"]);
+
+function realIndexForRow(r){
+  if(PSU_BANK_SYMBOLS.has(r.sym)) return "Nifty PSU Bank";
+  if(PRIVATE_BANK_SYMBOLS.has(r.sym)) return "Nifty Private Bank";
+  return SECTOR_TO_REAL_INDEX[r.sector] || null;
+}
+// Which of our internal sector tag(s) feed the Explore button's filter for
+// a given real index — the inverse of the map above, plus the bank split.
+function internalSectorFilterFor(realIndexName){
+  if(realIndexName === "Nifty PSU Bank" || realIndexName === "Nifty Private Bank"){
+    return "Financial Services"; // best available filter — Explorer can't isolate the bank subset yet, so this opens the broader Financial Services list
+  }
+  const entry = Object.entries(SECTOR_TO_REAL_INDEX).find(([, real]) => real === realIndexName);
+  return entry ? entry[0] : null;
+}
+
+let sectorIdxTab = "sector"; // "sector" | "broader"
+let sectorIdxRealData = { sector: [], broader: [] };
+
+function switchSectorIdxTab(tab){
+  sectorIdxTab = tab;
+  document.getElementById("sidxTabSector").classList.toggle("active", tab === "sector");
+  document.getElementById("sidxTabBroader").classList.toggle("active", tab === "broader");
+  renderSectorTrend();
+}
+
+async function fetchSectorIndexData(){
+  const base = getBackendUrl();
+  if(!base) return;
+  try {
+    const [sectorRes, broaderRes] = await Promise.all([
+      fetch(base + "/sector-indices"),
+      fetch(base + "/broader-indices"),
+    ]);
+    sectorIdxRealData.sector = sectorRes.ok ? await sectorRes.json() : [];
+    sectorIdxRealData.broader = broaderRes.ok ? await broaderRes.json() : [];
+    renderSectorTrend();
+  } catch(err){
+    // Silent — keeps showing last known values, same pattern as the
+    // rest of the dashboard's secondary pollers.
+  }
+}
+
 function renderSectorTrend(){
   const bySector = {};
   orbRows.forEach(r => {
-    if(!bySector[r.sector]) bySector[r.sector] = [];
-    bySector[r.sector].push(r);
+    const real = realIndexForRow(r);
+    if(!real) return;
+    if(!bySector[real]) bySector[real] = [];
+    bySector[real].push(r);
   });
   const bySectorDrb = {};
   drbRows.forEach(r => {
-    if(!bySectorDrb[r.sector]) bySectorDrb[r.sector] = [];
-    bySectorDrb[r.sector].push(r);
+    const real = realIndexForRow(r);
+    if(!real) return;
+    if(!bySectorDrb[real]) bySectorDrb[real] = [];
+    bySectorDrb[real].push(r);
   });
   const breakInfo = (rows) => {
     const breaks = rows.filter(r => r.signal !== "WATCH");
@@ -4274,90 +4356,90 @@ function renderSectorTrend(){
     return { count: breaks.length, dir: buys >= sells ? "bull" : "bear" };
   };
 
-  // Pass 1: raw per-sector inputs (Sector ROVL, indicator breadth, % change)
-  const rawAgg = SECTORS.map(name => {
-    const rows = bySector[name] || [];
+  const realRows = sectorIdxTab === "sector" ? sectorIdxRealData.sector : sectorIdxRealData.broader;
+  document.getElementById("sectorIdxEmpty").style.display = realRows.length ? "none" : "block";
+  document.getElementById("sectorIdxCount").textContent = realRows.length ? realRows.length + " indices" : "";
+  if(!realRows.length){
+    document.querySelector("#sectorIdxTable tbody").innerHTML = "";
+    return;
+  }
+
+  const rawAgg = realRows.map(real => {
+    const rows = bySector[real.name] || [];
+    const hasStockData = rows.length > 0;
     const avgRovl = rows.length ? rows.reduce((a,r)=>a+r.rovl,0) / rows.length : 1;
-    const avgChg = rows.length ? rows.reduce((a,r)=>a+r.chg,0) / rows.length : 0;
     const indicatorScore = sectorIndicatorScore(rows);
     const orbBreak = breakInfo(rows);
-    const drbBreak = breakInfo(bySectorDrb[name] || []);
-    return { name, avgRovl, avgChg, indicatorScore, orbBreak, drbBreak, hasData: rows.length > 0 };
+    const drbBreak = breakInfo(bySectorDrb[real.name] || []);
+    return { name: real.name, avgChg: real.chg, avgRovl, indicatorScore, orbBreak, drbBreak, hasData: hasStockData };
   });
 
-  // Avg_Sector_ROVL — recomputed fresh each cycle, only from sectors with
-  // live data this poll (an empty sector defaulting to 1 would otherwise
-  // quietly drag the whole benchmark toward 1).
   const withData = rawAgg.filter(sc => sc.hasData);
-  const avgSectorRovl = withData.length
-    ? withData.reduce((a,sc)=>a+sc.avgRovl,0) / withData.length
-    : 1;
-
-  // Min-max normalize ROVL_Diff across the current sector set so it lands in 0–1
-  const diffs = rawAgg.map(sc => sc.avgRovl - avgSectorRovl);
+  const avgSectorRovl = withData.length ? withData.reduce((a,sc)=>a+sc.avgRovl,0) / withData.length : 1;
+  const diffs = rawAgg.map(sc => sc.hasData ? sc.avgRovl - avgSectorRovl : 0);
   const minDiff = Math.min(...diffs), maxDiff = Math.max(...diffs);
   const spread = maxDiff - minDiff;
 
   const sectorAgg = rawAgg.map((sc, i) => {
+    if(!sc.hasData){
+      // No stock-level detail mapped for this real index — show real %
+      // change only, honestly mark the rest as unavailable rather than
+      // guessing at a classification with zero underlying stocks.
+      return { ...sc, rovlDiff: 0, rovlDiffNorm: 0.5, compositeScore: 0.5, classification: "NO_DATA", status: "neutral", strength: "moderate" };
+    }
     const rovlDiff = diffs[i];
     const rovlDiffNorm = spread > 0 ? (rovlDiff - minDiff) / spread : 0.5;
     const compositeScore = SECTOR_SCORE_W1_INDICATOR * sc.indicatorScore + SECTOR_SCORE_W2_ROVL * rovlDiffNorm;
-
     let classification;
     if(compositeScore >= SECTOR_SCORE_STRONG_MIN && rovlDiff > 0 && sc.indicatorScore >= 0.6) classification = "STRONG";
     else if(compositeScore <= SECTOR_SCORE_WEAK_MAX) classification = "WEAK";
     else classification = "NEUTRAL";
-
     const status = classification === "STRONG" ? "bull" : classification === "WEAK" ? "bear" : "neutral";
     const strength = classification === "STRONG" ? "strong" : classification === "WEAK" ? "weak" : "moderate";
-
-    return {
-      ...sc, rovlDiff, rovlDiffNorm, compositeScore, classification, status, strength
-    };
+    return { ...sc, rovlDiff, rovlDiffNorm, compositeScore, classification, status, strength };
   });
 
-  // Per-indicator breadth for the heatmap module — separate from
-  // compositeScore/indicatorScore above, which only ever see a blended
-  // average. This keeps the named, per-flag detail the heatmap needs.
   const breadthBySector = {};
-  sectorAgg.forEach((sc, i) => {
-    breadthBySector[sc.name] = computeSectorBreadth(bySector[sc.name] || [], sc.rovlDiffNorm);
+  sectorAgg.forEach(sc => {
+    if(sc.hasData) breadthBySector[sc.name] = computeSectorBreadth(bySector[sc.name] || [], sc.rovlDiffNorm);
   });
 
-  // Rotation effect: re-sort every cycle so the grid visibly reshuffles as
-  // sectors rotate. Group first by classification (STRONG block, then
-  // NEUTRAL, then WEAK) so a NEUTRAL sector can never sit above a STRONG one
-  // just because its raw CompositeScore edged higher (can happen since STRONG
-  // requires the secondary gate, not just the score threshold) — within each
-  // group, rank by CompositeScore descending.
-  const CLASS_RANK = { STRONG: 0, NEUTRAL: 1, WEAK: 2 };
-  sectorAgg.sort((a,b) => CLASS_RANK[a.classification] - CLASS_RANK[b.classification] || b.compositeScore - a.compositeScore);
+  // Sort by real % change, strongest to weakest — matches the reference
+  // tool's own ordering, and doesn't need the old STRONG/NEUTRAL/WEAK
+  // grouping since "NO_DATA" entries have no meaningful classification
+  // to group by anyway.
+  sectorAgg.sort((a,b) => b.avgChg - a.avgChg);
 
   sectorStrengthMap = {};
-  sectorAgg.forEach(sc => { sectorStrengthMap[sc.name] = sc.strength; });
   sectorStatusMap = {};
-  sectorAgg.forEach(sc => { sectorStatusMap[sc.name] = sc.status; });
+  sectorAgg.forEach(sc => {
+    sectorStrengthMap[sc.name] = sc.strength;
+    sectorStatusMap[sc.name] = sc.status;
+  });
 
-  sampleSectorBreadth(sectorAgg, breadthBySector);
+  sectorAgg.filter(sc => sc.hasData).forEach(sc => sampleSectorBreadth([sc], { [sc.name]: breadthBySector[sc.name] }));
   updateSectorTimeWindow();
 
-  document.getElementById("sectorCount").textContent = sectorAgg.length + " sectors";
-  document.querySelector("#sectorTable tbody").innerHTML = sectorAgg.map((sc, i) => `
+  document.querySelector("#sectorIdxTable tbody").innerHTML = sectorAgg.map((sc, i) => {
+    const noData = sc.classification === "NO_DATA";
+    const internalFilter = internalSectorFilterFor(sc.name);
+    return `
     <tr class="rail-${sc.status}">
       <td class="mono cell-sub">${i + 1}</td>
       <td style="font-weight:600;">${sc.name}</td>
       <td><span class="chg-txt ${sc.avgChg >= 0 ? 'up' : 'down'}">${sc.avgChg >= 0 ? '+' : ''}${sc.avgChg.toFixed(2)}%</span></td>
-      <td>${renderSectorBreadth(sc.name)}</td>
-      <td><span class="badge-status ${sc.status}" title="Composite ${sc.compositeScore.toFixed(2)} · Indicators ${Math.round(sc.indicatorScore*100)}% · ROVL ${sc.rovlDiff >= 0 ? '+' : ''}${sc.rovlDiff.toFixed(2)} vs avg"><span class="dot"></span>${label(sc.status)}</span></td>
+      <td>${noData ? '<span class="cell-sub" style="font-size:11px;" title="No stock-level detail mapped to this index yet">—</span>' : renderSectorBreadth(sc.name)}</td>
+      <td>${noData ? '<span class="cell-sub" style="font-size:11px;">—</span>' : `<span class="badge-status ${sc.status}" title="Composite ${sc.compositeScore.toFixed(2)} · Indicators ${Math.round(sc.indicatorScore*100)}% · ROVL ${sc.rovlDiff >= 0 ? '+' : ''}${sc.rovlDiff.toFixed(2)} vs avg"><span class="dot"></span>${label(sc.status)}</span>`}</td>
       <td>
+        ${!internalFilter ? '<span class="cell-sub" style="font-size:11px;">—</span>' : `
         <div class="sector-jump">
-          <button type="button" class="sector-jump-btn orb ${sc.orbBreak.count > 0 ? 'has-break ' + sc.orbBreak.dir : ''}" onclick="openExplorer('ORB','all','${sc.name.replace(/'/g,"\\'")}')" title="ORB breakouts in ${sc.name}">ORB${sc.orbBreak.count > 0 ? `<span class="jump-break-badge">${sc.orbBreak.count}</span>` : ''}</button>
-          <button type="button" class="sector-jump-btn drb ${sc.drbBreak.count > 0 ? 'has-break ' + sc.drbBreak.dir : ''}" onclick="openExplorer('DRB','all','${sc.name.replace(/'/g,"\\'")}')" title="DRB breakouts in ${sc.name}">DRB${sc.drbBreak.count > 0 ? `<span class="jump-break-badge">${sc.drbBreak.count}</span>` : ''}</button>
+          <button type="button" class="sector-jump-btn orb ${sc.orbBreak.count > 0 ? 'has-break ' + sc.orbBreak.dir : ''}" onclick="openExplorer('ORB','all','${internalFilter.replace(/'/g,"\\'")}')" title="ORB breakouts (Financial Services list — bank-only filtering isn't split yet)">ORB${sc.orbBreak.count > 0 ? `<span class="jump-break-badge">${sc.orbBreak.count}</span>` : ''}</button>
+          <button type="button" class="sector-jump-btn drb ${sc.drbBreak.count > 0 ? 'has-break ' + sc.drbBreak.dir : ''}" onclick="openExplorer('DRB','all','${internalFilter.replace(/'/g,"\\'")}')" title="DRB breakouts">DRB${sc.drbBreak.count > 0 ? `<span class="jump-break-badge">${sc.drbBreak.count}</span>` : ''}</button>
           <button type="button" class="sector-alert-bell ${alertEnabledSectors.has(sc.name) ? 'on' : ''}" data-sector="${sc.name.replace(/"/g,'&quot;')}" title="${alertEnabledSectors.has(sc.name) ? 'ORB alerts ON for ' + sc.name + ' — click to turn off' : 'Turn on ORB alerts for ' + sc.name}"><i class="bi bi-bell${alertEnabledSectors.has(sc.name) ? '-fill' : ''}"></i></button>
-        </div>
+        </div>`}
       </td>
-    </tr>
-  `).join("");
+    </tr>`;
+  }).join("");
 
   document.querySelectorAll(".sector-alert-bell").forEach(btn => {
     btn.addEventListener("click", function(){
@@ -4395,8 +4477,8 @@ function renderOppTable(bodyId, rows){
 function renderAll(){
   renderSectorTrend();
 
-  const longs = [...orbRows].filter(r => r.chg >= 0).sort((a,b) => b.score - a.score).slice(0,6);
-  const shorts = [...orbRows].filter(r => r.chg < 0).sort((a,b) => a.score - b.score).slice(0,6);
+  const longs = [...orbRows].filter(r => r.chg >= 0).sort((a,b) => b.chg - a.chg).slice(0,6);
+  const shorts = [...orbRows].filter(r => r.chg < 0).sort((a,b) => a.chg - b.chg).slice(0,6);
   renderOppTable("#longTable tbody", longs);
   renderOppTable("#shortTable tbody", shorts);
 
@@ -4528,6 +4610,26 @@ function showBreakToast(strategy, symbol, price, dir, qty, time, rovl){
   }, 6000);
 }
 
+// Alerts queue and fire one at a time, spaced 3.5s apart — if several
+// breaks land in the same poll (a fast-moving market can easily do this),
+// firing 5+ notification sounds simultaneously is jarring and easy to
+// miss individually. Spacing them out makes each one actually noticeable.
+const ALERT_QUEUE_SPACING_MS = 3500;
+let alertQueue = [];
+let alertQueueRunning = false;
+
+function queueBreakNotification(strategy, symbol, price, dir, qty, time, rovl){
+  alertQueue.push({ strategy, symbol, price, dir, qty, time, rovl });
+  if(!alertQueueRunning) processAlertQueue();
+}
+function processAlertQueue(){
+  if(!alertQueue.length){ alertQueueRunning = false; return; }
+  alertQueueRunning = true;
+  const next = alertQueue.shift();
+  fireBreakNotification(next.strategy, next.symbol, next.price, next.dir, next.qty, next.time, next.rovl);
+  setTimeout(processAlertQueue, ALERT_QUEUE_SPACING_MS);
+}
+
 function fireBreakNotification(strategy, symbol, price, dir, qty, time, rovl){
   playAlertBell();
   showBreakToast(strategy, symbol, price, dir, qty, time, rovl);
@@ -4569,7 +4671,7 @@ function checkForNewBreaksAndAlert(strategy, rows){
     const buyingPower = getBuyingPowerPerTrade();
     eligible.forEach(b => {
       const qty = Math.max(0, Math.floor(buyingPower / b.price));
-      fireBreakNotification(strategy, b.symbol, b.price, b.dir, qty, b.time, b.rovl);
+      queueBreakNotification(strategy, b.symbol, b.price, b.dir, qty, b.time, b.rovl);
     });
   }
 }
@@ -4589,13 +4691,13 @@ function checkTopLongShortAndAlert(allOrbRows){
     longCandidates.forEach(r => {
       if(!prevTop10Long.has(r.sym)){
         const qty = Math.max(0, Math.floor(getBuyingPowerPerTrade() / r.price));
-        fireBreakNotification("LONG", r.sym, r.price, "up", qty, "Top 10", r.rovl);
+        queueBreakNotification("LONG", r.sym, r.price, "up", qty, "Top 10", r.rovl);
       }
     });
     shortCandidates.forEach(r => {
       if(!prevTop10Short.has(r.sym)){
         const qty = Math.max(0, Math.floor(getBuyingPowerPerTrade() / r.price));
-        fireBreakNotification("SHORT", r.sym, r.price, "down", qty, "Top 10", r.rovl);
+        queueBreakNotification("SHORT", r.sym, r.price, "down", qty, "Top 10", r.rovl);
       }
     });
   }
@@ -4901,7 +5003,7 @@ SECTORS.forEach(s => {
 });
 
 let lsDirection = "long";
-let lsSort = { key: "score", dir: -1 };
+let lsSort = { key: "chg", dir: -1 };
 
 function strengthBadge(sectorName){
   const strength = sectorStrengthMap[sectorName] || "moderate";
@@ -5193,7 +5295,8 @@ function drawQuadPanel(canvas, candles, opts){
   // Compute EMA series up front so their range is included in lo/hi
   // (otherwise a fast-moving EMA line would clip off the top/bottom of
   // the chart instead of being visible like the candles it tracks).
-  const emaSeries = EMA_LENGTHS.map(cfg => ({ ...cfg, values: computeEMASeries(candles, cfg.length) }));
+  const activeEmaLengths = opts.emaLengths || EMA_LENGTHS;
+  const emaSeries = activeEmaLengths.map(cfg => ({ ...cfg, values: computeEMASeries(candles, cfg.length) }));
   emaSeries.forEach(s => {
     s.values.forEach(v => { if(v != null){ if(v < lo) lo = v; if(v > hi) hi = v; } });
   });
@@ -5322,7 +5425,7 @@ function drawQuadPanel(canvas, candles, opts){
     });
   }
 
-  canvas._chartData = { candles, x, y, slot, opts, emaDrawn, emaAll: EMA_LENGTHS };
+  canvas._chartData = { candles, x, y, slot, opts, emaDrawn, emaAll: activeEmaLengths };
   return emaDrawn;
 }
 
@@ -5351,18 +5454,30 @@ function attachQuadTooltip(canvas, tooltip){
   canvas.addEventListener("mouseleave", () => { tooltip.style.display = "none"; });
 }
 
-function renderQuadChart(data){
+const EMA_LENGTHS_ETF = [ // ETF charts specifically use 9/20/50, not the full 9/20/50/200 set
+  { length: 9,  color: "#00BFFF", label: "EMA9"  },
+  { length: 20, color: "#FFD700", label: "EMA20" },
+  { length: 50, color: "#FF69B4", label: "EMA50" },
+];
+
+function renderQuadChart(data, isEtf){
   const container = document.getElementById("tvChartContainer");
   container.classList.add("chart-quad-grid");
   container.innerHTML = "";
 
-  CHART_PANELS.forEach(panel => {
+  // ETFs get a single, larger daily panel (9/20/50 EMA) instead of the
+  // full 4-panel intraday+daily grid — ETF swing analysis doesn't have
+  // ORB/intraday relevance the way stock ORB/DRB trading does.
+  const panelsToRender = isEtf ? CHART_PANELS.filter(p => p.key === "daily") : CHART_PANELS;
+  if(isEtf) container.classList.add("chart-quad-single");
+
+  panelsToRender.forEach(panel => {
     const candles = (data.timeframes && data.timeframes[panel.key]) || [];
     const showStaleNote = data.stale_intraday && panel.key !== "daily";
     const box = document.createElement("div");
     box.className = "chart-quad-panel";
     box.innerHTML = `
-      <div class="chart-quad-panel-head">${panel.label}${showStaleNote ? ` <span class="chart-quad-stale">· last session (${data.intraday_as_of})</span>` : ''}</div>
+      <div class="chart-quad-panel-head">${isEtf ? "Daily" : panel.label}${showStaleNote ? ` <span class="chart-quad-stale">· last session (${data.intraday_as_of})</span>` : ''}</div>
       <div class="chart-quad-ema-legend"></div>
       <div class="chart-quad-panel-canvas-wrap">
         <canvas></canvas>
@@ -5372,11 +5487,12 @@ function renderQuadChart(data){
     const canvas = box.querySelector("canvas");
     const legendEl = box.querySelector(".chart-quad-ema-legend");
     const tooltip = box.querySelector(".chart-quad-tooltip");
-    const opts = { orbHigh: data.orb_high, orbLow: data.orb_low, markers: data.markers, showOrb: panel.showOrb };
+    const emaLengths = isEtf ? EMA_LENGTHS_ETF : EMA_LENGTHS;
+    const opts = { orbHigh: data.orb_high, orbLow: data.orb_low, markers: data.markers, showOrb: panel.showOrb, emaLengths };
     const draw = () => {
       const drawn = drawQuadPanel(canvas, candles, opts);
       const drawnLengths = new Set(drawn.map(s => s.length));
-      legendEl.innerHTML = EMA_LENGTHS.map(cfg => {
+      legendEl.innerHTML = emaLengths.map(cfg => {
         const live = drawnLengths.has(cfg.length);
         return `<span class="ema-legend-item${live ? '' : ' dim'}" title="${live ? cfg.label : cfg.label + ' — not enough candles on this panel yet'}"><i style="background:${cfg.color}"></i>${cfg.label}</span>`;
       }).join("");
@@ -5414,7 +5530,7 @@ async function loadChart(symbol, forcePlain){
       showChartMsg(data.error === "not_logged_in" ? "Log in to your data source to load charts." : "Couldn't load chart data for this symbol.", "bi-exclamation-triangle");
       return;
     }
-    renderQuadChart(data);
+    renderQuadChart(data, currentChartIsEtf);
     hideChartMsg();
   } catch(err){
     showChartMsg("Couldn't reach the chart data backend.", "bi-wifi-off");
@@ -5518,7 +5634,7 @@ document.getElementById("chartBreaklogCloseBtn").addEventListener("click", close
 function openChartModal(symbol, forcePlain){
   currentChartSymbol = symbol;
   currentChartIsEtf = !!forcePlain;
-  chartViewMode = forcePlain ? "tradingview" : "grid"; // ETFs always start on TradingView; stocks always start on grid
+  chartViewMode = "grid"; // both stocks and ETFs default to the own chart now
   currentChartForcePlain = effectiveForcePlain();
   const row = findRowForSymbol(symbol);
   document.getElementById("chartTitle").textContent = symbol;
@@ -5526,9 +5642,10 @@ function openChartModal(symbol, forcePlain){
     ? `${row.name || ""} · ${row.sector || ""} · ₹${row.price.toLocaleString('en-IN')}`
     : "Live daily chart";
   document.getElementById("chartOpenTv").href = `https://www.tradingview.com/chart/?symbol=${encodeURIComponent(tvSymbol(symbol))}`;
-  // The Grid/TradingView switch only makes sense for stocks — ETFs have no
-  // grid alternative (no ORB/DRB context), so it's TradingView-only for them.
-  document.getElementById("chartViewToggleBtn").style.display = forcePlain ? "none" : "";
+  // ETFs can still switch to TradingView via the same toggle stocks use —
+  // they just default to the own chart (single daily panel, EMA 9/20/50)
+  // instead of being TradingView-only.
+  document.getElementById("chartViewToggleBtn").style.display = "";
   updateChartViewToggleUI();
   applyChartViewVisibility();
   document.getElementById("chartBreaklogToggleBtn").style.display = forcePlain ? "none" : "";
@@ -5553,7 +5670,7 @@ function openChartModal(symbol, forcePlain){
   }, 5000);
 }
 function effectiveForcePlain(){
-  return currentChartIsEtf || chartViewMode === "tradingview";
+  return chartViewMode === "tradingview";
 }
 function applyChartViewVisibility(){
   const plain = effectiveForcePlain();
@@ -5568,7 +5685,6 @@ function updateChartViewToggleUI(){
   lbl.textContent = onTv ? "4 Grid" : "TradingView"; // shows what clicking it will switch TO
 }
 document.getElementById("chartViewToggleBtn").addEventListener("click", function(){
-  if(currentChartIsEtf) return; // ETFs don't have a grid alternative
   chartViewMode = chartViewMode === "tradingview" ? "grid" : "tradingview";
   currentChartForcePlain = effectiveForcePlain();
   updateChartViewToggleUI();
@@ -5733,6 +5849,45 @@ document.addEventListener("click", function(e){
 ===================================================================== */
 const BACKEND_URL_KEY = "ib_backend_url";
 const DEFAULT_BACKEND_URL = "https://143-110-248-250.nip.io";
+fetchSectorIndexData();
+setInterval(throttleWhenHidden(fetchSectorIndexData, 120000), 20000);
+
+function renderMarketNews(articles){
+  const track = document.getElementById("marketNewsTrack");
+  if(!track) return;
+  if(!articles || !articles.length){
+    track.innerHTML = `<span class="market-news-item cell-sub">No live headlines available right now.</span>`;
+    return;
+  }
+  const itemsHtml = articles.map(a =>
+    `<span class="market-news-item"><a href="${a.link}" target="_blank" rel="noopener">${a.title}</a><span class="mn-source">${a.source}${a.time_ago ? ' · ' + a.time_ago : ''}</span></span>`
+  ).join("");
+  // Duplicated once so the CSS animation (translateX -50%) loops seamlessly
+  // without a visible jump back to the start.
+  track.innerHTML = itemsHtml + itemsHtml;
+}
+
+let marketNewsInFlight = false;
+async function fetchMarketNews(){
+  if(marketNewsInFlight) return;
+  marketNewsInFlight = true;
+  const base = getBackendUrl();
+  if(!base){ marketNewsInFlight = false; return; }
+  try {
+    const res = await fetch(base + "/market-news");
+    if(res.ok){
+      const data = await res.json();
+      renderMarketNews(data.articles);
+    }
+  } catch(err){
+    // Silent — ticker just keeps showing its last known headlines.
+  } finally {
+    marketNewsInFlight = false;
+  }
+}
+fetchMarketNews();
+setInterval(throttleWhenHidden(fetchMarketNews, 600000), 300000); // matches the backend's own 5-min cache TTL — no point polling faster
+
 // Wraps a poll function so it still fires on the normal cadence while the
 // tab/screen is active, but skips most ticks while backgrounded (phone
 // locked, app switched away) — cuts battery/data use during the long
@@ -5946,7 +6101,7 @@ async function fetchLiveData(){
 
 function startBackendPolling(){
   fetchLiveData();
-  fetchMarketBrief();
+  fetchMarketNews();
   if(backendPollTimer) clearInterval(backendPollTimer);
   // Was 20s when every poll meant a fresh Upstox REST call server-side.
   // Now that get_live_rows() just reads the WebSocket feed's in-memory
@@ -5964,132 +6119,6 @@ document.getElementById("backendUrlSaveBtn").addEventListener("click", function(
   msg.style.display = "block";
   setTimeout(() => { msg.style.display = "none"; }, 2000);
   startBackendPolling();
-  fetchMarketBrief();
-});
-
-/* =====================================================================
-   AI MARKET BRIEF — auto-refreshes every few minutes; the backend only
-   actually regenerates twice/day (morning + midday slot), so polling
-   here is free — most calls just return the cached text.
-===================================================================== */
-async function fetchMarketBrief(){
-  const base = getBackendUrl();
-  if(!base) return;
-  try {
-    const res = await fetch(base + "/ai/brief");
-    if(!res.ok) return;
-    const data = await res.json();
-    const btn = document.getElementById("marketBriefBtn");
-    const textEl = document.getElementById("briefText");
-    const timeEl = document.getElementById("briefTime");
-    if(data.text){
-      textEl.textContent = data.text;
-      textEl.classList.remove("brief-error");
-      timeEl.textContent = data.generated_at ? `updated ${data.generated_at}` : "";
-      btn.style.display = "inline-flex";
-    } else if(data.error){
-      // Quiet fail — most likely OPENROUTER_API_KEY isn't set yet. Don't nag with
-      // a visible button every load; just stay hidden until it's configured.
-      btn.style.display = "none";
-    }
-    updateAskAiQuota(data.calls_used_today, data.calls_limit);
-  } catch(err){
-    // Backend unreachable — the existing backend-banner already covers that; stay quiet here.
-  }
-}
-fetchMarketBrief();
-setInterval(fetchMarketBrief, 5 * 60 * 1000);
-
-function openMarketBrief(){
-  document.getElementById("marketBriefOverlay").classList.add("show");
-}
-function closeMarketBrief(){
-  document.getElementById("marketBriefOverlay").classList.remove("show");
-}
-document.getElementById("marketBriefBtn").addEventListener("click", openMarketBrief);
-document.getElementById("marketBriefClose").addEventListener("click", closeMarketBrief);
-document.getElementById("marketBriefOverlay").addEventListener("click", function(e){
-  if(e.target === this) closeMarketBrief();
-});
-
-/* =====================================================================
-   ASK AI — dashboard-wide chat box, fed a summary of the whole day's
-   scan server-side. Each question spends one call against the shared
-   50/day OpenRouter quota (the market brief above shares the same pool).
-===================================================================== */
-function updateAskAiQuota(used, limit){
-  const el = document.getElementById("askAiQuota");
-  if(el && typeof used === "number" && typeof limit === "number"){
-    el.textContent = `${used}/${limit} today`;
-  }
-}
-
-const askAiFab = document.getElementById("askAiFab");
-const askAiPanel = document.getElementById("askAiPanel");
-const askAiBody = document.getElementById("askAiBody");
-const askAiInput = document.getElementById("askAiInput");
-const askAiSendBtn = document.getElementById("askAiSendBtn");
-
-askAiFab.addEventListener("click", () => {
-  askAiPanel.classList.toggle("open");
-  if(askAiPanel.classList.contains("open")) askAiInput.focus();
-});
-document.getElementById("askAiCloseBtn").addEventListener("click", () => {
-  askAiPanel.classList.remove("open");
-});
-
-function addAskAiMessage(text, cls){
-  const empty = askAiBody.querySelector(".ask-ai-empty");
-  if(empty) empty.remove();
-  const div = document.createElement("div");
-  div.className = "ask-ai-msg " + cls;
-  div.textContent = text;
-  askAiBody.appendChild(div);
-  askAiBody.scrollTop = askAiBody.scrollHeight;
-  return div;
-}
-
-async function submitAskAiQuestion(){
-  const question = askAiInput.value.trim();
-  if(!question) return;
-  const base = getBackendUrl();
-  if(!base){
-    addAskAiMessage("No backend URL configured — check Settings.", "error");
-    return;
-  }
-  addAskAiMessage(question, "user");
-  askAiInput.value = "";
-  askAiInput.disabled = true;
-  askAiSendBtn.disabled = true;
-  const loadingEl = addAskAiMessage("Thinking…", "loading");
-
-  try {
-    const res = await fetch(base + "/ai/ask", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ question })
-    });
-    const data = await res.json();
-    loadingEl.remove();
-    if(data.answer){
-      addAskAiMessage(data.answer, "answer");
-    } else {
-      addAskAiMessage(data.error || "Something went wrong.", "error");
-    }
-    updateAskAiQuota(data.calls_used_today, data.calls_limit);
-  } catch(err){
-    loadingEl.remove();
-    addAskAiMessage("Couldn't reach the backend — check the server is running.", "error");
-  } finally {
-    askAiInput.disabled = false;
-    askAiSendBtn.disabled = false;
-    askAiInput.focus();
-  }
-}
-
-askAiSendBtn.addEventListener("click", submitAskAiQuestion);
-askAiInput.addEventListener("keydown", (e) => {
-  if(e.key === "Enter") submitAskAiQuestion();
 });
 
 document.getElementById("saveWindowsBtn").addEventListener("click", async function(){
