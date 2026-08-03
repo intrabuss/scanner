@@ -385,23 +385,18 @@ html[data-theme="light"] .avatar{ background:linear-gradient(160deg,#E3E7EE,#F3F
 }
 @media (max-width: 1199.98px){ .idx-grid{ grid-template-columns:repeat(3, 1fr); } }
 
-/* Sector Indices table — fixed layout so the % Change bar column
-   gets a wide, fixed share of the row (see colgroup in markup)
-   instead of shrinking to fit the other columns' content. */
-#sectorIdxTable{ table-layout:fixed; }
-
 /* Sector Indices — real NSE index bars, sorted strongest to weakest */
 .sidx-row{
   display:grid; grid-template-columns:170px 1fr 60px; align-items:center; gap:10px;
-  padding:10px 0;
+  padding:6px 0;
 }
 .sidx-name{ font-size:12.5px; font-weight:600; color:var(--text-secondary); text-align:right; }
-.sidx-bar-track{ position:relative; height:28px; }
-.sidx-bar{ position:absolute; top:0; height:100%; border-radius:6px; transition:width .2s ease; box-shadow:0 1px 3px rgba(0,0,0,.15); }
+.sidx-bar-track{ position:relative; height:18px; }
+.sidx-bar{ position:absolute; top:0; height:100%; border-radius:3px; transition:width .2s ease; }
 .sidx-bar.up{ background:var(--bull); left:50%; }
 .sidx-bar.down{ background:var(--bear); right:50%; }
-.sidx-center-line{ position:absolute; left:50%; top:-4px; bottom:-4px; width:1px; background:var(--border-med); }
-.sidx-chg{ font-size:14px; font-weight:800; font-family:var(--font-data); }
+.sidx-center-line{ position:absolute; left:50%; top:-2px; bottom:-2px; width:1px; background:var(--border-med); }
+.sidx-chg{ font-size:12.5px; font-weight:700; font-family:var(--font-data); }
 .sidx-chg.up{ color:var(--bull); }
 .sidx-chg.down{ color:var(--bear); }
 .tech-score-chip{
@@ -434,12 +429,6 @@ html[data-theme="light"] .avatar{ background:linear-gradient(160deg,#E3E7EE,#F3F
 .idx-tech-label.bull{ background:var(--bull-dim); color:var(--bull); }
 .idx-tech-label.bear{ background:var(--bear-dim); color:var(--bear); }
 .idx-tech-label.neutral{ background:var(--neutral-dim); color:var(--neutral); }
-.explorer-sector-chg{
-  display:inline-flex; align-items:center; gap:3px; margin-top:0; font-size:12px; font-weight:800;
-  font-family:var(--font-data); padding:2px 9px; border-radius:6px; letter-spacing:-.01em;
-}
-.explorer-sector-chg.up{ background:var(--bull-dim); color:var(--bull); }
-.explorer-sector-chg.down{ background:var(--bear-dim); color:var(--bear); }
 .idx-expiry{ margin-top:6px; padding-top:6px; border-top:1px solid var(--border-soft); font-size:10.5px; color:var(--text-muted); letter-spacing:.02em; }
 .idx-change.bull{ color:var(--bull); }
 .idx-change.bear{ color:var(--bear); }
@@ -911,25 +900,9 @@ tr.pinned-row{ background:var(--brand-dim); }
 .role-badge{
   display:inline-flex; align-items:center; gap:5px; padding:3px 9px; border-radius:6px;
   font-size:10.5px; font-weight:700; letter-spacing:.03em; text-transform:uppercase;
-  cursor:pointer; border:none; transition:.15s ease;
 }
 .role-badge.admin{ background:var(--brand-dim); color:var(--brand); border:1px solid rgba(76,141,255,.35); }
 .role-badge.user{ background:var(--bg-hover); color:var(--text-secondary); border:1px solid var(--border-med); }
-.role-badge:hover{ filter:brightness(1.15); }
-
-.user-menu-wrap{ position:relative; display:inline-flex; }
-.user-menu-dropdown{
-  display:none; position:absolute; top:calc(100% + 8px); right:0; z-index:950;
-  min-width:190px; background:var(--bg-card, #12161d); border:1px solid var(--border-med);
-  border-radius:10px; padding:10px; box-shadow:0 10px 30px rgba(0,0,0,.35);
-}
-.user-menu-dropdown.open{ display:block; }
-.user-menu-session{
-  font-size:11px; color:var(--text-muted); padding:2px 4px 10px; border-bottom:1px solid var(--border-med); margin-bottom:8px;
-}
-.user-menu-dropdown .btn-danger{
-  width:100%; display:flex; align-items:center; justify-content:center; gap:7px;
-}
 
 /* ============ MODALS ============ */
 .modal-overlay{
@@ -1720,13 +1693,7 @@ html.hide-etf #etfSwingSection{ display:none !important; }
           <i class="bi bi-arrow-clockwise"></i>
         </button>
 
-        <div class="user-menu-wrap" id="userMenuWrap" style="display:none;">
-          <button type="button" class="role-badge user" id="roleBadge"></button>
-          <div class="user-menu-dropdown" id="userMenuDropdown">
-            <div class="user-menu-session">Signed in as <strong class="mono" id="userMenuMobile">—</strong></div>
-            <button class="btn-danger" id="logoutBtn"><i class="bi bi-box-arrow-right"></i> Log Out</button>
-          </div>
-        </div>
+        <span class="role-badge user" id="roleBadge" style="display:none;"></span>
       </div>
     </div>
 
@@ -1773,18 +1740,11 @@ html.hide-etf #etfSwingSection{ display:none !important; }
         </div>
       </div>
     </div>
-    <div class="section-sub" style="font-size:11px; color:var(--text-muted); margin:0 0 10px;">
-      <i class="bi bi-info-circle"></i> % Change is the real, official NSE index value. Breadth/Explore come from the stocks we've mapped into each index — some indices (marked "—") don't have stock-level detail mapped yet.
+    <div class="section-sub" style="font-size:11px; color:var(--text-muted); margin:-2px 0 10px;">
+      <i class="bi bi-info-circle"></i> % Change is the real, official NSE index value. Technical Score/Explore come from the stocks we've mapped into each index — some indices (marked "—") don't have stock-level detail mapped yet.
     </div>
     <div class="card-x table-scroll">
       <table class="data-grid" id="sectorIdxTable">
-        <colgroup>
-          <col style="width:44px;">
-          <col style="width:150px;">
-          <col style="width:46%;">
-          <col style="width:120px;">
-          <col style="width:130px;">
-        </colgroup>
         <thead>
           <tr>
             <th>#</th>
@@ -1809,7 +1769,7 @@ html.hide-etf #etfSwingSection{ display:none !important; }
         <div class="card-x table-scroll">
           <table class="data-grid" id="longTable">
             <thead>
-              <tr><th>Symbol</th><th>Sector</th><th>% Chg</th><th>LTP</th><th>ROVL</th><th>Technical Score</th></tr>
+              <tr><th>Symbol</th><th>Sector</th><th>% Chg</th><th>LTP</th><th>ROVL</th><th>Status</th></tr>
             </thead>
             <tbody></tbody>
           </table>
@@ -1824,7 +1784,7 @@ html.hide-etf #etfSwingSection{ display:none !important; }
         <div class="card-x table-scroll">
           <table class="data-grid" id="shortTable">
             <thead>
-              <tr><th>Symbol</th><th>Sector</th><th>% Chg</th><th>LTP</th><th>ROVL</th><th>Technical Score</th></tr>
+              <tr><th>Symbol</th><th>Sector</th><th>% Chg</th><th>LTP</th><th>ROVL</th><th>Status</th></tr>
             </thead>
             <tbody></tbody>
           </table>
@@ -2030,6 +1990,12 @@ html.hide-etf #etfSwingSection{ display:none !important; }
       <button class="theme-opt" id="themeLightBtn"><i class="bi bi-sun-fill"></i>Light</button>
     </div>
 
+    <div class="settings-divider"></div>
+
+    <div class="modal-section-lbl">Session</div>
+    <div class="settings-session">Signed in as <strong class="mono" id="settingsUserMobile">—</strong></div>
+    <button class="btn-danger" id="logoutBtn"><i class="bi bi-box-arrow-right"></i> Log Out</button>
+
     <div class="settings-divider" id="adminDivider" style="display:none;"></div>
     <div id="adminSection" style="display:none;">
       <div class="modal-section-lbl">Scan Size <span style="color:var(--text-muted); font-weight:500; text-transform:none; letter-spacing:0;">(admin only) · Defaults to Nifty 500</span></div>
@@ -2110,7 +2076,6 @@ html.hide-etf #etfSwingSection{ display:none !important; }
       <div>
         <div style="font-weight:800; font-size:16px; display:flex; align-items:center; gap:8px;">
           <span id="explorerTitle">ORB Breakout — Trade Explorer</span>
-          <span class="explorer-sector-chg" id="explorerSectorChg" style="display:none;"></span>
           <span class="idx-tech-label" id="explorerSectorStatus" style="display:none; margin-top:0;"></span>
         </div>
         <div class="explorer-meta" id="explorerSub">— symbols across — sectors</div>
@@ -2237,6 +2202,7 @@ html.hide-etf #etfSwingSection{ display:none !important; }
             <th class="sortable" data-key="sym">Symbol <span class="sort-arrow"><i class="bi bi-caret-down-fill"></i></span></th>
             <th class="sortable" data-key="name">Company <span class="sort-arrow"><i class="bi bi-caret-down-fill"></i></span></th>
             <th class="sortable" data-key="sector">Sector <span class="sort-arrow"><i class="bi bi-caret-down-fill"></i></span></th>
+            <th>Strength</th>
             <th class="sortable" data-key="price">Price <span class="sort-arrow"><i class="bi bi-caret-down-fill"></i></span></th>
             <th class="sortable" data-key="chg">% Chg <span class="sort-arrow"><i class="bi bi-caret-down-fill"></i></span></th>
             <th class="sortable" data-key="rovl">ROVL <span class="sort-arrow"><i class="bi bi-caret-down-fill"></i></span></th>
@@ -2614,7 +2580,7 @@ function maskMobile(mobile){
 function showApp(session){
   document.getElementById("loginGate").style.display = "none";
   document.getElementById("appShell").style.display = "grid";
-  document.getElementById("userMenuMobile").textContent = maskMobile(session.mobile);
+  document.getElementById("settingsUserMobile").textContent = maskMobile(session.mobile);
 
   const isAdmin = session.mobile === ADMIN_MOBILE;
   document.getElementById("adminDivider").style.display = isAdmin ? "block" : "none";
@@ -2627,8 +2593,8 @@ function showApp(session){
   if(isAdmin) renderAdminList();
   if(isAdmin) refreshScanModeUI(); // pull the real configured stock counts (e.g. 424 / 4,515) from /health right away — admin-only section
 
-  document.getElementById("userMenuWrap").style.display = "inline-flex";
   const roleBadge = document.getElementById("roleBadge");
+  roleBadge.style.display = "inline-flex";
   roleBadge.className = "role-badge " + (isAdmin ? "admin" : "user");
   roleBadge.innerHTML = isAdmin
     ? '<i class="bi bi-shield-fill-check"></i> Admin'
@@ -3143,19 +3109,8 @@ document.getElementById("settingsOverlay").addEventListener("click", function(e)
 });
 document.getElementById("themeDarkBtn").addEventListener("click", () => applyTheme("dark"));
 document.getElementById("themeLightBtn").addEventListener("click", () => applyTheme("light"));
-
-/* ---------------- Topbar user/admin badge: logout dropdown ---------------- */
-document.getElementById("roleBadge").addEventListener("click", function(e){
-  e.stopPropagation();
-  document.getElementById("userMenuDropdown").classList.toggle("open");
-});
-document.addEventListener("click", function(e){
-  const wrap = document.getElementById("userMenuWrap");
-  if(wrap && !wrap.contains(e.target)) document.getElementById("userMenuDropdown").classList.remove("open");
-});
 document.getElementById("logoutBtn").addEventListener("click", function(){
   clearSession();
-  document.getElementById("userMenuDropdown").classList.remove("open");
   closeSettings();
   showGate();
   if(backendPollTimer) clearInterval(backendPollTimer);
@@ -3529,574 +3484,7 @@ function getExpiryLabel(ix){
   return parts.join(' · ');
 }
 
-const STOCKS_RAW = [
-["3MINDIA","3M India Ltd.","Services"],
-["ABB","ABB India Ltd.","Industrial Manufacturing"],
-["ACC","ACC Ltd.","Cement & Cement Products"],
-["AIAENG","AIA Engineering Ltd.","Industrial Manufacturing"],
-["APLAPOLLO","APL Apollo Tubes Ltd.","Metals"],
-["AUBANK","AU Small Finance Bank Ltd.","Financial Services"],
-["AAVAS","Aavas Financiers Ltd.","Financial Services"],
-["ADANIGREEN","Adani Green Energy Ltd.","Energy"],
-["ADANIPORTS","Adani Ports and Special Economic Zone Ltd.","Services"],
-["ADANIPOWER","Adani Power Ltd.","Energy"],
-["ADANITRANS","Adani Transmission Ltd.","Energy"],
-["ABCAPITAL","Aditya Birla Capital Ltd.","Financial Services"],
-["ABFRL","Aditya Birla Fashion and Retail Ltd.","Consumer Goods"],
-["ADVENZYMES","Advanced Enzyme Tech Ltd.","Consumer Goods"],
-["AEGISCHEM","Aegis Logistics Ltd.","Energy"],
-["AJANTPHARM","Ajanta Pharmaceuticals Ltd.","Pharma"],
-["AKZOINDIA","Akzo Nobel India Ltd.","Consumer Goods"],
-["APLLTD","Alembic Pharmaceuticals Ltd.","Pharma"],
-["ALKEM","Alkem Laboratories Ltd.","Pharma"],
-["ALBK","Allahabad Bank","Financial Services"],
-["ALLCARGO","Allcargo Logistics Ltd.","Services"],
-["AMARAJABAT","Amara Raja Batteries Ltd.","Automobile"],
-["AMBUJACEM","Ambuja Cements Ltd.","Cement & Cement Products"],
-["ANDHRABANK","Andhra Bank","Financial Services"],
-["APOLLOHOSP","Apollo Hospitals Enterprise Ltd.","Healthcare Services"],
-["APOLLOTYRE","Apollo Tyres Ltd.","Automobile"],
-["ASHOKLEY","Ashok Leyland Ltd.","Automobile"],
-["ASHOKA","Ashoka Buildcon Ltd.","Construction"],
-["ASIANPAINT","Asian Paints Ltd.","Consumer Goods"],
-["ASTERDM","Aster DM Healthcare Ltd.","Healthcare Services"],
-["ASTRAZEN","AstraZenca Pharma India Ltd.","Pharma"],
-["ASTRAL","Astral Poly Technik Ltd.","Industrial Manufacturing"],
-["ATUL","Atul Ltd.","Chemicals"],
-["AUROPHARMA","Aurobindo Pharma Ltd.","Pharma"],
-["AVANTIFEED","Avanti Feeds Ltd.","Consumer Goods"],
-["DMART","Avenue Supermarts Ltd.","Consumer Goods"],
-["AXISBANK","Axis Bank Ltd.","Financial Services"],
-["BASF","BASF India Ltd.","Chemicals"],
-["BEML","BEML Ltd.","Industrial Manufacturing"],
-["BSE","BSE Ltd.","Financial Services"],
-["BAJAJ-AUTO","Bajaj Auto Ltd.","Automobile"],
-["BAJAJCON","Bajaj Consumer Care Ltd.","Consumer Goods"],
-["BAJAJELEC","Bajaj Electricals Ltd","Consumer Goods"],
-["BAJFINANCE","Bajaj Finance Ltd.","Financial Services"],
-["BAJAJFINSV","Bajaj Finserv Ltd.","Financial Services"],
-["BAJAJHLDNG","Bajaj Holdings & Investment Ltd.","Financial Services"],
-["BALKRISIND","Balkrishna Industries Ltd.","Automobile"],
-["BALMLAWRIE","Balmer Lawrie & Co. Ltd.","Services"],
-["BALRAMCHIN","Balrampur Chini Mills Ltd.","Consumer Goods"],
-["BANDHANBNK","Bandhan Bank Ltd.","Financial Services"],
-["BANKBARODA","Bank of Baroda","Financial Services"],
-["BANKINDIA","Bank of India","Financial Services"],
-["MAHABANK","Bank of Maharashtra.","Financial Services"],
-["BATAINDIA","Bata India Ltd.","Consumer Goods"],
-["BERGEPAINT","Berger Paints India Ltd.","Consumer Goods"],
-["BDL","Bharat Dynamics Ltd.","Industrial Manufacturing"],
-["BEL","Bharat Electronics Ltd.","Industrial Manufacturing"],
-["BHARATFORG","Bharat Forge Ltd.","Industrial Manufacturing"],
-["BHEL","Bharat Heavy Electricals Ltd.","Industrial Manufacturing"],
-["BPCL","Bharat Petroleum Corporation Ltd.","Energy"],
-["BHARTIARTL","Bharti Airtel Ltd.","Telecom"],
-["INFRATEL","Bharti Infratel Ltd.","Telecom"],
-["BIOCON","Biocon Ltd.","Pharma"],
-["BIRLACORPN","Birla Corporation Ltd.","Cement & Cement Products"],
-["BLISSGVS","Bliss GVS Pharma Ltd.","Pharma"],
-["BLUEDART","Blue Dart Express Ltd.","Services"],
-["BLUESTARCO","Blue Star Ltd.","Consumer Goods"],
-["BBTC","Bombay Burmah Trading Corporation Ltd.","Consumer Goods"],
-["BOMDYEING","Bombay Dyeing & Manufacturing Co. Ltd.","Textiles"],
-["BOSCHLTD","Bosch Ltd.","Automobile"],
-["BRIGADE","Brigade Enterprises Ltd.","Construction"],
-["BRITANNIA","Britannia Industries Ltd.","Consumer Goods"],
-["CARERATING","CARE Ratings Ltd.","Financial Services"],
-["CCL","CCL Products (I) Ltd.","Consumer Goods"],
-["CESC","CESC Ltd.","Energy"],
-["CGPOWER","CG Power and Industrial Solutions Ltd.","Industrial Manufacturing"],
-["CRISIL","CRISIL Ltd.","Financial Services"],
-["CADILAHC","Cadila Healthcare Ltd.","Pharma"],
-["CANFINHOME","Can Fin Homes Ltd.","Financial Services"],
-["CANBK","Canara Bank","Financial Services"],
-["CAPLIPOINT","Caplin Point Laboratories Ltd.","Pharma"],
-["CARBORUNIV","Carborundum Universal Ltd.","Industrial Manufacturing"],
-["CASTROLIND","Castrol India Ltd.","Energy"],
-["CEATLTD","Ceat Ltd.","Automobile"],
-["CENTRALBK","Central Bank of India","Financial Services"],
-["CDSL","Central Depository Services (India) Ltd.","Financial Services"],
-["CENTURYPLY","Century Plyboards (India) Ltd.","Consumer Goods"],
-["CERA","Cera Sanitaryware Ltd","Construction"],
-["CHAMBLFERT","Chambal Fertilizers & Chemicals Ltd.","Fertilisers & Pesticides"],
-["CHENNPETRO","Chennai Petroleum Corporation Ltd.","Energy"],
-["CHOLAHLDNG","Cholamandalam Financial Holdings Ltd.","Financial Services"],
-["CHOLAFIN","Cholamandalam Investment and Finance Company Ltd.","Financial Services"],
-["CIPLA","Cipla Ltd.","Pharma"],
-["CUB","City Union Bank Ltd.","Financial Services"],
-["COALINDIA","Coal India Ltd.","Metals"],
-["COCHINSHIP","Cochin Shipyard Ltd.","Industrial Manufacturing"],
-["COFFEEDAY","Coffee Day Enterprises Ltd.","Consumer Goods"],
-["COLPAL","Colgate Palmolive (India) Ltd.","Consumer Goods"],
-["CONCOR","Container Corporation of India Ltd.","Services"],
-["COROMANDEL","Coromandel International Ltd.","Fertilisers & Pesticides"],
-["CORPBANK","Corporation Bank","Financial Services"],
-["COX&KINGS","Cox & Kings Ltd.","Services"],
-["CREDITACC","CreditAccess Grameen Ltd.","Financial Services"],
-["CROMPTON","Crompton Greaves Consumer Electricals Ltd.","Consumer Goods"],
-["CUMMINSIND","Cummins India Ltd.","Industrial Manufacturing"],
-["CYIENT","Cyient Ltd.","IT"],
-["DBCORP","D.B.Corp Ltd.","Media & Entertainment"],
-["DCBBANK","DCB Bank Ltd.","Financial Services"],
-["DCMSHRIRAM","DCM Shriram Ltd.","Consumer Goods"],
-["DLF","DLF Ltd.","Construction"],
-["DABUR","Dabur India Ltd.","Consumer Goods"],
-["DEEPAKFERT","Deepak Fertilisers & Petrochemicals Corp. Ltd.","Chemicals"],
-["DEEPAKNTR","Deepak Nitrite Ltd.","Chemicals"],
-["DELTACORP","Delta Corp Ltd.","Services"],
-["DHFL","Dewan Housing Finance Corporation Ltd.","Financial Services"],
-["DBL","Dilip Buildcon Ltd.","Construction"],
-["DISHTV","Dish TV India Ltd.","Media & Entertainment"],
-["DCAL","Dishman Carbogen Amcis Ltd.","Pharma"],
-["DIVISLAB","Divi's Laboratories Ltd.","Pharma"],
-["DIXON","Dixon Technologies (India) Ltd.","Consumer Goods"],
-["LALPATHLAB","Dr. Lal Path Labs Ltd.","Healthcare Services"],
-["DRREDDY","Dr. Reddy's Laboratories Ltd.","Pharma"],
-["EIDPARRY","E.I.D. Parry (India) Ltd.","Fertilisers & Pesticides"],
-["EIHOTEL","EIH Ltd.","Services"],
-["EDELWEISS","Edelweiss Financial Services Ltd.","Financial Services"],
-["EICHERMOT","Eicher Motors Ltd.","Automobile"],
-["ELGIEQUIP","Elgi Equipments Ltd.","Industrial Manufacturing"],
-["EMAMILTD","Emami Ltd.","Consumer Goods"],
-["ENDURANCE","Endurance Technologies Ltd.","Automobile"],
-["ENGINERSIN","Engineers India Ltd.","Construction"],
-["EQUITAS","Equitas Holdings Ltd.","Financial Services"],
-["ERIS","Eris Lifesciences Ltd.","Pharma"],
-["ESCORTS","Escorts Ltd.","Automobile"],
-["ESSELPACK","Essel Propack Ltd.","Industrial Manufacturing"],
-["EXIDEIND","Exide Industries Ltd.","Automobile"],
-["FDC","FDC Ltd.","Pharma"],
-["FEDERALBNK","Federal Bank Ltd.","Financial Services"],
-["FINEORG","Fine Organic Industries Ltd.","Chemicals"],
-["FINCABLES","Finolex Cables Ltd.","Industrial Manufacturing"],
-["FINPIPE","Finolex Industries Ltd.","Industrial Manufacturing"],
-["FSL","Firstsource Solutions Ltd.","IT"],
-["FORTIS","Fortis Healthcare Ltd.","Healthcare Services"],
-["FCONSUMER","Future Consumer Ltd.","Consumer Goods"],
-["FLFL","Future Lifestyle Fashions Ltd.","Consumer Goods"],
-["FRETAIL","Future Retail Ltd.","Consumer Goods"],
-["GAIL","GAIL (India) Ltd.","Energy"],
-["GEPIL","GE Power India Ltd.","Industrial Manufacturing"],
-["GET&D","GE T&D India Ltd.","Industrial Manufacturing"],
-["GHCL","GHCL Ltd.","Chemicals"],
-["GMRINFRA","GMR Infrastructure Ltd.","Construction"],
-["GALAXYSURF","Galaxy Surfactants Ltd.","Chemicals"],
-["GDL","Gateway Distriparks Ltd.","Services"],
-["GAYAPROJ","Gayatri Projects Ltd.","Construction"],
-["GICRE","General Insurance Corporation of India","Financial Services"],
-["GILLETTE","Gillette India Ltd.","Consumer Goods"],
-["GSKCONS","GlaxoSmithkline Consumer Healthcare Ltd.","Consumer Goods"],
-["GLAXO","Glaxosmithkline Pharmaceuticals Ltd.","Pharma"],
-["GLENMARK","Glenmark Pharmaceuticals Ltd.","Pharma"],
-["GODFRYPHLP","Godfrey Phillips India Ltd.","Consumer Goods"],
-["GODREJAGRO","Godrej Agrovet Ltd.","Consumer Goods"],
-["GODREJCP","Godrej Consumer Products Ltd.","Consumer Goods"],
-["GODREJIND","Godrej Industries Ltd.","Consumer Goods"],
-["GODREJPROP","Godrej Properties Ltd.","Construction"],
-["GRANULES","Granules India Ltd.","Pharma"],
-["GRAPHITE","Graphite India Ltd.","Industrial Manufacturing"],
-["GRASIM","Grasim Industries Ltd.","Cement & Cement Products"],
-["GESHIP","Great Eastern Shipping Co. Ltd.","Services"],
-["GREAVESCOT","Greaves Cotton Ltd.","Industrial Manufacturing"],
-["GRINDWELL","Grindwell Norton Ltd.","Industrial Manufacturing"],
-["GRUH","Gruh Finance Ltd.","Financial Services"],
-["GUJALKALI","Gujarat Alkalies & Chemicals Ltd.","Chemicals"],
-["GUJFLUORO","Gujarat Fluorochemicals Ltd.","Chemicals"],
-["GUJGASLTD","Gujarat Gas Ltd.","Energy"],
-["GMDCLTD","Gujarat Mineral Development Corporation Ltd.","Metals"],
-["GNFC","Gujarat Narmada Valley Fertilizers and Chemicals Ltd.","Chemicals"],
-["GPPL","Gujarat Pipavav Port Ltd.","Services"],
-["GSFC","Gujarat State Fertilizers & Chemicals Ltd.","Fertilisers & Pesticides"],
-["GSPL","Gujarat State Petronet Ltd.","Energy"],
-["GULFOILLUB","Gulf Oil Lubricants India Ltd.","Energy"],
-["HEG","H.E.G. Ltd.","Industrial Manufacturing"],
-["HCLTECH","HCL Technologies Ltd.","IT"],
-["HDFCAMC","HDFC Asset Management Company Ltd.","Financial Services"],
-["HDFCBANK","HDFC Bank Ltd.","Financial Services"],
-["HDFCLIFE","HDFC Life Insurance Company Ltd.","Financial Services"],
-["HATHWAY","Hathway Cable & Datacom Ltd.","Media & Entertainment"],
-["HATSUN","Hatsun Agro Product Ltd.","Consumer Goods"],
-["HAVELLS","Havells India Ltd.","Consumer Goods"],
-["HEIDELBERG","HeidelbergCement India Ltd.","Cement & Cement Products"],
-["HERITGFOOD","Heritage Foods Ltd.","Consumer Goods"],
-["HEROMOTOCO","Hero MotoCorp Ltd.","Automobile"],
-["HEXAWARE","Hexaware Technologies Ltd.","IT"],
-["HFCL","Himachal Fut Com Ltd.","Telecom"],
-["HSCL","Himadri Speciality Chemical Ltd.","Chemicals"],
-["HIMATSEIDE","Himatsingka Seide Ltd.","Textiles"],
-["HINDALCO","Hindalco Industries Ltd.","Metals"],
-["HAL","Hindustan Aeronautics Ltd.","Industrial Manufacturing"],
-["HINDCOPPER","Hindustan Copper Ltd.","Metals"],
-["HINDPETRO","Hindustan Petroleum Corporation Ltd.","Energy"],
-["HINDUNILVR","Hindustan Unilever Ltd.","Consumer Goods"],
-["HINDZINC","Hindustan Zinc Ltd.","Metals"],
-["HONAUT","Honeywell Automation India Ltd.","Industrial Manufacturing"],
-["HUDCO","Housing & Urban Development Corporation Ltd.","Financial Services"],
-["HDFC","Housing Development Finance Corporation Ltd.","Financial Services"],
-["ICICIBANK","ICICI Bank Ltd.","Financial Services"],
-["ICICIGI","ICICI Lombard General Insurance Company Ltd.","Financial Services"],
-["ICICIPRULI","ICICI Prudential Life Insurance Company Ltd.","Financial Services"],
-["ISEC","ICICI Securities Ltd.","Financial Services"],
-["ICRA","ICRA Ltd.","Financial Services"],
-["IDBI","IDBI Bank Ltd.","Financial Services"],
-["IDFCFIRSTB","IDFC First Bank Ltd.","Financial Services"],
-["IDFC","IDFC Ltd.","Financial Services"],
-["IFBIND","IFB Industries Ltd.","Consumer Goods"],
-["IFCI","IFCI Ltd.","Financial Services"],
-["IRB","IRB Infrastructure Developers Ltd.","Construction"],
-["IRCON","IRCON International Ltd.","Construction"],
-["ITC","ITC Ltd.","Consumer Goods"],
-["ITDCEM","ITD Cementation India Ltd.","Construction"],
-["ITI","ITI Ltd.","Telecom"],
-["INDIACEM","India Cements Ltd.","Cement & Cement Products"],
-["ITDC","India Tourism Development Corporation Ltd.","Services"],
-["IBULHSGFIN","Indiabulls Housing Finance Ltd.","Financial Services"],
-["IBULISL","Indiabulls Integrated Services Ltd.","IT"],
-["IBREALEST","Indiabulls Real Estate Ltd.","Construction"],
-["IBVENTURES","Indiabulls Ventures Ltd.","Financial Services"],
-["INDIANB","Indian Bank","Financial Services"],
-["IEX","Indian Energy Exchange Ltd.","Financial Services"],
-["INDHOTEL","Indian Hotels Co. Ltd.","Services"],
-["IOC","Indian Oil Corporation Ltd.","Energy"],
-["IOB","Indian Overseas Bank","Financial Services"],
-["INDOSTAR","IndoStar Capital Finance Ltd.","Financial Services"],
-["INDOCO","Indoco Remedies Ltd.","Pharma"],
-["IGL","Indraprastha Gas Ltd.","Energy"],
-["INDUSINDBK","IndusInd Bank Ltd.","Financial Services"],
-["INFIBEAM","Infibeam Avenues Ltd.","IT"],
-["NAUKRI","Info Edge (India) Ltd.","IT"],
-["INFY","Infosys Ltd.","IT"],
-["INOXLEISUR","Inox Leisure Ltd.","Media & Entertainment"],
-["INOXWIND","Inox Wind Ltd.","Industrial Manufacturing"],
-["INTELLECT","Intellect Design Arena Ltd.","IT"],
-["INDIGO","InterGlobe Aviation Ltd.","Services"],
-["IPCALAB","Ipca Laboratories Ltd.","Pharma"],
-["JBCHEPHARM","J.B. Chemicals & Pharmaceuticals Ltd.","Pharma"],
-["JKCEMENT","J.K. Cement Ltd.","Cement & Cement Products"],
-["JKLAKSHMI","JK Lakshmi Cement Ltd.","Cement & Cement Products"],
-["JKPAPER","JK Paper Ltd.","Paper"],
-["JKTYRE","JK Tyre & Industries Ltd.","Automobile"],
-["JMFINANCIL","JM Financial Ltd.","Financial Services"],
-["JSWENERGY","JSW Energy Ltd.","Energy"],
-["JSWSTEEL","JSW Steel Ltd.","Metals"],
-["JAGRAN","Jagran Prakashan Ltd.","Media & Entertainment"],
-["JAICORPLTD","Jai Corp Ltd.","Industrial Manufacturing"],
-["JISLJALEQS","Jain Irrigation Systems Ltd.","Industrial Manufacturing"],
-["JPASSOCIAT","Jaiprakash Associates Ltd.","Cement & Cement Products"],
-["J&KBANK","Jammu & Kashmir Bank Ltd.","Financial Services"],
-["JAMNAAUTO","Jamna Auto Industries Ltd.","Automobile"],
-["JETAIRWAYS","Jet Airways (India) Ltd.","Services"],
-["JINDALSAW","Jindal Saw Ltd.","Metals"],
-["JSLHISAR","Jindal Stainless (Hisar) Ltd.","Metals"],
-["JSL","Jindal Stainless Ltd.","Metals"],
-["JINDALSTEL","Jindal Steel & Power Ltd.","Metals"],
-["JUBLFOOD","Jubilant Foodworks Ltd.","Consumer Goods"],
-["JUBILANT","Jubilant Life Sciences Ltd.","Pharma"],
-["JUSTDIAL","Justdial Ltd.","IT"],
-["JYOTHYLAB","Jyothy Laboratories Ltd.","Consumer Goods"],
-["KPRMILL","K.P.R. Mill Ltd.","Textiles"],
-["KEI","KEI Industries Ltd.","Industrial Manufacturing"],
-["KIOCL","KIOCL Ltd.","Metals"],
-["KNRCON","KNR Constructions Ltd.","Construction"],
-["KRBL","KRBL Ltd.","Consumer Goods"],
-["KAJARIACER","Kajaria Ceramics Ltd.","Construction"],
-["KALPATPOWR","Kalpataru Power Transmission Ltd.","Energy"],
-["KANSAINER","Kansai Nerolac Paints Ltd.","Consumer Goods"],
-["KTKBANK","Karnataka Bank Ltd.","Financial Services"],
-["KARURVYSYA","Karur Vysya Bank Ltd.","Financial Services"],
-["KSCL","Kaveri Seed Company Ltd.","Consumer Goods"],
-["KEC","Kec International Ltd.","Construction"],
-["KIRLOSENG","Kirloskar Oil Eng Ltd.","Industrial Manufacturing"],
-["KOLTEPATIL","Kolte-Patil Developers Ltd.","Construction"],
-["KOTAKBANK","Kotak Mahindra Bank Ltd.","Financial Services"],
-["L&TFH","L&T Finance Holdings Ltd.","Financial Services"],
-["LTTS","L&T Technology Services Ltd.","IT"],
-["LICHSGFIN","LIC Housing Finance Ltd.","Financial Services"],
-["LAXMIMACH","Lakshmi Machine Works Ltd.","Industrial Manufacturing"],
-["LAKSHVILAS","Lakshmi Vilas Bank Ltd.","Financial Services"],
-["LTI","Larsen & Toubro Infotech Ltd.","IT"],
-["LT","Larsen & Toubro Ltd.","Construction"],
-["LAURUSLABS","Laurus Labs Ltd.","Pharma"],
-["LEMONTREE","Lemon Tree Hotels Ltd.","Services"],
-["LINDEINDIA","Linde India Ltd.","Chemicals"],
-["LUPIN","Lupin Ltd.","Pharma"],
-["LUXIND","Lux Industries Ltd.","Textiles"],
-["MASFIN","MAS Financial Services Ltd.","Financial Services"],
-["MMTC","MMTC Ltd.","Services"],
-["MOIL","MOIL Ltd.","Metals"],
-["MRF","MRF Ltd.","Automobile"],
-["MAGMA","Magma Fincorp Ltd.","Financial Services"],
-["MGL","Mahanagar Gas Ltd.","Energy"],
-["MAHSCOOTER","Maharashtra Scooters Ltd.","Automobile"],
-["MAHSEAMLES","Maharashtra Seamless Ltd.","Metals"],
-["M&MFIN","Mahindra & Mahindra Financial Services Ltd.","Financial Services"],
-["M&M","Mahindra & Mahindra Ltd.","Automobile"],
-["MAHINDCIE","Mahindra CIE Automotive Ltd.","Industrial Manufacturing"],
-["MHRIL","Mahindra Holidays & Resorts India Ltd.","Services"],
-["MAHLOG","Mahindra Logistics Ltd.","Services"],
-["MANAPPURAM","Manappuram Finance Ltd.","Financial Services"],
-["MRPL","Mangalore Refinery & Petrochemicals Ltd.","Energy"],
-["MARICO","Marico Ltd.","Consumer Goods"],
-["MARUTI","Maruti Suzuki India Ltd.","Automobile"],
-["MFSL","Max Financial Services Ltd.","Financial Services"],
-["MAXINDIA","Max India Ltd.","Healthcare Services"],
-["MINDTREE","MindTree Ltd.","IT"],
-["MINDACORP","Minda Corporation Ltd.","Automobile"],
-["MINDAIND","Minda Industries Ltd.","Automobile"],
-["MONSANTO","Monsanto India Ltd.","Fertilisers & Pesticides"],
-["MOTHERSUMI","Motherson Sumi Systems Ltd.","Automobile"],
-["MOTILALOFS","Motilal Oswal Financial Services Ltd.","Financial Services"],
-["MPHASIS","MphasiS Ltd.","IT"],
-["MUTHOOTFIN","Muthoot Finance Ltd.","Financial Services"],
-["NATCOPHARM","NATCO Pharma Ltd.","Pharma"],
-["NBCC","NBCC (India) Ltd.","Construction"],
-["NCC","NCC Ltd.","Construction"],
-["NESCO","NESCO Ltd.","Services"],
-["NHPC","NHPC Ltd.","Energy"],
-["NIITTECH","NIIT Technologies Ltd.","IT"],
-["NLCINDIA","NLC India Ltd.","Energy"],
-["NMDC","NMDC Ltd.","Metals"],
-["NTPC","NTPC Ltd.","Energy"],
-["NH","Narayana Hrudayalaya Ltd.","Healthcare Services"],
-["NATIONALUM","National Aluminium Co. Ltd.","Metals"],
-["NFL","National Fertilizers Ltd.","Fertilisers & Pesticides"],
-["NBVENTURES","Nava Bharat Ventures Ltd.","Energy"],
-["NAVINFLUOR","Navin Fluorine International Ltd.","Chemicals"],
-["NETWORK18","Network18 Media & Investments Ltd.","Media & Entertainment"],
-["NILKAMAL","Nilkamal Ltd.","Industrial Manufacturing"],
-["OBEROIRLTY","Oberoi Realty Ltd.","Construction"],
-["ONGC","Oil & Natural Gas Corporation Ltd.","Energy"],
-["OIL","Oil India Ltd.","Energy"],
-["OMAXE","Omaxe Ltd.","Construction"],
-["OFSS","Oracle Financial Services Software Ltd.","IT"],
-["ORIENTCEM","Orient Cement Ltd.","Cement & Cement Products"],
-["ORIENTELEC","Orient Electric Ltd.","Consumer Goods"],
-["ORIENTBANK","Oriental Bank of Commerce","Financial Services"],
-["PCJEWELLER","PC Jeweller Ltd.","Consumer Goods"],
-["PIIND","PI Industries Ltd.","Fertilisers & Pesticides"],
-["PNBHOUSING","PNB Housing Finance Ltd.","Financial Services"],
-["PNCINFRA","PNC Infratech Ltd.","Construction"],
-["PTC","PTC India Ltd.","Energy"],
-["PVR","PVR Ltd.","Media & Entertainment"],
-["PAGEIND","Page Industries Ltd.","Textiles"],
-["PARAGMILK","Parag Milk Foods Ltd.","Consumer Goods"],
-["PERSISTENT","Persistent Systems Ltd.","IT"],
-["PETRONET","Petronet LNG Ltd.","Energy"],
-["PFIZER","Pfizer Ltd.","Pharma"],
-["PHILIPCARB","Phillips Carbon Black Ltd.","Chemicals"],
-["PHOENIXLTD","Phoenix Mills Ltd.","Construction"],
-["PIDILITIND","Pidilite Industries Ltd.","Chemicals"],
-["PEL","Piramal Enterprises Ltd.","Pharma"],
-["PFC","Power Finance Corporation Ltd.","Financial Services"],
-["POWERGRID","Power Grid Corporation of India Ltd.","Energy"],
-["PRAJIND","Praj Industries Ltd.","Industrial Manufacturing"],
-["PRESTIGE","Prestige Estates Projects Ltd.","Construction"],
-["PRSMJOHNSN","Prism Johnson Ltd.","Cement & Cement Products"],
-["PGHL","Procter & Gamble Health Ltd.","Pharma"],
-["PGHH","Procter & Gamble Hygiene & Health Care Ltd.","Consumer Goods"],
-["PNB","Punjab National Bank","Financial Services"],
-["QUESS","Quess Corp Ltd.","Services"],
-["RBLBANK","RBL Bank Ltd.","Financial Services"],
-["RECLTD","REC Ltd.","Financial Services"],
-["RITES","RITES Ltd.","Construction"],
-["RADICO","Radico Khaitan Ltd","Consumer Goods"],
-["RAIN","Rain Industries Ltd","Chemicals"],
-["RAJESHEXPO","Rajesh Exports Ltd.","Consumer Goods"],
-["RALLIS","Rallis India Ltd.","Fertilisers & Pesticides"],
-["RKFORGE","Ramkrishna Forgings Ltd.","Industrial Manufacturing"],
-["RCF","Rashtriya Chemicals & Fertilizers Ltd.","Fertilisers & Pesticides"],
-["RAYMOND","Raymond Ltd.","Textiles"],
-["REDINGTON","Redington (India) Ltd.","Services"],
-["RELAXO","Relaxo Footwears Ltd.","Consumer Goods"],
-["RELCAPITAL","Reliance Capital Ltd.","Financial Services"],
-["RCOM","Reliance Communications Ltd.","Telecom"],
-["RHFL","Reliance Home Finance Ltd.","Financial Services"],
-["RELIANCE","Reliance Industries Ltd.","Energy"],
-["RELINFRA","Reliance Infrastructure Ltd.","Energy"],
-["RNAM","Reliance Nippon Life Asset Management Ltd.","Financial Services"],
-["RPOWER","Reliance Power Ltd.","Energy"],
-["REPCOHOME","Repco Home Finance Ltd.","Financial Services"],
-["RUPA","Rupa & Company Ltd.","Textiles"],
-["SHK","S H Kelkar and Company Ltd.","Consumer Goods"],
-["SBILIFE","SBI Life Insurance Company Ltd.","Financial Services"],
-["SJVN","SJVN Ltd.","Energy"],
-["SKFINDIA","SKF India Ltd.","Industrial Manufacturing"],
-["SREINFRA","SREI Infrastructure Finance Ltd.","Financial Services"],
-["SRF","SRF Ltd.","Textiles"],
-["SADBHAV","Sadbhav Engineering Ltd.","Construction"],
-["SANOFI","Sanofi India Ltd.","Pharma"],
-["SCHAEFFLER","Schaeffler India Ltd.","Industrial Manufacturing"],
-["SIS","Security and Intelligence Services (India) Ltd.","Services"],
-["SHANKARA","Shankara Building Products Ltd.","Metals"],
-["SHARDACROP","Sharda Cropchem Ltd.","Fertilisers & Pesticides"],
-["SFL","Sheela Foam Ltd.","Consumer Goods"],
-["SHILPAMED","Shilpa Medicare Ltd.","Pharma"],
-["SCI","Shipping Corporation of India Ltd.","Services"],
-["SHOPERSTOP","Shoppers Stop Ltd.","Consumer Goods"],
-["SHREECEM","Shree Cement Ltd.","Cement & Cement Products"],
-["RENUKA","Shree Renuka Sugars Ltd.","Consumer Goods"],
-["SHRIRAMCIT","Shriram City Union Finance Ltd.","Financial Services"],
-["SRTRANSFIN","Shriram Transport Finance Co. Ltd.","Financial Services"],
-["SIEMENS","Siemens Ltd.","Industrial Manufacturing"],
-["SPTL","Sintex Plastics Technology Ltd.","Industrial Manufacturing"],
-["SOBHA","Sobha Ltd.","Construction"],
-["SOLARINDS","Solar Industries India Ltd.","Chemicals"],
-["SONATSOFTW","Sonata Software Ltd.","IT"],
-["SOUTHBANK","South Indian Bank Ltd.","Financial Services"],
-["STARCEMENT","Star Cement Ltd.","Cement & Cement Products"],
-["SBIN","State Bank of India","Financial Services"],
-["SAIL","Steel Authority of India Ltd.","Metals"],
-["STRTECH","Sterlite Technologies Ltd.","Telecom"],
-["STAR","Strides Pharma Science Ltd.","Pharma"],
-["SUDARSCHEM","Sudarshan Chemical Industries Ltd.","Chemicals"],
-["SPARC","Sun Pharma Advanced Research Company Ltd.","Pharma"],
-["SUNPHARMA","Sun Pharmaceutical Industries Ltd.","Pharma"],
-["SUNTV","Sun TV Network Ltd.","Media & Entertainment"],
-["SUNCLAYLTD","Sundaram Clayton Ltd.","Automobile"],
-["SUNDARMFIN","Sundaram Finance Ltd.","Financial Services"],
-["SUNDRMFAST","Sundram Fasteners Ltd.","Automobile"],
-["SUNTECK","Sunteck Realty Ltd.","Construction"],
-["SUPRAJIT","Suprajit Engineering Ltd.","Automobile"],
-["SUPREMEIND","Supreme Industries Ltd.","Industrial Manufacturing"],
-["SUVEN","Suven Life Sciences Ltd.","Pharma"],
-["SUZLON","Suzlon Energy Ltd.","Industrial Manufacturing"],
-["SWANENERGY","Swan Energy Ltd.","Textiles"],
-["SYMPHONY","Symphony Ltd.","Consumer Goods"],
-["SYNDIBANK","Syndicate Bank","Financial Services"],
-["SYNGENE","Syngene International Ltd.","Pharma"],
-["TCNSBRANDS","TCNS Clothing Co. Ltd.","Textiles"],
-["TTKPRESTIG","TTK Prestige Ltd.","Consumer Goods"],
-["TVTODAY","TV Today Network Ltd.","Media & Entertainment"],
-["TV18BRDCST","TV18 Broadcast Ltd.","Media & Entertainment"],
-["TVSMOTOR","TVS Motor Company Ltd.","Automobile"],
-["TAKE","Take Solutions Ltd.","IT"],
-["TNPL","Tamil Nadu Newsprint & Papers Ltd.","Paper"],
-["TATACHEM","Tata Chemicals Ltd.","Chemicals"],
-["TATACOFFEE","Tata Coffee Ltd.","Consumer Goods"],
-["TCS","Tata Consultancy Services Ltd.","IT"],
-["TATAELXSI","Tata Elxsi Ltd.","IT"],
-["TATAGLOBAL","Tata Global Beverages Ltd.","Consumer Goods"],
-["TATAINVEST","Tata Investment Corporation Ltd.","Financial Services"],
-["TATAMTRDVR","Tata Motors Ltd DVR","Automobile"],
-["TATAMOTORS","Tata Motors Ltd.","Automobile"],
-["TATAPOWER","Tata Power Co. Ltd.","Energy"],
-["TATASTEEL","Tata Steel Ltd.","Metals"],
-["TEAMLEASE","Teamlease Services Ltd.","Services"],
-["TECHM","Tech Mahindra Ltd.","IT"],
-["NIACL","The New India Assurance Company Ltd.","Financial Services"],
-["RAMCOCEM","The Ramco Cements Ltd.","Cement & Cement Products"],
-["THERMAX","Thermax Ltd.","Industrial Manufacturing"],
-["THOMASCOOK","Thomas Cook (India) Ltd.","Services"],
-["THYROCARE","Thyrocare Technologies Ltd.","Healthcare Services"],
-["TIMETECHNO","Time Technoplast Ltd.","Industrial Manufacturing"],
-["TIMKEN","Timken India Ltd.","Industrial Manufacturing"],
-["TITAN","Titan Company Ltd.","Consumer Goods"],
-["TORNTPHARM","Torrent Pharmaceuticals Ltd.","Pharma"],
-["TORNTPOWER","Torrent Power Ltd.","Energy"],
-["TRENT","Trent Ltd.","Consumer Goods"],
-["TRIDENT","Trident Ltd.","Textiles"],
-["TRITURBINE","Triveni Turbine Ltd.","Industrial Manufacturing"],
-["TIINDIA","Tube Investments of India Ltd.","Automobile"],
-["UCOBANK","UCO Bank","Financial Services"],
-["UFLEX","UFLEX Ltd.","Industrial Manufacturing"],
-["UPL","UPL Ltd.","Fertilisers & Pesticides"],
-["UJJIVAN","Ujjivan Financial Services Ltd.","Financial Services"],
-["ULTRACEMCO","UltraTech Cement Ltd.","Cement & Cement Products"],
-["UNIONBANK","Union Bank of India","Financial Services"],
-["UBL","United Breweries Ltd.","Consumer Goods"],
-["MCDOWELL-N","United Spirits Ltd.","Consumer Goods"],
-["VGUARD","V-Guard Industries Ltd.","Consumer Goods"],
-["VMART","V-Mart Retail Ltd.","Consumer Goods"],
-["VIPIND","V.I.P. Industries Ltd.","Consumer Goods"],
-["VRLLOG","VRL Logistics Ltd.","Services"],
-["VSTIND","VST Industries Ltd.","Consumer Goods"],
-["WABAG","Va Tech Wabag Ltd.","Services"],
-["VAKRANGEE","Vakrangee Ltd.","IT"],
-["VTL","Vardhman Textiles Ltd.","Textiles"],
-["VARROC","Varroc Engineering Ltd.","Automobile"],
-["VBL","Varun Beverages Ltd.","Consumer Goods"],
-["VEDL","Vedanta Ltd.","Metals"],
-["VENKEYS","Venky's (India) Ltd.","Consumer Goods"],
-["VINATIORGA","Vinati Organics Ltd.","Chemicals"],
-["IDEA","Vodafone Idea Ltd.","Telecom"],
-["VOLTAS","Voltas Ltd.","Consumer Goods"],
-["WABCOINDIA","WABCO India Ltd.","Automobile"],
-["WELCORP","Welspun Corp Ltd.","Metals"],
-["WELSPUNIND","Welspun India Ltd.","Textiles"],
-["WHIRLPOOL","Whirlpool of India Ltd.","Consumer Goods"],
-["WIPRO","Wipro Ltd.","IT"],
-["WOCKPHARMA","Wockhardt Ltd.","Pharma"],
-["YESBANK","Yes Bank Ltd.","Financial Services"],
-["ZEEL","Zee Entertainment Enterprises Ltd.","Media & Entertainment"],
-["ZENSARTECH","Zensar Technolgies Ltd.","IT"],
-["ZYDUSWELL","Zydus Wellness Ltd.","Consumer Goods"],
-["ECLERX","eClerx Services Ltd.","IT"]
-];
-
 const SECTORS = ["Automobile", "Cement & Cement Products", "Chemicals", "Construction", "Consumer Goods", "Energy", "Fertilisers & Pesticides", "Financial Services", "Healthcare Services", "IT", "Industrial Manufacturing", "Media & Entertainment", "Metals", "Other", "Paper", "Pharma", "Services", "Telecom", "Textiles"];
-
-function hashSeed(str){
-  let h = 0;
-  for(let i=0;i<str.length;i++){ h = (h*31 + str.charCodeAt(i)) >>> 0; }
-  return h;
-}
-function seededRand(seed){
-  let x = Math.sin(seed) * 10000;
-  return x - Math.floor(x);
-}
-const STOCKS = STOCKS_RAW.map(([sym,name,sector]) => {
-  const seed = hashSeed(sym);
-  const base = Math.round((40 + seededRand(seed) * 4200) * 100) / 100;
-  return { sym, name, sector, base };
-});
-
-const rand = (min, max) => Math.random() * (max - min) + min;
-const pick = (h, l) => Math.random() > 0.5 ? h : l;
-
-function genTime(){
-  const h = 9, startM = 15;
-  const totalMin = Math.floor(rand(0, 300)); // up to 5hrs after open
-  let m = startM + totalMin;
-  let hour = h + Math.floor(m / 60);
-  m = m % 60;
-  return String(hour).padStart(2,"0") + ":" + String(m).padStart(2,"0");
-}
-
-function genRows(variance){
-  return STOCKS.map(s => {
-    const chg = rand(-3.6, 3.6) * variance;
-    const price = s.base * (1 + chg/100 * rand(0.3,1));
-    const rovl = +rand(0.4, 3.2).toFixed(1);
-    const emaAbove = Math.random() > (chg > 0 ? 0.3 : 0.65);
-    const vwapAbove = Math.random() > (chg > 0 ? 0.32 : 0.62);
-    const rsi = Math.round(rand(22, 84));
-    const adx = Math.round(rand(12, 56));
-
-    let score = 50;
-    score += emaAbove ? 14 : -14;
-    score += vwapAbove ? 14 : -14;
-    score += (rsi - 50) * 0.35;
-    score += (adx - 25) * 0.45;
-    score += (rovl - 1) * 9;
-    score = Math.max(2, Math.min(98, Math.round(score)));
-
-    let signal = "WATCH";
-    if(score >= 68) signal = "BUY";
-    else if(score <= 34) signal = "SELL";
-
-    const status = signal === "BUY" ? "bull" : signal === "SELL" ? "bear" : "neutral";
-    const pivot = price * (1 + rand(-1.2, 1.2) / 100);
-
-    return {
-      sym: s.sym, name: s.name, sector: s.sector,
-      price: +price.toFixed(price > 1000 ? 1 : 2),
-      pivot: +pivot.toFixed(pivot > 1000 ? 1 : 2),
-      chg: +chg.toFixed(2),
-      rovl, ema: emaAbove ? "Above" : "Below", vwap: vwapAbove ? "Above" : "Below",
-      rsi, adx, score, signal, status, time: genTime()
-    };
-  });
-}
 
 let orbRows = [];
 let drbRows = [];
@@ -4133,7 +3521,6 @@ document.getElementById("globalIdxGrid").innerHTML = globalIndices.map(ix => `
 /* ---------------- Render: Sector table (derived from ORB rows) ---------------- */
 let sectorStrengthMap = {};
 let sectorStatusMap = {};
-let sectorChgMap = {};
 
 function todayDateKey(){ return new Date().toISOString().slice(0,10); }
 
@@ -4348,8 +3735,8 @@ const SECTOR_TO_REAL_INDEX = {
   "Consumer Goods": "Nifty FMCG",
   "Financial Services": "Nifty Financial Services",
 };
-const PSU_BANK_SYMBOLS = new Set(["SBIN","BANKBARODA","BANKINDIA","CANBK","CENTRALBK","INDIANB","IOB","MAHABANK","PNB","UCOBANK","UNIONBANK","ANDHRABANK","ALBK","CORPBANK","ORIENTBANK","SYNDIBANK"]);
-const PRIVATE_BANK_SYMBOLS = new Set(["AXISBANK","BANDHANBNK","AUBANK","CUB","DCBBANK","FEDERALBNK","HDFCBANK","ICICIBANK","IDFCFIRSTB","INDUSINDBK","J&KBANK","KARURVYSYA","KOTAKBANK","KTKBANK","RBLBANK","SOUTHBANK","YESBANK","LAKSHVILAS","UJJIVAN","EQUITAS"]);
+const PSU_BANK_SYMBOLS = new Set(["SBIN","BANKBARODA","BANKINDIA","CANBK","CENTRALBK","INDIANB","IOB","MAHABANK","PNB","UCOBANK","UNIONBANK"]);
+const PRIVATE_BANK_SYMBOLS = new Set(["AXISBANK","BANDHANBNK","AUBANK","CUB","DCBBANK","FEDERALBNK","HDFCBANK","ICICIBANK","IDFCFIRSTB","INDUSINDBK","J&KBANK","KARURVYSYA","KOTAKBANK","KTKBANK","RBLBANK","SOUTHBANK","YESBANK","UJJIVAN","EQUITAS"]);
 // "Nifty Bank" is the combined index — every PSU + Private bank together.
 // Previously entirely unmapped (only the split-out PSU/Private buckets
 // existed), which is exactly why it showed "—" for everything.
@@ -4383,27 +3770,27 @@ function internalSectorFilterFor(realIndexName){
   const entry = Object.entries(SECTOR_TO_REAL_INDEX).find(([, real]) => real === realIndexName);
   return entry ? entry[0] : null;
 }
-// Accurate per-row tooltip for the ORB/DRB explore buttons — only mentions
-// a fallback/approximation when one is actually being used for this real
-// index; otherwise just names the actual sector's stocks being opened.
-function breakoutTooltipFor(realIndexName, kind){
-  const label = kind === "ORB" ? "ORB breakouts" : "DRB breakouts";
-  if(realIndexName === "Nifty PSU Bank" || realIndexName === "Nifty Private Bank" || realIndexName === "Nifty Bank"){
-    return `${label} — Financial Services list (bank-only filtering isn't split yet)`;
-  }
-  if(realIndexName === "Nifty Realty") return `${label} — Construction list (no dedicated Realty tag yet)`;
-  if(realIndexName === "Nifty Consumer Durables") return `${label} — Consumer Goods list (no dedicated tag yet)`;
-  return `${label} — ${realIndexName} stocks`;
-}
 
-let sectorIdxRealData = { sector: [] };
+let sectorIdxTab = "sector"; // "sector" | "broader"
+let sectorIdxRealData = { sector: [], broader: [] };
+
+function switchSectorIdxTab(tab){
+  sectorIdxTab = tab;
+  document.getElementById("sidxTabSector").classList.toggle("active", tab === "sector");
+  document.getElementById("sidxTabBroader").classList.toggle("active", tab === "broader");
+  renderSectorTrend();
+}
 
 async function fetchSectorIndexData(){
   const base = getBackendUrl();
   if(!base) return;
   try {
-    const sectorRes = await fetch(base + "/sector-indices");
+    const [sectorRes, broaderRes] = await Promise.all([
+      fetch(base + "/sector-indices"),
+      fetch(base + "/broader-indices"),
+    ]);
     sectorIdxRealData.sector = sectorRes.ok ? await sectorRes.json() : [];
+    sectorIdxRealData.broader = broaderRes.ok ? await broaderRes.json() : [];
     renderSectorTrend();
   } catch(err){
     // Silent — keeps showing last known values, same pattern as the
@@ -4434,7 +3821,7 @@ function renderSectorTrend(){
     return { count: breaks.length, dir: buys >= sells ? "bull" : "bear" };
   };
 
-  const realRows = sectorIdxRealData.sector;
+  const realRows = sectorIdxTab === "sector" ? sectorIdxRealData.sector : sectorIdxRealData.broader;
   document.getElementById("sectorIdxEmpty").style.display = realRows.length ? "none" : "block";
   document.getElementById("sectorIdxCount").textContent = realRows.length ? realRows.length + " indices" : "";
   if(!realRows.length){
@@ -4490,11 +3877,9 @@ function renderSectorTrend(){
 
   sectorStrengthMap = {};
   sectorStatusMap = {};
-  sectorChgMap = {};
   sectorAgg.forEach(sc => {
     sectorStrengthMap[sc.name] = sc.strength;
     sectorStatusMap[sc.name] = sc.status;
-    sectorChgMap[sc.name] = sc.avgChg;
   });
 
   // Bar width scales against the biggest mover currently in view, so the
@@ -4524,11 +3909,12 @@ function renderSectorTrend(){
         </div>
       </td>
       <td>${noData ? '<span class="cell-sub" style="font-size:11px;">—</span>' : `<span class="tech-score-chip" title="${nameTooltip}">${scoreOutOf10}/10</span>`}</td>
+      <td>${noData ? '<span class="cell-sub" style="font-size:11px;">—</span>' : `<span class="badge-status ${sc.status}" title="Composite ${sc.compositeScore.toFixed(2)} · Indicators ${Math.round(sc.indicatorScore*100)}% · ROVL ${sc.rovlDiff >= 0 ? '+' : ''}${sc.rovlDiff.toFixed(2)} vs avg"><span class="dot"></span>${label(sc.status)}</span>`}</td>
       <td>
         ${!internalFilter ? '<span class="cell-sub" style="font-size:11px;">—</span>' : `
         <div class="sector-jump">
-          <button type="button" class="sector-jump-btn orb ${sc.orbBreak.count > 0 ? 'has-break ' + sc.orbBreak.dir : ''}" onclick="openExplorer('ORB','all','${internalFilter.replace(/'/g,"\\'")}')" title="${breakoutTooltipFor(sc.name, 'ORB')}">ORB${sc.orbBreak.count > 0 ? `<span class="jump-break-badge">${sc.orbBreak.count}</span>` : ''}</button>
-          <button type="button" class="sector-jump-btn drb ${sc.drbBreak.count > 0 ? 'has-break ' + sc.drbBreak.dir : ''}" onclick="openExplorer('DRB','all','${internalFilter.replace(/'/g,"\\'")}')" title="${breakoutTooltipFor(sc.name, 'DRB')}">DRB${sc.drbBreak.count > 0 ? `<span class="jump-break-badge">${sc.drbBreak.count}</span>` : ''}</button>
+          <button type="button" class="sector-jump-btn orb ${sc.orbBreak.count > 0 ? 'has-break ' + sc.orbBreak.dir : ''}" onclick="openExplorer('ORB','all','${internalFilter.replace(/'/g,"\\'")}')" title="ORB breakouts (Financial Services list — bank-only filtering isn't split yet)">ORB${sc.orbBreak.count > 0 ? `<span class="jump-break-badge">${sc.orbBreak.count}</span>` : ''}</button>
+          <button type="button" class="sector-jump-btn drb ${sc.drbBreak.count > 0 ? 'has-break ' + sc.drbBreak.dir : ''}" onclick="openExplorer('DRB','all','${internalFilter.replace(/'/g,"\\'")}')" title="DRB breakouts">DRB${sc.drbBreak.count > 0 ? `<span class="jump-break-badge">${sc.drbBreak.count}</span>` : ''}</button>
           <button type="button" class="sector-alert-bell ${alertEnabledSectors.has(sc.name) ? 'on' : ''}" data-sector="${sc.name.replace(/"/g,'&quot;')}" title="${alertEnabledSectors.has(sc.name) ? 'ORB alerts ON for ' + sc.name + ' — click to turn off' : 'Turn on ORB alerts for ' + sc.name}"><i class="bi bi-bell${alertEnabledSectors.has(sc.name) ? '-fill' : ''}"></i></button>
         </div>`}
       </td>
@@ -4563,7 +3949,7 @@ function renderOppTable(bodyId, rows){
       <td><span class="chg-txt ${r.chg >= 0 ? 'up' : 'down'}">${r.chg >= 0 ? '+' : ''}${r.chg.toFixed(2)}%</span></td>
       <td class="mono">${r.price.toLocaleString('en-IN')}</td>
       <td><span class="rovl-tag ${r.rovl > 1.2 ? 'hot' : 'normal'}">${r.rovl}${r.rovl > 1.2 ? ' 🔥' : ''}</span></td>
-      <td><span class="tech-score-chip" title="Technical score">${Math.round(r.score / 10)}/10</span></td>
+      <td><span class="badge-status ${r.status}"><span class="dot"></span>${label(r.status)}</span></td>
     </tr>
   `).join("");
 }
@@ -5036,23 +4422,8 @@ function openExplorer(strategy, initialSignal, initialSector){
   const validSector = initialSector && SECTORS.includes(initialSector) ? initialSector : "all";
 
   document.getElementById("explorerTitle").textContent = (isORB ? "ORB Breakout" : "DRB Breakout") + " — Trade Explorer" + (initialSector ? ` · ${initialSector}` : "");
-  // sectorChgMap/sectorStatusMap are keyed by the real index name (e.g.
-  // "Nifty IT"), but initialSector here is the internal sector tag (e.g.
-  // "IT") — resolve it back to the real index name before looking either
-  // up, otherwise both badges silently fail to match and stay hidden.
-  const realIndexName = initialSector ? SECTOR_TO_REAL_INDEX[initialSector] : null;
-  const chgBadge = document.getElementById("explorerSectorChg");
-  const sectorChg = realIndexName ? sectorChgMap[realIndexName] : null;
-  if(sectorChg !== null && sectorChg !== undefined){
-    const dir = sectorChg >= 0 ? "up" : "down";
-    chgBadge.textContent = (sectorChg >= 0 ? "+" : "") + sectorChg.toFixed(2) + "%";
-    chgBadge.className = "explorer-sector-chg " + dir;
-    chgBadge.style.display = "inline-flex";
-  } else {
-    chgBadge.style.display = "none";
-  }
   const statusBadge = document.getElementById("explorerSectorStatus");
-  const sectorStatus = realIndexName ? sectorStatusMap[realIndexName] : null;
+  const sectorStatus = initialSector ? sectorStatusMap[initialSector] : null;
   if(sectorStatus){
     statusBadge.textContent = techLabel(sectorStatus);
     statusBadge.className = "idx-tech-label " + sectorStatus;
@@ -5144,6 +4515,7 @@ function renderLongShort(){
       <td><div class="sym sym-link" onclick="openChartModal('${r.sym}')">${r.sym} <i class="bi bi-graph-up"></i></div>${rowActionIconsHtml(r.sym, r.price)}</td>
       <td class="cell-sub">${r.name}</td>
       <td class="cell-sub">${r.sector}</td>
+      <td>${strengthBadge(r.sector)}</td>
       <td class="mono">${r.price.toLocaleString('en-IN')}</td>
       <td><span class="chg-txt ${r.chg >= 0 ? 'up' : 'down'}">${r.chg >= 0 ? '+' : ''}${r.chg.toFixed(2)}%</span></td>
       <td><span class="rovl-tag ${r.rovl > 1.2 ? 'hot' : 'normal'}">${r.rovl}${r.rovl > 1.2 ? ' 🔥' : ''}</span></td>
