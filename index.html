@@ -5794,11 +5794,22 @@ setInterval(() => {
   if(el && lastSuccessfulFetchAt) el.textContent = " · " + freshnessTickerText();
 }, 1000);
 
+let fetchLiveDataInFlight = false;
 async function fetchLiveData(){
+  // Guard against overlapping calls: if a previous poll is still waiting
+  // on the server (e.g. it's busy with the ORB candle sweep, which alone
+  // can take 30+ seconds), just skip this tick entirely rather than firing
+  // a second batch of requests on top of the first. Without this, a slow
+  // server response combined with a short poll interval causes requests to
+  // pile up faster than they can resolve — exactly what was happening
+  // before this fix (100+ queued requests, most stuck pending).
+  if(fetchLiveDataInFlight) return;
+  fetchLiveDataInFlight = true;
   const base = getBackendUrl();
   if(!base){
     showBackendBanner("offline", "No live data source set — check your backend URL in Settings.");
     if(!hasLoadedOnce) showInitialLoadError("No backend URL configured yet.");
+    fetchLiveDataInFlight = false;
     return;
   }
   showCalcPill();
@@ -5849,6 +5860,7 @@ async function fetchLiveData(){
     }
   } finally {
     hideCalcPill();
+    fetchLiveDataInFlight = false;
   }
 }
 
