@@ -1866,7 +1866,7 @@ html.hide-etf #etfSwingSection{ display:none !important; }
 
     <div id="etfSwingSection">
       <div class="section-head">
-        <div class="section-title">ETF Swing Screener <span class="count" id="etfSwingCount">Most fallen · 20d / 3wk / 1mo</span></div>
+        <div class="section-title">ETF Swing Screener <span class="count" id="etfSwingCount">Most fallen · 20d / 3mo / 1mo</span></div>
         <div style="display:flex; gap:8px; align-items:center;">
           <select id="etfSwingSectorFilter" class="explorer-select"><option value="all">All Sectors</option></select>
           <button class="btn-etf-refresh" id="etfSwingRefreshBtn"><i class="bi bi-arrow-clockwise"></i> Refresh</button>
@@ -1874,7 +1874,7 @@ html.hide-etf #etfSwingSection{ display:none !important; }
       </div>
       <div class="card-x" style="padding:0; overflow:hidden;">
         <div style="padding:14px 18px; font-size:11.5px; color:var(--text-muted); border-bottom:1px solid var(--border-soft);">
-          Ranked by biggest fall over 20d/3wk/1mo, filtered by relative volume. Score uses RSI, MACD, 200-day average, and trend strength — informational only, not financial advice.
+          Ranked by biggest fall over 20d/3mo/1mo, filtered by relative volume. Score uses RSI, MACD, 200-day average, and trend strength — informational only, not financial advice.
         </div>
         <div style="display:flex; gap:8px; padding:12px 18px; border-bottom:1px solid var(--border-soft);">
           <button class="filter-chip active" data-signal="all" id="etfFilterAll">All</button>
@@ -1890,7 +1890,7 @@ html.hide-etf #etfSwingSection{ display:none !important; }
                 <th class="sortable" data-key="sector">Sector</th>
                 <th class="sortable" data-key="price">Price</th>
                 <th class="sortable" data-key="chg_20d">20d <span class="sort-arrow"><i class="bi bi-caret-down-fill"></i></span></th>
-                <th class="sortable" data-key="chg_3wk">3wk <span class="sort-arrow"><i class="bi bi-caret-down-fill"></i></span></th>
+                <th class="sortable" data-key="chg_3mo">3mo <span class="sort-arrow"><i class="bi bi-caret-down-fill"></i></span></th>
                 <th class="sortable" data-key="chg_1mo">1mo <span class="sort-arrow"><i class="bi bi-caret-down-fill"></i></span></th>
                 <th class="sortable" data-key="volume">Volume <span class="sort-arrow"><i class="bi bi-caret-down-fill"></i></span></th>
                 <th class="sortable" data-key="rvol">RVOL <span class="sort-arrow"><i class="bi bi-caret-down-fill"></i></span></th>
@@ -6194,7 +6194,7 @@ function renderEtfSwingTable(){
       <td class="cell-sub">${r.sector || 'Other'}</td>
       <td class="mono">${r.price != null ? r.price.toLocaleString('en-IN') : '—'}</td>
       <td>${etfChgTxt(r.chg_20d)}</td>
-      <td>${etfChgTxt(r.chg_3wk)}</td>
+      <td>${etfChgTxt(r.chg_3mo)}</td>
       <td>${etfChgTxt(r.chg_1mo)}</td>
       <td class="mono">${formatVolume(r.volume)}</td>
       <td><span class="rovl-tag ${r.rvol != null && r.rvol > 1.2 ? 'hot' : 'normal'}">${r.rvol != null ? r.rvol + 'x' : '—'}</span></td>
