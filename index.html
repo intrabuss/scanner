@@ -402,7 +402,7 @@ html[data-theme="light"] .avatar{ background:linear-gradient(160deg,#E3E7EE,#F3F
 .tech-score-chip{
   display:inline-block; font-family:var(--font-data); font-size:12.5px; font-weight:700;
   padding:3px 9px; border-radius:6px; background:var(--bg-raised); color:var(--text-secondary);
-  border:1px solid var(--border-soft); cursor:help;
+  border:1px solid var(--border-soft);
 }
 @media (max-width: 575.98px){ .idx-grid{ grid-template-columns:repeat(2, 1fr); gap:10px; } }
 
@@ -1004,6 +1004,7 @@ tr.pinned-row{ background:var(--brand-dim); }
 }
 .chart-toolbar .chart-legend .lg-item{ display:flex; align-items:center; gap:5px; }
 .chart-toolbar .chart-legend i{ font-size:13px; }
+.chart-last-updated{ font-size:11px; color:var(--text-muted); white-space:nowrap; margin-left:auto; }
 .chart-market-status-badge{
   font-size:11px; font-weight:700; padding:4px 10px; border-radius:20px;
   background:var(--bear-dim); color:var(--bear); border:1px solid rgba(239,68,68,.35);
@@ -1933,8 +1934,8 @@ html.hide-etf #etfSwingSection{ display:none !important; }
       <div class="settings-divider"></div>
     </div>
 
-    <div class="modal-section-lbl">Breakout Windows</div>
-    <div style="font-size:11.5px; color:var(--text-muted); margin-bottom:10px;">How long after market open before a breakout counts</div>
+    <div class="modal-section-lbl">Breakout Windows <span style="color:var(--text-muted); font-weight:500; text-transform:none; letter-spacing:0;">(Strategy ORB — signal detection)</span></div>
+    <div style="font-size:11.5px; color:var(--text-muted); margin-bottom:10px;">How long after market open before a breakout counts. This drives actual BUY/SELL signals — separate from the Sector ORB switch below, which only controls what shows in Sector Indices.</div>
     <div class="risk-input-row">
       <label>ORB opening range</label>
       <select id="orbWindowSelect" class="explorer-select">
@@ -1953,6 +1954,20 @@ html.hide-etf #etfSwingSection{ display:none !important; }
     </div>
     <button class="btn-primary" id="saveWindowsBtn" style="margin-top:10px;"><i class="bi bi-check-lg"></i> Apply Windows</button>
     <div id="windowsMsg" style="font-size:11.5px; color:var(--bull); display:none; margin-top:6px;">Saved — server will use these from tomorrow's cache build.</div>
+
+    <div class="settings-divider"></div>
+
+    <div class="toggle-row">
+      <div>
+        <div class="toggle-row-title">Sector ORB Switch</div>
+        <div class="toggle-row-sub">Independent of the strategy-level window above — this only controls whether the Sector Indices table shows ORB Explore buttons and breakout count badges. Turning it off doesn't affect ORB signal detection itself.</div>
+      </div>
+      <label class="switch">
+        <input type="checkbox" id="sectorOrbSwitchToggle" checked>
+        <span class="switch-slider"></span>
+      </label>
+    </div>
+    <div id="sectorOrbSwitchMsg" style="font-size:11.5px; display:none; margin-top:6px;"></div>
 
     <div class="settings-divider"></div>
 
@@ -2172,6 +2187,7 @@ html.hide-etf #etfSwingSection{ display:none !important; }
             <th class="sortable" data-key="rovl">ROVL <span class="sort-arrow"><i class="bi bi-caret-down-fill"></i></span></th>
             <th class="sortable" data-key="price">Price <span class="sort-arrow"><i class="bi bi-caret-down-fill"></i></span></th>
             <th class="sortable" data-key="qty">Qty <span class="sort-arrow"><i class="bi bi-caret-down-fill"></i></span></th>
+            <th class="sortable" data-key="volume">Volume <span class="sort-arrow"><i class="bi bi-caret-down-fill"></i></span></th>
             <th class="sortable" data-key="score">Signal</th>
             <th class="col-breaklog">Break Log</th>
           </tr>
@@ -2502,7 +2518,6 @@ broke_low  = live_price &lt; yesterday_low</code></pre>
     </div>
     <div class="chart-toolbar">
       <button class="icon-btn" id="chartReloadBtn" title="Reload"><i class="bi bi-arrow-clockwise"></i></button>
-      <button class="chart-popover-toggle" id="chartBreaklogToggleBtn" title="Today's break log"><i class="bi bi-clock-history"></i> Breaks</button>
       <button class="chart-popover-toggle" id="chartNewsToggleBtn" title="Latest news"><i class="bi bi-newspaper"></i> News</button>
       <div class="chart-legend">
         <span class="lg-item"><i class="bi bi-arrow-up-short" style="color:var(--bull);"></i>Buy break</span>
@@ -2510,26 +2525,19 @@ broke_low  = live_price &lt; yesterday_low</code></pre>
         <span class="lg-item"><span style="display:inline-block; width:10px; height:2px; background:#3B82F6; margin-right:3px; vertical-align:middle;"></span>15min ORB</span>
         <span class="lg-item"><span style="display:inline-block; width:10px; height:2px; background:#F59E0B; margin-right:3px; vertical-align:middle;"></span>30min ORB</span>
       </div>
+      <span class="chart-last-updated" id="chartLastUpdated"></span>
       <span class="chart-market-status-badge" id="chartMarketStatusBadge" style="display:none;"></span>
     </div>
     <div class="chart-levels" id="chartLevels" style="display:none;">
       <span class="lvl-chip high"><i class="bi bi-arrow-bar-up"></i> <span id="chartLevelHighLbl">High</span> <span class="mono" id="chartLevelHigh">—</span></span>
       <span class="lvl-chip low"><i class="bi bi-arrow-bar-down"></i> <span id="chartLevelLowLbl">Low</span> <span class="mono" id="chartLevelLow">—</span></span>
     </div>
+    <div class="breaks" id="chartBreakSummary" style="padding:0 20px 10px;"></div>
     <div class="chart-body-wrap">
       <div id="tvChartContainer"></div>
       <div class="chart-msg" id="chartMsg">
         <i class="bi bi-hourglass-split"></i>
         <div id="chartMsgText">Loading chart…</div>
-      </div>
-      <div class="chart-popover" id="chartBreaklog">
-        <div class="chart-popover-head">
-          <div class="chart-breaklog-lbl" style="margin:0;"><i class="bi bi-clock-history"></i> Today's break log</div>
-          <button type="button" class="icon-btn" id="chartBreaklogCloseBtn"><i class="bi bi-x-lg"></i></button>
-        </div>
-        <div class="chart-popover-body">
-          <div class="breaks" id="chartBreakSummary"></div>
-        </div>
       </div>
       <div class="chart-popover" id="chartNews">
         <div class="chart-popover-head">
@@ -3870,6 +3878,10 @@ function internalSectorFilterFor(realIndexName){
   const entry = Object.entries(SECTOR_TO_REAL_INDEX).find(([, real]) => real === realIndexName);
   return entry ? entry[0] : null;
 }
+// Matches internalSectorFilterFor's special cases exactly — these are the
+// indices whose Explore button opens a broader internal category than the
+// real index itself (Explorer can't isolate the exact subset yet).
+const BROADER_FILTER_INDICES = new Set(["Nifty PSU Bank", "Nifty Private Bank", "Nifty Bank", "Nifty Realty", "Nifty Consumer Durables"]);
 
 let sectorIdxTab = "sector"; // "sector" | "broader"
 let sectorIdxRealData = { sector: [], broader: [] };
@@ -3998,7 +4010,7 @@ function renderSectorTrend(){
     return `
     <tr class="rail-${sc.status}">
       <td class="mono cell-sub">${i + 1}</td>
-      <td style="font-weight:600; cursor:help;" title="${nameTooltip}">${sc.name}</td>
+      <td style="font-weight:600;" title="${nameTooltip}">${sc.name}</td>
       <td>
         <div class="sidx-row" style="grid-template-columns:1fr 60px; padding:0;">
           <div class="sidx-bar-track">
@@ -4012,8 +4024,8 @@ function renderSectorTrend(){
       <td>
         ${!internalFilter ? '<span class="cell-sub" style="font-size:11px;">—</span>' : `
         <div class="sector-jump">
-          <button type="button" class="sector-jump-btn orb ${sc.orbBreak.count > 0 ? 'has-break ' + sc.orbBreak.dir : ''}" onclick="openExplorer('ORB','all','${internalFilter.replace(/'/g,"\\'")}','${sc.name.replace(/'/g,"\\'")}',${sc.avgChg})" title="ORB breakouts (Financial Services list — bank-only filtering isn't split yet)">ORB${sc.orbBreak.count > 0 ? `<span class="jump-break-badge">${sc.orbBreak.count}</span>` : ''}</button>
-          <button type="button" class="sector-jump-btn drb ${sc.drbBreak.count > 0 ? 'has-break ' + sc.drbBreak.dir : ''}" onclick="openExplorer('DRB','all','${internalFilter.replace(/'/g,"\\'")}','${sc.name.replace(/'/g,"\\'")}',${sc.avgChg})" title="DRB breakouts">DRB${sc.drbBreak.count > 0 ? `<span class="jump-break-badge">${sc.drbBreak.count}</span>` : ''}</button>
+          ${sectorOrbEnabled ? `<button type="button" class="sector-jump-btn orb ${sc.orbBreak.count > 0 ? 'has-break ' + sc.orbBreak.dir : ''}" onclick="openExplorer('ORB','all','${internalFilter.replace(/'/g,"\\'")}','${sc.name.replace(/'/g,"\\'")}',${sc.avgChg})" title="${BROADER_FILTER_INDICES.has(sc.name) ? `ORB breakouts — uses the broader ${internalFilter} list, since ${sc.name} isn't split out separately yet` : `ORB breakouts in ${sc.name}`}">ORB${sc.orbBreak.count > 0 ? `<span class="jump-break-badge">${sc.orbBreak.count}</span>` : ''}</button>` : ''}
+          <button type="button" class="sector-jump-btn drb ${sc.drbBreak.count > 0 ? 'has-break ' + sc.drbBreak.dir : ''}" onclick="openExplorer('DRB','all','${internalFilter.replace(/'/g,"\\'")}','${sc.name.replace(/'/g,"\\'")}',${sc.avgChg})" title="${BROADER_FILTER_INDICES.has(sc.name) ? `DRB breakouts — uses the broader ${internalFilter} list, since ${sc.name} isn't split out separately yet` : `DRB breakouts in ${sc.name}`}">DRB${sc.drbBreak.count > 0 ? `<span class="jump-break-badge">${sc.drbBreak.count}</span>` : ''}</button>
           <button type="button" class="sector-alert-bell ${alertEnabledSectors.has(sc.name) ? 'on' : ''}" data-sector="${sc.name.replace(/"/g,'&quot;')}" title="${alertEnabledSectors.has(sc.name) ? 'ORB alerts ON for ' + sc.name + ' — click to turn off' : 'Turn on ORB alerts for ' + sc.name}"><i class="bi bi-bell${alertEnabledSectors.has(sc.name) ? '-fill' : ''}"></i></button>
         </div>`}
       </td>
@@ -4454,6 +4466,7 @@ function renderExplorer(){
       <td><span class="rovl-tag ${r.rovl > 1.2 ? 'hot' : 'normal'}">${r.rovl}${r.rovl > 1.2 ? ' 🔥' : ''}</span></td>
       <td class="mono">${r.price.toLocaleString('en-IN')}</td>
       <td class="mono">${r.qty.toLocaleString('en-IN')}</td>
+      <td class="mono cell-sub">${formatVolume(r.volume)}</td>
       <td>${comboChip(r, false)}</td>
       <td class="mono cell-sub break-log-cell">${renderBreakLog(r.breakLog)}</td>
     </tr>
@@ -4648,7 +4661,7 @@ function renderLongShort(){
 
 function openLongShort(direction){
   lsDirection = direction;
-  lsSort = { key: "score", dir: -1 };
+  lsSort = { key: "chg", dir: -1 }; // always high to low, for both Long and Short
   document.getElementById("lsSearch").value = "";
   lsSectorFilter.value = "all";
 
@@ -5071,6 +5084,8 @@ async function loadChart(symbol){
       return;
     }
     renderQuadChart(data, currentChartIsEtf);
+    const now = new Date();
+    document.getElementById("chartLastUpdated").textContent = "Updated " + now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
     hideChartMsg();
   } catch(err){
     showChartMsg("Couldn't reach the chart data backend.", "bi-wifi-off");
@@ -5157,7 +5172,6 @@ async function loadChartNews(symbol){
 
 const CHART_POPOVERS = {
   chartNews: "chartNewsToggleBtn",
-  chartBreaklog: "chartBreaklogToggleBtn",
 };
 function toggleChartPopover(id){
   const panel = document.getElementById(id);
@@ -5175,8 +5189,6 @@ function closeChartPopovers(){
 }
 document.getElementById("chartNewsToggleBtn").addEventListener("click", () => toggleChartPopover("chartNews"));
 document.getElementById("chartNewsCloseBtn").addEventListener("click", closeChartPopovers);
-document.getElementById("chartBreaklogToggleBtn").addEventListener("click", () => toggleChartPopover("chartBreaklog"));
-document.getElementById("chartBreaklogCloseBtn").addEventListener("click", closeChartPopovers);
 
 function openChartModal(symbol, isEtf){
   currentChartSymbol = symbol;
@@ -5186,7 +5198,7 @@ function openChartModal(symbol, isEtf){
   document.getElementById("chartSub").textContent = row
     ? `${row.name || ""} · ${row.sector || ""} · ₹${row.price.toLocaleString('en-IN')}`
     : "Live daily chart";
-  document.getElementById("chartBreaklogToggleBtn").style.display = isEtf ? "none" : "";
+  document.getElementById("chartBreakSummary").style.display = isEtf ? "none" : "";
   renderChartBreakSummary(row);
   renderChartLevels(row);
   closeChartPopovers();
@@ -5987,6 +5999,56 @@ fetchAndApplyStrategyFocus();
 // Every user (not just admin) re-checks this periodically, so a change
 // the admin makes actually reaches everyone else's already-open tab.
 setInterval(throttleWhenHidden(fetchAndApplyStrategyFocus, 90000), 20000);
+
+/* ---------------- Sector ORB Switch ---------------- */
+let sectorOrbEnabled = true; // safe default until the real value loads
+async function fetchAndApplySectorOrbSwitch(){
+  const base = getBackendUrl();
+  if(!base) return;
+  try {
+    const res = await fetch(base + "/sector-orb-switch");
+    if(!res.ok) throw new Error("HTTP " + res.status);
+    const data = await res.json();
+    if(typeof data.enabled === "boolean") sectorOrbEnabled = data.enabled;
+  } catch(err){
+    // keep whatever we last knew
+  }
+  document.getElementById("sectorOrbSwitchToggle").checked = sectorOrbEnabled;
+  renderSectorTrend(); // re-render so the change actually shows immediately
+}
+fetchAndApplySectorOrbSwitch();
+setInterval(throttleWhenHidden(fetchAndApplySectorOrbSwitch, 90000), 20000);
+
+document.getElementById("sectorOrbSwitchToggle").addEventListener("change", async function(){
+  const msg = document.getElementById("sectorOrbSwitchMsg");
+  const newVal = this.checked;
+  this.disabled = true;
+  try {
+    const res = await fetch(getBackendUrl() + "/sector-orb-switch", {
+      method: "POST", headers: adminHeaders(), body: JSON.stringify({ enabled: newVal })
+    });
+    const data = await res.json();
+    if(!data.success){
+      this.checked = !newVal; // revert on failure
+      msg.textContent = data.error === "unauthorized" ? "Admin PIN check failed." : "Couldn't save. Try again.";
+      msg.style.color = "var(--bear)";
+    } else {
+      sectorOrbEnabled = newVal;
+      msg.textContent = "Saved.";
+      msg.style.color = "var(--bull)";
+      renderSectorTrend();
+    }
+  } catch(err){
+    this.checked = !newVal;
+    msg.textContent = "Couldn't reach the server.";
+    msg.style.color = "var(--bear)";
+  } finally {
+    this.disabled = false;
+    msg.style.display = "block";
+    setTimeout(() => { msg.style.display = "none"; }, 2500);
+  }
+});
+
 
 
 /* ---------------- Refresh button ---------------- */
