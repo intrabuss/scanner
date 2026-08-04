@@ -1718,6 +1718,16 @@ html.hide-etf #etfSwingSection{ display:none !important; }
       </div>
     </div>
 
+    <!-- TOP GAINERS / LOSERS — placed near the top, so it's visible without scrolling -->
+    <div class="row g-3" style="margin-bottom:4px;">
+      <div class="col-6">
+        <button class="btn-view" id="openTopGainers" style="width:100%; color:var(--bull); border-color:rgba(34,197,94,.3); font-size:13.5px; padding:12px;"><i class="bi bi-graph-up-arrow"></i> Top 20 Gainers</button>
+      </div>
+      <div class="col-6">
+        <button class="btn-view" id="openTopLosers" style="width:100%; color:var(--bear); border-color:rgba(239,68,68,.3); font-size:13.5px; padding:12px;"><i class="bi bi-graph-down-arrow"></i> Top 20 Losers</button>
+      </div>
+    </div>
+
     <!-- MARKET SNAPSHOT -->
     <div class="section-head">
       <div class="section-title">Market Snapshot</div>
@@ -1766,7 +1776,7 @@ html.hide-etf #etfSwingSection{ display:none !important; }
         <div class="card-x table-scroll">
           <table class="data-grid" id="longTable">
             <thead>
-              <tr><th>Symbol</th><th>Sector</th><th>% Chg</th><th>LTP</th><th>ROVL</th><th>Volume</th><th>Technical Score</th></tr>
+              <tr><th>Symbol</th><th>Sector</th><th>% Chg</th><th>LTP</th><th>ROVL</th><th>Volume</th><th>Technical Score</th><th>Break Log</th></tr>
             </thead>
             <tbody></tbody>
           </table>
@@ -1781,7 +1791,7 @@ html.hide-etf #etfSwingSection{ display:none !important; }
         <div class="card-x table-scroll">
           <table class="data-grid" id="shortTable">
             <thead>
-              <tr><th>Symbol</th><th>Sector</th><th>% Chg</th><th>LTP</th><th>ROVL</th><th>Volume</th><th>Technical Score</th></tr>
+              <tr><th>Symbol</th><th>Sector</th><th>% Chg</th><th>LTP</th><th>ROVL</th><th>Volume</th><th>Technical Score</th><th>Break Log</th></tr>
             </thead>
             <tbody></tbody>
           </table>
@@ -2241,7 +2251,7 @@ html.hide-etf #etfSwingSection{ display:none !important; }
         <i class="bi bi-bell"></i>
         <span id="lsAlertToggleLbl">Top 10 Alerts: Off</span>
       </button>
-      <span class="alert-toggle-hint">Alerts when a stock newly enters the Top 10 by RVOL (RVOL &gt; 1.2) in Long or Short — covers both directions.</span>
+      <span class="alert-toggle-hint">Alerts when a stock has a fresh, confirmed ORB break (up to the 10 most recent) — Long or Short, covers both directions.</span>
     </div>
     <div class="explorer-body table-scroll">
       <table class="data-grid" id="lsTable">
@@ -2255,11 +2265,50 @@ html.hide-etf #etfSwingSection{ display:none !important; }
             <th class="sortable" data-key="chg">% Chg <span class="sort-arrow"><i class="bi bi-caret-down-fill"></i></span></th>
             <th class="sortable" data-key="rovl">ROVL <span class="sort-arrow"><i class="bi bi-caret-down-fill"></i></span></th>
             <th class="sortable" data-key="volume">Volume <span class="sort-arrow"><i class="bi bi-caret-down-fill"></i></span></th>
+            <th class="sortable" data-key="latestBreakTime">Break Log <span class="sort-arrow"><i class="bi bi-caret-down-fill"></i></span></th>
           </tr>
         </thead>
         <tbody id="lsBody"></tbody>
       </table>
       <div class="explorer-empty" id="lsEmpty" style="display:none;">No symbols match your filters.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ TOP GAINERS/LOSERS MODAL ============ -->
+<div class="modal-overlay" id="topMoversOverlay">
+  <div class="modal-box wide">
+    <div class="modal-head">
+      <div>
+        <div style="font-weight:800; font-size:16px;" id="topMoversTitle">Top 20 Gainers</div>
+        <div class="explorer-meta">From the current scan universe, ranked by % change</div>
+      </div>
+      <button class="icon-btn" id="topMoversClose"><i class="bi bi-x-lg"></i></button>
+    </div>
+    <div class="explorer-toolbar">
+      <input type="text" class="explorer-search" id="topMoversSearch" placeholder="Search symbol or company…">
+    </div>
+    <div style="display:flex; gap:8px; padding:0 20px 14px; flex-wrap:wrap;">
+      <button type="button" class="sidx-tab active" id="topMoversUniverseAll" data-universe="all">Total Market</button>
+      <button type="button" class="sidx-tab" id="topMoversUniverse50" data-universe="nifty50">Nifty 50</button>
+      <button type="button" class="sidx-tab" id="topMoversUniverse100" data-universe="nifty100">Nifty 100</button>
+    </div>
+    <div class="explorer-body table-scroll">
+      <table class="data-grid" id="topMoversTable">
+        <thead>
+          <tr>
+            <th>Symbol</th>
+            <th>Company</th>
+            <th>Sector</th>
+            <th>Price</th>
+            <th>% Chg</th>
+            <th>ROVL</th>
+            <th>Volume</th>
+          </tr>
+        </thead>
+        <tbody id="topMoversBody"></tbody>
+      </table>
+      <div class="explorer-empty" id="topMoversEmpty" style="display:none;">No symbols match your search.</div>
     </div>
   </div>
 </div>
@@ -3959,16 +4008,36 @@ function renderOppTable(bodyId, rows){
       <td><span class="rovl-tag ${r.rovl > 1.2 ? 'hot' : 'normal'}">${r.rovl}${r.rovl > 1.2 ? ' 🔥' : ''}</span></td>
       <td class="mono cell-sub">${formatVolume(r.volume)}</td>
       <td>${techScore === null ? '<span class="cell-sub" style="font-size:11px;">—</span>' : `<span class="tech-score-chip">${techScore}/10</span>`}</td>
+      <td class="mono cell-sub break-log-cell">${renderBreakLog(r.breakLog)}</td>
     </tr>
   `;
   }).join("");
 }
 
+// Long/Short Opportunities now surface stocks by their most RECENT confirmed
+// ORB break, not raw % change or ROVL — a stock that broke out 2 minutes ago
+// is a live opportunity in a way a stock that's merely "up 3% since 9:15 with
+// no actual breakout" isn't. Only counts a stock whose LATEST break_log entry
+// is a genuine "up"/"down" crossover (never "reversed" — that means price is
+// back inside the range right now, so it's not currently a live opportunity
+// in either direction).
+function getLatestOrbBreakOpportunities(direction, limit){
+  return orbRows
+    .filter(r => r.breakLog && r.breakLog.length > 0)
+    .map(r => ({ row: r, latest: r.breakLog[r.breakLog.length - 1] }))
+    .filter(x => x.latest.dir === direction)
+    // "HH:MM" zero-padded 24h strings sort correctly as plain strings —
+    // no need for a separate time-parsing step.
+    .sort((a, b) => b.latest.time.localeCompare(a.latest.time))
+    .slice(0, limit)
+    .map(x => x.row);
+}
+
 function renderAll(){
   renderSectorTrend();
 
-  const longs = [...orbRows].filter(r => r.chg >= 0).sort((a,b) => b.chg - a.chg).slice(0,6);
-  const shorts = [...orbRows].filter(r => r.chg < 0).sort((a,b) => a.chg - b.chg).slice(0,6);
+  const longs = getLatestOrbBreakOpportunities("up", 10);
+  const shorts = getLatestOrbBreakOpportunities("down", 10);
   renderOppTable("#longTable tbody", longs);
   renderOppTable("#shortTable tbody", shorts);
 
@@ -4244,8 +4313,12 @@ function checkForNewBreaksAndAlert(strategy, rows){
 }
 
 function checkTopLongShortAndAlert(allOrbRows){
-  // Long = today's gainers, Short = today's losers — same source data and
-  // definition the Long/Short Opportunities modal itself uses.
+  // Deliberately INDEPENDENT of the ORB-break criteria the Long/Short
+  // Opportunities table now uses. This channel answers a genuinely
+  // different question — "which stocks are unusually busy right now" —
+  // not "which stocks just had a confirmed breakout". A stock can be a
+  // RVOL alert candidate with zero ORB breaks today, and that's the
+  // whole point of having two separate channels instead of one.
   const longCandidates = allOrbRows.filter(r => r.chg >= 0 && r.rovl > LS_ALERT_MIN_RVOL)
     .sort((a, b) => b.rovl - a.rovl).slice(0, LS_ALERT_TOP_N);
   const shortCandidates = allOrbRows.filter(r => r.chg < 0 && r.rovl > LS_ALERT_MIN_RVOL)
@@ -4337,7 +4410,7 @@ function updateLsAlertToggleUI(){
   document.getElementById("lsAlertToggle").classList.toggle("on", on);
   document.getElementById("lsAlertToggleLbl").textContent = `${dirLabel} Alerts: ${on ? "On" : "Off"}`;
   const hint = document.querySelector("#lsOverlay .alert-toggle-hint");
-  if(hint) hint.textContent = `Alerts when a stock newly enters the Top 10 by RVOL (RVOL > 1.2) — ${dirLabel} only. Short alerts are a separate switch, toggled from the Short Opportunities view.`;
+  if(hint) hint.textContent = `Alerts when a stock has a fresh, confirmed ORB break (up to the 10 most recent) — ${dirLabel} only. ${dirLabel === "Long" ? "Short" : "Long"} alerts are a separate switch, toggled from the ${dirLabel === "Long" ? "Short" : "Long"} Opportunities view.`;
 }
 
 document.getElementById("lsAlertToggle").addEventListener("click", function(){
@@ -4605,7 +4678,7 @@ function renderLongShort(){
   const search = document.getElementById("lsSearch").value.trim().toUpperCase();
   const sector = lsSectorFilter.value;
 
-  let rows = orbRows.filter(r => lsDirection === "long" ? r.chg >= 0 : r.chg < 0);
+  let rows = orbRows.filter(r => r.breakLog && r.breakLog.length && r.breakLog[r.breakLog.length - 1].dir === (lsDirection === "long" ? "up" : "down"));
   rows = rows.filter(r => {
     if(sector !== "all" && r.sector !== sector) return false;
     if(search && !r.sym.includes(search) && !r.name.toUpperCase().includes(search)) return false;
@@ -4632,6 +4705,7 @@ function renderLongShort(){
       <td><span class="chg-txt ${r.chg >= 0 ? 'up' : 'down'}">${r.chg >= 0 ? '+' : ''}${r.chg.toFixed(2)}%</span></td>
       <td><span class="rovl-tag ${r.rovl > 1.2 ? 'hot' : 'normal'}">${r.rovl}${r.rovl > 1.2 ? ' 🔥' : ''}</span></td>
       <td class="mono cell-sub">${formatVolume(r.volume)}${r.live === false ? ' <span class="cell-sub" style="font-size:10px;">(last close)</span>' : ''}</td>
+      <td class="mono cell-sub break-log-cell">${renderBreakLog(r.breakLog)}</td>
     </tr>
   `;
   }).join("");
@@ -4643,20 +4717,87 @@ function renderLongShort(){
   return rows;
 }
 
+/* ---------------- Top Gainers / Losers — simple, reuses the same data everything else uses ---------------- */
+let topMoversDirection = "gainers";
+let topMoversUniverse = "all";
+let indexMembership = { nifty50: [], nifty100: [] };
+let indexMembershipLoaded = false;
+
+async function loadIndexMembership(){
+  const base = getBackendUrl();
+  if(!base) return;
+  try {
+    const res = await fetch(base + "/index-membership");
+    if(!res.ok) return;
+    indexMembership = await res.json();
+    indexMembershipLoaded = true;
+  } catch(err){
+    // Universe buttons will just show fewer/no rows for the Nifty
+    // 50/200/500 options until this succeeds — Total Market is
+    // unaffected either way since it doesn't need this data.
+  }
+}
+
+function openTopMovers(direction){
+  topMoversDirection = direction;
+  topMoversUniverse = "all";
+  document.querySelectorAll("#topMoversOverlay [data-universe]").forEach(btn => {
+    btn.classList.toggle("active", btn.dataset.universe === "all");
+  });
+  document.getElementById("topMoversTitle").textContent = direction === "gainers" ? "Top 20 Gainers" : "Top 20 Losers";
+  document.getElementById("topMoversSearch").value = "";
+  if(!indexMembershipLoaded) loadIndexMembership();
+  renderTopMovers();
+  document.getElementById("topMoversOverlay").classList.add("show");
+}
+function renderTopMovers(){
+  const search = document.getElementById("topMoversSearch").value.trim().toUpperCase();
+  let universeRows = orbRows;
+  if(topMoversUniverse !== "all"){
+    const members = new Set(indexMembership[topMoversUniverse] || []);
+    universeRows = orbRows.filter(r => members.has(r.sym));
+  }
+  let rows = [...universeRows].sort((a, b) => topMoversDirection === "gainers" ? b.chg - a.chg : a.chg - b.chg).slice(0, 20);
+  if(search) rows = rows.filter(r => r.sym.includes(search) || r.name.toUpperCase().includes(search));
+  document.getElementById("topMoversEmpty").style.display = rows.length ? "none" : "block";
+  document.getElementById("topMoversBody").innerHTML = rows.map(r => `
+    <tr class="rail-${r.chg >= 0 ? 'bull' : 'bear'}">
+      <td><div class="sym sym-link" onclick="openChartModal('${r.sym}')">${r.sym} <i class="bi bi-graph-up"></i></div></td>
+      <td class="cell-sub">${r.name}</td>
+      <td class="cell-sub">${r.sector}</td>
+      <td class="mono">${r.price.toLocaleString('en-IN')}</td>
+      <td><span class="chg-txt ${r.chg >= 0 ? 'up' : 'down'}">${r.chg >= 0 ? '+' : ''}${r.chg.toFixed(2)}%</span></td>
+      <td><span class="rovl-tag ${r.rovl > 1.2 ? 'hot' : 'normal'}">${r.rovl}${r.rovl > 1.2 ? ' 🔥' : ''}</span></td>
+      <td class="mono cell-sub">${formatVolume(r.volume)}</td>
+    </tr>
+  `).join("");
+}
+document.getElementById("openTopGainers").addEventListener("click", () => openTopMovers("gainers"));
+document.getElementById("openTopLosers").addEventListener("click", () => openTopMovers("losers"));
+document.getElementById("topMoversClose").addEventListener("click", () => document.getElementById("topMoversOverlay").classList.remove("show"));
+document.getElementById("topMoversOverlay").addEventListener("click", function(e){ if(e.target === this) this.classList.remove("show"); });
+document.getElementById("topMoversSearch").addEventListener("input", renderTopMovers);
+document.querySelectorAll("#topMoversOverlay [data-universe]").forEach(btn => {
+  btn.addEventListener("click", function(){
+    topMoversUniverse = this.dataset.universe;
+    document.querySelectorAll("#topMoversOverlay [data-universe]").forEach(b => b.classList.toggle("active", b === this));
+    renderTopMovers();
+  });
+});
+
 function openLongShort(direction){
   lsDirection = direction;
-  // Long: biggest gainer first (descending). Short: biggest FALL first —
-  // for negative numbers that's ascending (-14% sorts before -7%), not
-  // descending. A uniform "always descending" would show the smallest
-  // decline first for shorts, which isn't what "biggest fall first" means.
-  lsSort = { key: "chg", dir: direction === "long" ? -1 : 1 };
+  // Most recent break first, for both directions — this replaces the old
+  // %-change-based default now that Long/Short is defined by actual ORB
+  // breakouts, not raw price movement.
+  lsSort = { key: "latestBreakTime", dir: -1 };
   document.getElementById("lsSearch").value = "";
   lsSectorFilter.value = "all";
 
   document.getElementById("lsTitle").textContent = direction === "long" ? "Long Opportunities" : "Short Opportunities";
   document.getElementById("lsStatTotalLbl").textContent = direction === "long" ? "Long Opportunities" : "Short Opportunities";
 
-  const allInDirection = orbRows.filter(r => direction === "long" ? r.chg >= 0 : r.chg < 0);
+  const allInDirection = orbRows.filter(r => r.breakLog && r.breakLog.length && r.breakLog[r.breakLog.length - 1].dir === (direction === "long" ? "up" : "down"));
   const hotRovl = allInDirection.filter(r => r.rovl > 1.2);
   const strongSector = allInDirection.filter(r => sectorStrengthMap[r.sector] === "strong");
 
@@ -4664,7 +4805,7 @@ function openLongShort(direction){
   document.getElementById("lsStatHotRovl").textContent = hotRovl.length.toLocaleString("en-IN");
   document.getElementById("lsStatStrongSector").textContent = strongSector.length.toLocaleString("en-IN");
 
-  document.getElementById("lsSub").textContent = `Sorted by Score · flat/opposite-direction stocks excluded`;
+  document.getElementById("lsSub").textContent = `Sorted by most recent ORB break · only stocks with a confirmed ${lsDirection === "long" ? "up" : "down"} break shown`;
 
   updateLsAlertToggleUI();
   renderLongShort();
@@ -5493,11 +5634,12 @@ function getBackendUrl(){
 
 function mapApiRowToTableRow(r, strategy){
   const status = r.signal === "BUY" ? "bull" : r.signal === "SELL" ? "bear" : "neutral";
+  const breakLog = r.break_log || [];
   return {
     sym: r.symbol, name: r.name, sector: r.sector,
     price: r.price, chg: r.chg, rovl: r.rvol, volume: r.volume,
     score: r.score, signal: r.signal, status, live: r.live,
-    breakLog: r.break_log || [],
+    breakLog, latestBreakTime: breakLog.length ? breakLog[breakLog.length - 1].time : "",
     breakCount: r.break_count || 0,
     levelHigh: r.level_high, levelLow: r.level_low, strategy,
     indicators: r.indicators || null
