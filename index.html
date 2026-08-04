@@ -2535,7 +2535,6 @@ broke_low  = live_price &lt; yesterday_low</code></pre>
         <span class="lg-item"><i class="bi bi-arrow-up-short" style="color:var(--bull);"></i>Buy break</span>
         <span class="lg-item"><i class="bi bi-arrow-down-short" style="color:var(--bear);"></i>Sell break</span>
         <span class="lg-item"><span style="display:inline-block; width:10px; height:2px; background:#3B82F6; margin-right:3px; vertical-align:middle;"></span>15min ORB</span>
-        <span class="lg-item"><span style="display:inline-block; width:10px; height:2px; background:#F59E0B; margin-right:3px; vertical-align:middle;"></span>30min ORB</span>
       </div>
       <span class="chart-last-updated" id="chartLastUpdated"></span>
       <span class="chart-market-status-badge" id="chartMarketStatusBadge" style="display:none;"></span>
@@ -4664,7 +4663,11 @@ function renderLongShort(){
 
 function openLongShort(direction){
   lsDirection = direction;
-  lsSort = { key: "chg", dir: -1 }; // always high to low, for both Long and Short
+  // Long: biggest gainer first (descending). Short: biggest FALL first —
+  // for negative numbers that's ascending (-14% sorts before -7%), not
+  // descending. A uniform "always descending" would show the smallest
+  // decline first for shorts, which isn't what "biggest fall first" means.
+  lsSort = { key: "chg", dir: direction === "long" ? -1 : 1 };
   document.getElementById("lsSearch").value = "";
   lsSectorFilter.value = "all";
 
@@ -4794,7 +4797,15 @@ function drawQuadPanel(canvas, candles, opts){
   const ctx = canvas.getContext("2d");
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.clearRect(0, 0, w, h);
-  if(!candles || !candles.length) return [];
+  if(!candles || !candles.length){
+    ctx.save();
+    ctx.fillStyle = cssVar("--text-muted") || "#8D96A6";
+    ctx.font = "13px Inter, sans-serif";
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText("No intraday data available for this symbol", w / 2, h / 2);
+    ctx.restore();
+    return [];
+  }
 
   const bull = cssVar("--bull") || "#22C55E";
   const bear = cssVar("--bear") || "#EF4444";
@@ -4807,15 +4818,13 @@ function drawQuadPanel(canvas, candles, opts){
   const orbLow = opts.showOrb ? opts.orbLow : null;
   const orbHigh15 = opts.showOrb ? opts.orbHigh15 : null;
   const orbLow15 = opts.showOrb ? opts.orbLow15 : null;
-  const orbHigh30 = opts.showOrb ? opts.orbHigh30 : null;
-  const orbLow30 = opts.showOrb ? opts.orbLow30 : null;
 
   let lo = Math.min(...candles.map(c => c.l));
   let hi = Math.max(...candles.map(c => c.h));
   if(orbHigh != null) hi = Math.max(hi, orbHigh);
   if(orbLow != null) lo = Math.min(lo, orbLow);
-  [orbHigh15, orbHigh30].forEach(v => { if(v != null) hi = Math.max(hi, v); });
-  [orbLow15, orbLow30].forEach(v => { if(v != null) lo = Math.min(lo, v); });
+  if(orbHigh15 != null) hi = Math.max(hi, orbHigh15);
+  if(orbLow15 != null) lo = Math.min(lo, orbLow15);
 
   // Compute EMA series up front so their range is included in lo/hi
   // (otherwise a fast-moving EMA line would clip off the top/bottom of
@@ -4904,7 +4913,6 @@ function drawQuadPanel(canvas, candles, opts){
     ctx.restore();
   };
   drawFixedOrbLine(orbHigh15, "#3B82F6"); drawFixedOrbLine(orbLow15, "#3B82F6");
-  drawFixedOrbLine(orbHigh30, "#F59E0B"); drawFixedOrbLine(orbLow30, "#F59E0B");
 
   // candles
   candles.forEach((c, i) => {
@@ -5045,7 +5053,6 @@ function renderQuadChart(data, isEtf){
     const opts = {
       orbHigh: data.orb_high, orbLow: data.orb_low,
       orbHigh15: data.orb_high_15, orbLow15: data.orb_low_15,
-      orbHigh30: data.orb_high_30, orbLow30: data.orb_low_30,
       markers: data.markers, showOrb: panel.showOrb, emaLengths,
     };
     const draw = () => {
