@@ -665,6 +665,10 @@ tr.pinned-row{ background:var(--brand-dim); }
 .chg-txt.up{ color:var(--bull); }
 .chg-txt.down{ color:var(--bear); }
 
+/* % Chg + combo chip merged cell (Trade Explorer) — replaces the old standalone Signal column */
+.chg-signal-cell{ display:flex; flex-direction:column; align-items:flex-start; gap:4px; white-space:nowrap; }
+.chg-signal-cell .combo-chip{ font-size:10.5px; padding:2px 6px; }
+
 .ema-tag, .vwap-tag{ font-size:12px; font-weight:600; }
 .ema-tag.above, .vwap-tag.above{ color:var(--bull); }
 .ema-tag.below, .vwap-tag.below{ color:var(--bear); }
@@ -679,6 +683,7 @@ tr.pinned-row{ background:var(--brand-dim); }
 }
 .strategy-top{ display:flex; align-items:center; justify-content:between; gap:10px; }
 .strategy-name{ font-weight:700; font-size:15px; }
+.strategy-total{ font-size:11px; font-weight:600; color:var(--text-muted); margin-left:4px; }
 .strategy-desc{ font-size:12px; color:var(--text-muted); margin-top:2px; }
 .strategy-icon{
   width:38px; height:38px; border-radius:9px; background:var(--brand-dim); color:var(--brand);
@@ -687,6 +692,7 @@ tr.pinned-row{ background:var(--brand-dim); }
 .signal-stat{ flex:1; text-align:center; padding:12px 8px; border-radius:var(--radius-sm); background:var(--bg-raised); border:1px solid var(--border-soft); }
 .signal-stat .num{ font-family:var(--font-data); font-size:22px; font-weight:700; }
 .signal-stat .lbl{ font-size:10.5px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.05em; margin-top:2px; }
+.signal-stat .signal-stat-desc{ font-size:10px; color:var(--text-muted); line-height:1.35; margin-top:6px; }
 .signal-stat.buy .num{ color:var(--bull); }
 .signal-stat.sell .num{ color:var(--bear); }
 
@@ -934,59 +940,6 @@ tr.pinned-row{ background:var(--brand-dim); }
   display:flex; align-items:center; justify-content:space-between; gap:12px;
 }
 .modal-box.wide .modal-head{ padding:16px 20px; border-bottom:1px solid var(--border-soft); }
-
-/* ============ STRATEGY GUIDE MODAL ============ */
-.modal-box.doc{ max-width:740px; max-height:88vh; padding:0; display:flex; flex-direction:column; }
-.modal-box.doc .modal-head{ padding:18px 22px; border-bottom:1px solid var(--border-soft); }
-.strategy-doc{ padding:22px 26px 30px; overflow-y:auto; font-size:13.5px; line-height:1.7; color:var(--text-secondary); }
-.strategy-doc > p:first-child{ margin-top:0; }
-.strategy-doc h4{
-  font-size:15px; font-weight:800; color:var(--text-primary);
-  margin:28px 0 10px; display:flex; align-items:center; gap:9px;
-}
-.strategy-doc h4:first-of-type{ margin-top:0; }
-.strategy-doc .doc-tag{
-  font-family:var(--font-data); font-size:10.5px; font-weight:700;
-  padding:2px 9px; border-radius:5px; letter-spacing:.03em;
-}
-.strategy-doc .doc-tag.orb{ background:var(--brand-dim); color:var(--brand); }
-.strategy-doc .doc-tag.drb{ background:var(--neutral-dim); color:var(--neutral); }
-.strategy-doc .doc-tag.shared{ background:var(--bull-dim); color:var(--bull); }
-.strategy-doc p{ margin:0 0 12px; }
-.strategy-doc strong{ color:var(--text-primary); font-weight:700; }
-.strategy-doc ol, .strategy-doc ul{ margin:0 0 14px; padding-left:20px; }
-.strategy-doc li{ margin-bottom:6px; }
-.strategy-doc li::marker{ color:var(--text-muted); }
-.strategy-doc code{
-  font-family:var(--font-data); font-size:12px; background:var(--bg-hover);
-  color:var(--text-primary); padding:1px 5px; border-radius:4px;
-}
-.strategy-doc pre{
-  background:var(--bg-raised); border:1px solid var(--border-soft);
-  border-radius:var(--radius-sm); padding:12px 14px; overflow-x:auto; margin:0 0 14px;
-}
-.strategy-doc pre code{ background:none; padding:0; font-size:12.5px; color:var(--text-primary); line-height:1.6; }
-.strategy-doc hr{ border:none; border-top:1px solid var(--border-soft); margin:24px 0; }
-.strategy-doc .doc-scroll{ overflow-x:auto; margin:0 0 16px; }
-.strategy-doc table{ width:100%; border-collapse:collapse; font-size:12.5px; min-width:460px; }
-.strategy-doc th{
-  text-align:left; padding:8px 10px; background:var(--bg-raised); color:var(--text-secondary);
-  font-weight:700; font-size:10.5px; text-transform:uppercase; letter-spacing:.03em;
-  border-bottom:1px solid var(--border-med); white-space:nowrap;
-}
-.strategy-doc td{ padding:9px 10px; border-bottom:1px solid var(--border-soft); color:var(--text-primary); vertical-align:top; }
-.strategy-doc tr:last-child td{ border-bottom:none; }
-.strategy-doc .doc-callout{
-  background:var(--brand-dim); border:1px solid rgba(76,141,255,.3); border-radius:var(--radius-md);
-  padding:12px 14px; font-size:12.5px; color:var(--text-primary); margin:4px 0 22px;
-  display:flex; gap:10px; align-items:flex-start;
-}
-.strategy-doc .doc-callout i{ color:var(--brand); font-size:15px; margin-top:1px; flex-shrink:0; }
-.strategy-doc .doc-note{ font-size:11.5px; color:var(--text-muted); font-style:italic; }
-@media (max-width: 767.98px){
-  .strategy-doc{ padding:18px 18px 26px; font-size:13px; }
-  .strategy-doc h4{ font-size:14px; margin-top:24px; }
-}
 
 /* ============ CHART MODAL (TradingView embed) ============ */
 .modal-box.chart-box{ max-width:1180px; height:84vh; overflow:hidden; }
@@ -1687,7 +1640,6 @@ html.hide-etf #etfSwingSection{ display:none !important; }
     <button class="nav-icon" data-target="longSection"><i class="bi bi-graph-up-arrow"></i><span class="tip">Long</span></button>
     <button class="nav-icon" data-target="shortSection"><i class="bi bi-graph-down-arrow"></i><span class="tip">Short</span></button>
     <button class="nav-icon" data-target="strategySection"><i class="bi bi-lightning-charge-fill"></i><span class="tip">Strategies</span></button>
-    <button class="nav-icon" id="strategyGuideBtn"><i class="bi bi-question-circle"></i><span class="tip">Strategy Guide</span></button>
     <button class="nav-icon" id="globalMarketsBtn"><i class="bi bi-globe-americas"></i><span class="tip">Global</span></button>
     <button class="nav-icon" id="fiiDiiBtn"><i class="bi bi-bank2"></i><span class="tip">FII/DII</span></button>
     <button class="nav-icon" id="riskMgmtBtn"><i class="bi bi-shield-check"></i><span class="tip">Risk Mgmt</span></button>
@@ -1840,7 +1792,6 @@ html.hide-etf #etfSwingSection{ display:none !important; }
     <!-- STRATEGY PANEL -->
     <div class="section-head" id="strategySection">
       <div class="section-title">Live Strategies</div>
-      <button class="section-link" id="strategyGuideInlineBtn" style="background:none; border:none; cursor:pointer;"><i class="bi bi-question-circle"></i> How it works</button>
     </div>
     <div class="row g-3">
       <div class="col-12 col-md-6" id="orbStrategyCard">
@@ -1848,13 +1799,21 @@ html.hide-etf #etfSwingSection{ display:none !important; }
           <div class="strategy-top">
             <div class="strategy-icon"><i class="bi bi-box-arrow-in-up-right"></i></div>
             <div>
-              <div class="strategy-name">ORB Breakout</div>
+              <div class="strategy-name">ORB Breakout <span class="strategy-total" id="orbTotalCount">0 stocks</span></div>
               <div class="strategy-desc">Opening Range Breakout · 15m</div>
             </div>
           </div>
           <div class="d-flex gap-2">
-            <div class="signal-stat buy"><div class="num" id="orbBuyCount">0</div><div class="lbl">Buy signals</div></div>
-            <div class="signal-stat sell"><div class="num" id="orbSellCount">0</div><div class="lbl">Sell signals</div></div>
+            <div class="signal-stat buy">
+              <div class="num" id="orbBuyCount">0</div>
+              <div class="lbl">Buy signals</div>
+              <div class="signal-stat-desc">Broke above the opening-range high with volume &amp; trend confirmation</div>
+            </div>
+            <div class="signal-stat sell">
+              <div class="num" id="orbSellCount">0</div>
+              <div class="lbl">Sell signals</div>
+              <div class="signal-stat-desc">Broke below the opening-range low with volume &amp; trend confirmation</div>
+            </div>
           </div>
           <button class="btn-view" data-strategy="ORB">View Details</button>
         </div>
@@ -1865,13 +1824,21 @@ html.hide-etf #etfSwingSection{ display:none !important; }
           <div class="strategy-top">
             <div class="strategy-icon"><i class="bi bi-arrows-angle-expand"></i></div>
             <div>
-              <div class="strategy-name">DRB Breakout</div>
+              <div class="strategy-name">DRB Breakout <span class="strategy-total" id="drbTotalCount">0 stocks</span></div>
               <div class="strategy-desc">Day Range Breakout · Daily</div>
             </div>
           </div>
           <div class="d-flex gap-2">
-            <div class="signal-stat buy"><div class="num" id="drbBuyCount">0</div><div class="lbl">Buy signals</div></div>
-            <div class="signal-stat sell"><div class="num" id="drbSellCount">0</div><div class="lbl">Sell signals</div></div>
+            <div class="signal-stat buy">
+              <div class="num" id="drbBuyCount">0</div>
+              <div class="lbl">Buy signals</div>
+              <div class="signal-stat-desc">Broke above yesterday's high, confirmed after the first 15 minutes</div>
+            </div>
+            <div class="signal-stat sell">
+              <div class="num" id="drbSellCount">0</div>
+              <div class="lbl">Sell signals</div>
+              <div class="signal-stat-desc">Broke below yesterday's low, confirmed after the first 15 minutes</div>
+            </div>
           </div>
           <button class="btn-view" data-strategy="DRB">View Details</button>
         </div>
@@ -2216,7 +2183,6 @@ html.hide-etf #etfSwingSection{ display:none !important; }
             <th class="sortable" data-key="price">Price <span class="sort-arrow"><i class="bi bi-caret-down-fill"></i></span></th>
             <th class="sortable" data-key="qty">Qty <span class="sort-arrow"><i class="bi bi-caret-down-fill"></i></span></th>
             <th class="sortable" data-key="volume">Volume <span class="sort-arrow"><i class="bi bi-caret-down-fill"></i></span></th>
-            <th class="sortable" data-key="score">Signal</th>
             <th class="col-breaklog">Break Log</th>
           </tr>
         </thead>
@@ -2332,95 +2298,6 @@ html.hide-etf #etfSwingSection{ display:none !important; }
       <div class="explorer-body table-scroll" style="padding:16px 20px;">
         <div class="idx-grid" id="globalIdxGrid"></div>
       </div>
-    </div>
-  </div>
-</div>
-
-<!-- ============ STRATEGY GUIDE MODAL ============ -->
-<div class="modal-overlay" id="strategyGuideOverlay">
-  <div class="modal-box doc">
-    <div class="modal-head">
-      <div>
-        <div style="font-weight:800; font-size:16px;">ORB vs DRB: Breakout Strategy Logic Explained</div>
-        <div class="explorer-meta">How the scanner decides what counts as a breakout</div>
-      </div>
-      <button class="icon-btn" id="strategyGuideClose"><i class="bi bi-x-lg"></i></button>
-    </div>
-    <div class="strategy-doc">
-      <p>Our scanner runs two intraday breakout strategies side by side — <strong>ORB (Opening Range Breakout)</strong> and <strong>DRB (Daily Range Breakout)</strong>. Both flag stocks breaking out of a key price level, but they define that level differently, confirm breaks differently, and are tuned for different moments in the trading day.</p>
-
-      <h4><span class="doc-tag orb">ORB</span> Opening Range Breakout</h4>
-      <p><strong>The level:</strong> The high and low formed during the first 15 minutes of today's session (9:15–9:30 AM), captured fresh once per day right after the window closes.</p>
-      <p><strong>The idea:</strong> The opening 15 minutes reflects where buyers and sellers first agree on value for the day. A decisive move beyond that range signals which side is in control for the session.</p>
-      <p><strong>How a break is confirmed:</strong> Unlike a simple live-price check, ORB does <strong>not</strong> count a break the moment price ticks across the line, and it does <strong>not</strong> keep re-counting a break just because price is still sitting beyond the level. Instead, it uses the same crossover/crossunder logic as the Pine Script version:</p>
-      <ol>
-        <li>Price data is resampled into 3-minute candles.</li>
-        <li>Every ~3 minutes, the scanner checks the <strong>two most recently closed</strong> 3-minute candles (never the one still forming, and never a live WebSocket tick).</li>
-        <li>A break only counts on a genuine <strong>crossover</strong>: the previous closed candle's close was at-or-inside the range, and the current closed candle's close is beyond it (and symmetrically for a crossunder on the low).</li>
-      </ol>
-      <div class="doc-callout"><i class="bi bi-info-circle-fill"></i><div>This filters out both brief "wick pokes" (a stock spiking across the level for a few seconds and snapping back) and repeat detections while a stock simply stays beyond the level candle after candle.</div></div>
-      <p><strong>Re-entry handling:</strong> If a stock was confirmed broken and a later 3-minute candle closes back inside the range, that only resets the internal breakout state — it is <strong>not</strong> written to the Break Log. If price then crosses out again later, that's logged as a brand-new break, same as Pine Script only incrementing its breakout count on an actual crossover/crossunder.</p>
-      <p><strong>RVOL at breakout:</strong> Calculated once, at the moment of the crossover — this candle's own volume ÷ the average volume of the previous 20 completed 3-minute candles — and frozen into that Break Log entry permanently.</p>
-      <p><strong>Break time:</strong> The candle's own close time is recorded, not the wall-clock time the scan happened to run.</p>
-      <p><strong>Why 3-minute candles:</strong> It's a middle ground — fast enough to catch the move early in the session, slow enough to avoid reacting to 1-minute noise.</p>
-
-      <hr>
-
-      <h4><span class="doc-tag drb">DRB</span> Daily Range Breakout</h4>
-      <p><strong>The level:</strong> Yesterday's high and low (the full previous trading session's range) — not today's opening range.</p>
-      <p><strong>The idea:</strong> Rather than reacting to today's first few minutes, DRB asks whether price is breaking into territory it didn't reach <em>at all</em> yesterday — a stronger, longer-horizon breakout signal.</p>
-      <p><strong>How a break is confirmed:</strong> DRB uses a simpler, faster method than ORB — a <strong>live tick comparison</strong>, checked on every price poll:</p>
-      <pre><code>broke_high = live_price &gt; yesterday_high
-broke_low  = live_price &lt; yesterday_low</code></pre>
-      <p>No candle-close confirmation — the moment price crosses yesterday's high/low on a live quote, it counts. This makes DRB more immediate but also more prone to noise than ORB's candle-confirmed approach.</p>
-      <p><strong>The 15-minute "cool-down":</strong> A DRB breakout in the first 15 minutes after market open is deliberately <strong>ignored</strong> (downgraded to WATCH). Right at the open, price is often just reacting to an overnight gap — not a genuine intraday breakout — so the scanner waits until the gap has settled before trusting a DRB signal.</p>
-
-      <hr>
-
-      <h4><span class="doc-tag shared">Shared</span> Filters Applied to Both</h4>
-      <p>A raw price breakout alone isn't treated as tradeable. Every signal — ORB or DRB — is passed through the same quality filters before it's shown as BUY or SELL:</p>
-      <div class="doc-scroll">
-        <table>
-          <thead><tr><th>Filter</th><th>Condition</th><th>Effect</th></tr></thead>
-          <tbody>
-            <tr><td><strong>Trend strength</strong></td><td>ADX(14) &lt; 20</td><td>Signal downgraded to WATCH (no clear trend)</td></tr>
-            <tr><td><strong>Volume confirmation</strong></td><td>RVOL &lt; 1.0</td><td>Signal downgraded to WATCH (below-average volume)</td></tr>
-            <tr><td><strong>Composite score</strong></td><td>7-factor weighted score</td><td>Must score ≥65/100 for BUY, ≤35/100 for SELL</td></tr>
-          </tbody>
-        </table>
-      </div>
-
-      <p style="font-weight:700; color:var(--text-primary); margin-bottom:8px;">The 7-Factor Composite Score</p>
-      <p>Each stock's breakout direction is just one of seven inputs into a score (rescaled to 0–100):</p>
-      <ol>
-        <li>Price above/below EMA(9)</li>
-        <li>Supertrend direction (Uptrend/Downtrend)</li>
-        <li>MACD vs MACD signal line</li>
-        <li>RSI(14) — above 55 bullish, below 45 bearish, neutral between</li>
-        <li>Price above/below the day's pivot point <span class="doc-note">(classic (H+L+C)/3 from yesterday's candle)</span></li>
-        <li>Gap direction (today's open vs. yesterday's close)</li>
-        <li>The breakout itself (ORB or DRB, depending on which scan is running)</li>
-      </ol>
-      <p>This means a breakout on its own is never enough to trigger BUY/SELL — it has to align with trend, momentum, and volume at the same time.</p>
-
-      <hr>
-
-      <h4><i class="bi bi-columns-gap" style="color:var(--text-secondary); font-size:14px;"></i> Quick Comparison</h4>
-      <div class="doc-scroll">
-        <table>
-          <thead><tr><th></th><th>ORB</th><th>DRB</th></tr></thead>
-          <tbody>
-            <tr><td>Level used</td><td>First 15-min opening range (today)</td><td>Previous day's high/low</td></tr>
-            <tr><td>Confirmation</td><td>3-min candle-close <strong>crossover</strong> of level</td><td>Live tick crossing the level</td></tr>
-            <tr><td>Speed</td><td>Slower, filters out noise</td><td>Faster, more reactive</td></tr>
-            <tr><td>Early-session handling</td><td>N/A — window defines itself at 9:30</td><td>Breakouts ignored for first 15 min (gap filter)</td></tr>
-            <tr><td>Reversal tracking</td><td>Silent state reset, no log entry</td><td>Re-evaluated on every poll</td></tr>
-            <tr><td>Best suited for</td><td>Trend/momentum days building off the open</td><td>Stocks pushing into genuinely new territory vs. the prior session</td></tr>
-          </tbody>
-        </table>
-      </div>
-
-      <p class="doc-note" style="margin-top:4px;">Both scans still require the same volume (RVOL ≥ 1) and trend-strength (ADX ≥ 20) confirmation, and both feed into the same 7-factor scoring model — the only structural difference is how the breakout level itself is defined and confirmed.</p>
     </div>
   </div>
 </div>
@@ -3382,20 +3259,6 @@ document.getElementById("globalMarketsOverlay").addEventListener("click", functi
   if(e.target === this) closeGlobalMarkets();
 });
 
-/* ---------------- Strategy Guide modal ---------------- */
-function openStrategyGuide(){
-  document.getElementById("strategyGuideOverlay").classList.add("show");
-}
-function closeStrategyGuide(){
-  document.getElementById("strategyGuideOverlay").classList.remove("show");
-}
-document.getElementById("strategyGuideBtn").addEventListener("click", openStrategyGuide);
-document.getElementById("strategyGuideInlineBtn").addEventListener("click", openStrategyGuide);
-document.getElementById("strategyGuideClose").addEventListener("click", closeStrategyGuide);
-document.getElementById("strategyGuideOverlay").addEventListener("click", function(e){
-  if(e.target === this) closeStrategyGuide();
-});
-
 /* ---------------- FII/DII ---------------- */
 let fiiDiiData = null; // raw last-known payload from /fii-dii
 
@@ -4113,6 +3976,8 @@ function renderAll(){
   document.getElementById("orbSellCount").textContent = orbRows.filter(r => r.signal === "SELL").length;
   document.getElementById("drbBuyCount").textContent = drbRows.filter(r => r.signal === "BUY").length;
   document.getElementById("drbSellCount").textContent = drbRows.filter(r => r.signal === "SELL").length;
+  document.getElementById("orbTotalCount").textContent = `${orbRows.length.toLocaleString('en-IN')} stocks`;
+  document.getElementById("drbTotalCount").textContent = `${drbRows.length.toLocaleString('en-IN')} stocks`;
 
   // if the explorer modal is currently open, refresh its data reference and re-render it too
   if(document.getElementById("explorerOverlay").classList.contains("show") && currentExplorerStrategy){
@@ -4582,12 +4447,11 @@ function renderExplorer(){
       <td><div class="sym sym-link ${r.live ? 'sym-live' : 'sym-closed'}" onclick="openChartModal('${r.sym}')" title="${r.live ? 'Live — market open' : 'Market closed — showing last known price'}">${r.sym} <i class="bi bi-graph-up"></i></div>${rowActionIconsHtml(r.sym, r.price)}</td>
       <td class="cell-sub">${r.name}</td>
       <td class="cell-sub col-sector">${r.sector}</td>
-      <td><span class="chg-txt ${r.chg >= 0 ? 'up' : 'down'}">${r.chg >= 0 ? '+' : ''}${r.chg.toFixed(2)}%</span></td>
+      <td class="chg-signal-cell"><span class="chg-txt ${r.chg >= 0 ? 'up' : 'down'}">${r.chg >= 0 ? '+' : ''}${r.chg.toFixed(2)}%</span>${comboChip(r, false)}</td>
       <td><span class="rovl-tag ${r.rovl > 1.2 ? 'hot' : 'normal'}">${r.rovl}${r.rovl > 1.2 ? ' 🔥' : ''}</span></td>
       <td class="mono">${r.price.toLocaleString('en-IN')}</td>
       <td class="mono">${r.qty.toLocaleString('en-IN')}</td>
       <td class="mono cell-sub">${formatVolume(r.volume)}</td>
-      <td>${comboChip(r, false)}</td>
       <td class="mono cell-sub break-log-cell">${renderBreakLog(r.breakLog)}</td>
     </tr>
   `).join("");
@@ -5368,7 +5232,7 @@ document.getElementById("chartNewsCloseBtn").addEventListener("click", closeChar
 function openChartModal(symbol, isEtf){
   currentChartSymbol = symbol;
   currentChartIsEtf = !!isEtf;
-  currentChartTimeframe = "3min"; // always opens on 3min by default
+  currentChartTimeframe = isEtf ? "daily" : "3min"; // ETF charts default to 1D; stock charts still default to 3min
   currentChartCanvasEl = null; // forces a fresh DOM build for this (possibly new) symbol
   const row = findRowForSymbol(symbol);
   document.getElementById("chartTitle").textContent = symbol;
