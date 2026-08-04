@@ -815,23 +815,6 @@ tr.pinned-row{ background:var(--brand-dim); }
 .dashboard-top-disclaimer i{ font-size:14px; margin-top:1px; flex-shrink:0; color:var(--text-secondary); }
 
 .market-news-bar{
-.sentiment-banner{
-  display:flex; align-items:center; gap:14px;
-  border-radius:var(--radius-md); padding:14px 18px; margin-bottom:16px;
-  border:1px solid var(--border-soft);
-}
-.sentiment-emoji{ font-size:28px; line-height:1; flex-shrink:0; }
-.sentiment-label{ font-size:15px; font-weight:800; letter-spacing:.01em; }
-.sentiment-detail{ font-size:12px; color:var(--text-muted); margin-top:2px; }
-.sentiment-banner.bullish{ background:var(--bull-dim); border-color:rgba(34,197,94,.35); }
-.sentiment-banner.bullish .sentiment-label{ color:var(--bull); }
-.sentiment-banner.bearish{ background:var(--bear-dim); border-color:rgba(239,68,68,.35); }
-.sentiment-banner.bearish .sentiment-label{ color:var(--bear); }
-.sentiment-banner.sideways{ background:rgba(234,179,8,.12); border-color:rgba(234,179,8,.35); }
-.sentiment-banner.sideways .sentiment-label{ color:#EAB308; }
-.sentiment-banner.volatile{ background:rgba(249,115,22,.12); border-color:rgba(249,115,22,.35); }
-.sentiment-banner.volatile .sentiment-label{ color:#F97316; }
-
   display:flex; align-items:center; gap:12px;
   background:var(--bg-surface); border:1px solid var(--border-soft); border-radius:var(--radius-md);
   padding:9px 14px; margin-bottom:16px; overflow:hidden;
@@ -1780,15 +1763,6 @@ html.hide-etf #etfSwingSection{ display:none !important; }
         <div class="market-news-track" id="marketNewsTrack">
           <span class="market-news-item cell-sub">Loading live headlines…</span>
         </div>
-      </div>
-    </div>
-
-    <!-- MARKET SENTIMENT (India VIX + Nifty trend) -->
-    <div class="sentiment-banner" id="sentimentBanner" style="display:none;">
-      <span class="sentiment-emoji" id="sentimentEmoji">—</span>
-      <div>
-        <div class="sentiment-label" id="sentimentLabel">—</div>
-        <div class="sentiment-detail" id="sentimentDetail">—</div>
       </div>
     </div>
 
@@ -3534,14 +3508,21 @@ function updateIndicesFromLive(liveIndices){
     if(!idx) return;
     idx.value = li.value.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     idx.chg = li.chg;
-    idx.status = li.chg > 0.05 ? "bull" : li.chg < -0.05 ? "bear" : "neutral";
+    // India VIX is the "fear gauge", not a price index — rising VIX means
+    // rising fear/volatility, which is a BEARISH signal for the market,
+    // and falling VIX (calmer market) is BULLISH. That's the opposite of
+    // every other card here, where a rising value is bullish. Everything
+    // else keeps the normal up=bull/down=bear logic.
+    idx.status = idx.name === "INDIA VIX"
+      ? (li.chg > 0.05 ? "bear" : li.chg < -0.05 ? "bull" : "neutral")
+      : (li.chg > 0.05 ? "bull" : li.chg < -0.05 ? "bear" : "neutral");
   });
   document.getElementById("idxGrid").innerHTML = indices.map(ix => `
     <div class="card-x idx-card ${ix.status}">
       <div class="idx-name">${ix.name}</div>
       <div class="idx-value mono">${ix.value}</div>
       <div class="idx-change ${ix.status}">
-        <i class="bi ${arrow(ix.status)}"></i> ${ix.chg > 0 ? "+" : ""}${ix.chg.toFixed(2)}%
+        <i class="bi ${arrowForChg(ix.chg)}"></i> ${ix.chg > 0 ? "+" : ""}${ix.chg.toFixed(2)}%
       </div>
       <div class="idx-tech-label ${ix.status}">${techLabel(ix.status)}</div>
       ${getExpiryLabel(ix) ? `<div class="idx-expiry mono">${getExpiryLabel(ix)}</div>` : ''}
@@ -3651,6 +3632,11 @@ let orbRows = [];
 let drbRows = [];
 
 const arrow = s => s==="bull" ? "bi-arrow-up-right" : s==="bear" ? "bi-arrow-down-right" : "bi-arrow-right";
+// Arrow icon should always reflect which way the number actually moved —
+// separate from arrow(status) above, since India VIX's status is
+// intentionally inverted (rising VIX = bearish) but the arrow still needs
+// to point up when the VIX value itself went up, not down.
+const arrowForChg = chg => chg > 0.05 ? "bi-arrow-up-right" : chg < -0.05 ? "bi-arrow-down-right" : "bi-arrow-right";
 const barColor = s => s==="bull" ? "var(--bull)" : s==="bear" ? "var(--bear)" : "var(--neutral)";
 const label = s => s==="bull" ? "Bullish" : s==="bear" ? "Bearish" : "Neutral";
 const techLabel = s => s==="bull" ? "Bullish" : s==="bear" ? "Bearish" : "Sideways";
@@ -3662,7 +3648,7 @@ document.getElementById("idxGrid").innerHTML = indices.map(ix => `
     <div class="idx-name">${ix.name}</div>
     <div class="idx-value mono">${ix.value}</div>
     <div class="idx-change ${ix.status}">
-      <i class="bi ${arrow(ix.status)}"></i> ${ix.chg > 0 ? "+" : ""}${ix.chg.toFixed(2)}%
+      <i class="bi ${arrowForChg(ix.chg)}"></i> ${ix.chg > 0 ? "+" : ""}${ix.chg.toFixed(2)}%
     </div>
     <div class="idx-tech-label ${ix.status}">${techLabel(ix.status)}</div>
     ${getExpiryLabel(ix) ? `<div class="idx-expiry mono">${getExpiryLabel(ix)}</div>` : ''}
@@ -6206,37 +6192,6 @@ async function fetchAndApplySectorDrbSwitch(){
 }
 fetchAndApplySectorDrbSwitch();
 setInterval(throttleWhenHidden(fetchAndApplySectorDrbSwitch, 90000), 20000);
-
-/* ---------------- Market Sentiment (India VIX + Nifty trend) ---------------- */
-const SENTIMENT_CONFIG = {
-  bullish:  { emoji: "🟢", label: "Bullish" },
-  bearish:  { emoji: "🔴", label: "Bearish" },
-  sideways: { emoji: "🟡", label: "Sideways" },
-  volatile: { emoji: "🟠", label: "Volatile" },
-};
-async function fetchMarketSentiment(){
-  const base = getBackendUrl();
-  if(!base) return;
-  try {
-    const res = await fetch(base + "/market-sentiment");
-    if(!res.ok) return;
-    const data = await res.json();
-    const banner = document.getElementById("sentimentBanner");
-    if(!data.available){ banner.style.display = "none"; return; }
-    const cfg = SENTIMENT_CONFIG[data.sentiment];
-    if(!cfg) return;
-    banner.className = "sentiment-banner " + data.sentiment;
-    banner.style.display = "flex";
-    document.getElementById("sentimentEmoji").textContent = cfg.emoji;
-    document.getElementById("sentimentLabel").textContent = cfg.label;
-    document.getElementById("sentimentDetail").textContent =
-      `India VIX ${data.vix.toFixed(2)} · Nifty 50 ${data.nifty_chg >= 0 ? '+' : ''}${data.nifty_chg.toFixed(2)}%`;
-  } catch(err){
-    // keep showing whatever was last known
-  }
-}
-fetchMarketSentiment();
-setInterval(throttleWhenHidden(fetchMarketSentiment, 120000), 20000);
 
 document.getElementById("sectorDrbSwitchToggle").addEventListener("change", async function(){
   const msg = document.getElementById("sectorDrbSwitchMsg");
