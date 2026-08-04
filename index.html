@@ -1947,6 +1947,7 @@ html.hide-etf #etfSwingSection{ display:none !important; }
       <div class="settings-divider"></div>
     </div>
 
+    <div id="adminOrbSettingsWrap" style="display:none;">
     <div class="modal-section-lbl">Breakout Windows <span style="color:var(--text-muted); font-weight:500; text-transform:none; letter-spacing:0;">(Strategy ORB — signal detection)</span></div>
     <div style="font-size:11.5px; color:var(--text-muted); margin-bottom:10px;">How long after market open before a breakout counts. This drives actual BUY/SELL signals — separate from the Sector ORB switch below, which only controls what shows in Sector Indices.</div>
     <div class="risk-input-row">
@@ -1995,6 +1996,7 @@ html.hide-etf #etfSwingSection{ display:none !important; }
     <div id="sectorDrbSwitchMsg" style="font-size:11.5px; display:none; margin-top:6px;"></div>
 
     <div class="settings-divider"></div>
+    </div>
 
     <div id="strategyFocusWrap">
       <div class="modal-section-lbl">Strategy Focus</div>
@@ -2547,7 +2549,6 @@ broke_low  = live_price &lt; yesterday_low</code></pre>
       <div class="chart-legend">
         <span class="lg-item"><i class="bi bi-arrow-up-short" style="color:var(--bull);"></i>Buy break</span>
         <span class="lg-item"><i class="bi bi-arrow-down-short" style="color:var(--bear);"></i>Sell break</span>
-        <span class="lg-item"><span style="display:inline-block; width:10px; height:2px; background:#3B82F6; margin-right:3px; vertical-align:middle;"></span>15min ORB</span>
       </div>
       <span class="chart-last-updated" id="chartLastUpdated"></span>
       <span class="chart-market-status-badge" id="chartMarketStatusBadge" style="display:none;"></span>
@@ -2655,6 +2656,7 @@ function showApp(session){
   currentUserIsAdmin = isAdmin;
   document.getElementById("adminDivider").style.display = isAdmin ? "block" : "none";
   document.getElementById("adminSection").style.display = isAdmin ? "block" : "none";
+  document.getElementById("adminOrbSettingsWrap").style.display = isAdmin ? "block" : "none";
   document.getElementById("liveDataSourceSection").style.display = isAdmin ? "block" : "none";
   document.getElementById("strategyFocusWrap").style.display = isAdmin ? "block" : "none";
   document.getElementById("emailAlertsWrap").style.display = isAdmin ? "block" : "none";
@@ -4201,7 +4203,7 @@ function playAlertBell(){
   }
 }
 
-function showBreakToast(strategy, symbol, price, dir, qty, time, rovl){
+function showBreakToast(strategy, symbol, price, dir, qty, time, rovl, channelLabel){
   const wrap = document.getElementById("breakToastWrap");
   const isBuy = dir === "up";
   const toast = document.createElement("div");
@@ -4209,7 +4211,7 @@ function showBreakToast(strategy, symbol, price, dir, qty, time, rovl){
   toast.innerHTML = `
     <div class="break-toast-icon"><i class="bi ${isBuy ? 'bi-arrow-up-short' : 'bi-arrow-down-short'}"></i></div>
     <div class="break-toast-body">
-      <div class="break-toast-top"><strong>${symbol}</strong> <span class="break-toast-strategy">${strategy}</span> <span class="break-toast-time">${time}</span></div>
+      <div class="break-toast-top"><strong>${symbol}</strong> <span class="break-toast-strategy">${channelLabel}</span> <span class="break-toast-time">${time}</span></div>
       <div class="break-toast-detail">₹${price.toLocaleString('en-IN')} · ${isBuy ? 'BUY' : 'SELL'} · Qty ${qty.toLocaleString('en-IN')}${rovl ? ` · RVOL ${rovl}x` : ''}</div>
     </div>`;
   wrap.appendChild(toast);
@@ -4217,36 +4219,66 @@ function showBreakToast(strategy, symbol, price, dir, qty, time, rovl){
   setTimeout(() => {
     toast.classList.remove("show");
     setTimeout(() => toast.remove(), 300);
-  }, 6000);
+  }, 10000); // was 6000 — increased to the required 10s full visibility
 }
 
-// Alerts queue and fire one at a time, spaced 3.5s apart — if several
-// breaks land in the same poll (a fast-moving market can easily do this),
-// firing 5+ notification sounds simultaneously is jarring and easy to
-// miss individually. Spacing them out makes each one actually noticeable.
-const ALERT_QUEUE_SPACING_MS = 3500;
-let alertQueue = [];
-let alertQueueRunning = false;
+// ---------------------------------------------------------------------
+// TWO fully independent alert channels — ORB/DRB breakout alerts and
+// RVOL (Top 10) alerts each get their own queue, spacing timer, and
+// notification history. Neither can block or delay the other; a burst
+// of ORB breaks queuing up has zero effect on when an RVOL alert fires,
+// and vice versa. Previously these shared one single queue, which is
+// exactly what caused them to interfere with each other.
+// ---------------------------------------------------------------------
+const ALERT_QUEUE_SPACING_MS = 10500; // must exceed the 10s display duration above, so same-channel alerts never visually overlap
 
-function queueBreakNotification(strategy, symbol, price, dir, qty, time, rovl){
-  alertQueue.push({ strategy, symbol, price, dir, qty, time, rovl });
-  if(!alertQueueRunning) processAlertQueue();
+let orbAlertQueue = [];
+let orbAlertQueueRunning = false;
+let orbAlertHistory = []; // {symbol, dir, time, strategy, firedAt} — most recent first, capped
+
+let rvolAlertQueue = [];
+let rvolAlertQueueRunning = false;
+let rvolAlertHistory = [];
+
+const ALERT_HISTORY_MAX = 50;
+
+function queueOrbAlert(strategy, symbol, price, dir, qty, time, rovl){
+  const channelLabel = `${strategy} ${dir === "up" ? "Long" : "Short"} Break`;
+  orbAlertQueue.push({ strategy, symbol, price, dir, qty, time, rovl, channelLabel });
+  if(!orbAlertQueueRunning) processOrbAlertQueue();
 }
-function processAlertQueue(){
-  if(!alertQueue.length){ alertQueueRunning = false; return; }
-  alertQueueRunning = true;
-  const next = alertQueue.shift();
-  fireBreakNotification(next.strategy, next.symbol, next.price, next.dir, next.qty, next.time, next.rovl);
-  setTimeout(processAlertQueue, ALERT_QUEUE_SPACING_MS);
+function processOrbAlertQueue(){
+  if(!orbAlertQueue.length){ orbAlertQueueRunning = false; return; }
+  orbAlertQueueRunning = true;
+  const next = orbAlertQueue.shift();
+  fireBreakNotification(next.strategy, next.symbol, next.price, next.dir, next.qty, next.time, next.rovl, next.channelLabel);
+  orbAlertHistory.unshift({ ...next, firedAt: new Date().toLocaleTimeString('en-IN', { hour:'2-digit', minute:'2-digit' }) });
+  if(orbAlertHistory.length > ALERT_HISTORY_MAX) orbAlertHistory.length = ALERT_HISTORY_MAX;
+  setTimeout(processOrbAlertQueue, ALERT_QUEUE_SPACING_MS);
 }
 
-function fireBreakNotification(strategy, symbol, price, dir, qty, time, rovl){
+function queueRvolAlert(strategy, symbol, price, dir, qty, time, rovl){
+  const channelLabel = `RVOL ${dir === "up" ? "Long" : "Short"}`;
+  rvolAlertQueue.push({ strategy, symbol, price, dir, qty, time, rovl, channelLabel });
+  if(!rvolAlertQueueRunning) processRvolAlertQueue();
+}
+function processRvolAlertQueue(){
+  if(!rvolAlertQueue.length){ rvolAlertQueueRunning = false; return; }
+  rvolAlertQueueRunning = true;
+  const next = rvolAlertQueue.shift();
+  fireBreakNotification(next.strategy, next.symbol, next.price, next.dir, next.qty, next.time, next.rovl, next.channelLabel);
+  rvolAlertHistory.unshift({ ...next, firedAt: new Date().toLocaleTimeString('en-IN', { hour:'2-digit', minute:'2-digit' }) });
+  if(rvolAlertHistory.length > ALERT_HISTORY_MAX) rvolAlertHistory.length = ALERT_HISTORY_MAX;
+  setTimeout(processRvolAlertQueue, ALERT_QUEUE_SPACING_MS);
+}
+
+function fireBreakNotification(strategy, symbol, price, dir, qty, time, rovl, channelLabel){
   playAlertBell();
-  showBreakToast(strategy, symbol, price, dir, qty, time, rovl);
+  showBreakToast(strategy, symbol, price, dir, qty, time, rovl, channelLabel || strategy);
   const isBuy = dir === "up";
   if("Notification" in window && Notification.permission === "granted"){
     try {
-      new Notification(`${symbol} — ${isBuy ? "BUY" : "SELL"} (${strategy})`, {
+      new Notification(`${symbol} — ${channelLabel || strategy}`, {
         body: `${time} · ₹${price.toLocaleString('en-IN')} · Qty ${qty.toLocaleString('en-IN')}${rovl ? ` · RVOL ${rovl}x` : ''}`,
         tag: `${strategy}-${symbol}-${time}`,
       });
@@ -4281,7 +4313,7 @@ function checkForNewBreaksAndAlert(strategy, rows){
     const buyingPower = getBuyingPowerPerTrade();
     eligible.forEach(b => {
       const qty = Math.max(0, Math.floor(buyingPower / b.price));
-      queueBreakNotification(strategy, b.symbol, b.price, b.dir, qty, b.time, b.rovl);
+      queueOrbAlert(strategy, b.symbol, b.price, b.dir, qty, b.time, b.rovl);
     });
   }
 }
@@ -4301,13 +4333,13 @@ function checkTopLongShortAndAlert(allOrbRows){
     longCandidates.forEach(r => {
       if(!prevTop10Long.has(r.sym)){
         const qty = Math.max(0, Math.floor(getBuyingPowerPerTrade() / r.price));
-        queueBreakNotification("LONG", r.sym, r.price, "up", qty, "Top 10", r.rovl);
+        queueRvolAlert("LONG", r.sym, r.price, "up", qty, "Top 10", r.rovl);
       }
     });
     shortCandidates.forEach(r => {
       if(!prevTop10Short.has(r.sym)){
         const qty = Math.max(0, Math.floor(getBuyingPowerPerTrade() / r.price));
-        queueBreakNotification("SHORT", r.sym, r.price, "down", qty, "Top 10", r.rovl);
+        queueRvolAlert("SHORT", r.sym, r.price, "down", qty, "Top 10", r.rovl);
       }
     });
   }
@@ -4859,7 +4891,7 @@ function drawQuadPanel(canvas, candles, opts){
 
   const n = candles.length;
   const slot = w / n;
-  const bodyW = Math.max(1.5, Math.min(9, slot * 0.62));
+  const bodyW = Math.max(1.5, Math.min(11, slot * 0.78)); // was 0.62 — tighter spacing between candles, per request
   const y = v => priceH - ((v - lo) / (hi - lo)) * priceH;
   const x = i => i * slot + slot / 2;
 
