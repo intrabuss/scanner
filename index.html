@@ -1969,6 +1969,18 @@ html.hide-etf #etfSwingSection{ display:none !important; }
     </div>
     <div id="sectorOrbSwitchMsg" style="font-size:11.5px; display:none; margin-top:6px;"></div>
 
+    <div class="toggle-row">
+      <div>
+        <div class="toggle-row-title">Sector DRB Switch</div>
+        <div class="toggle-row-sub">Same idea as the ORB switch above, for DRB's Explore button in Sector Indices — independent of DRB signal detection.</div>
+      </div>
+      <label class="switch">
+        <input type="checkbox" id="sectorDrbSwitchToggle" checked>
+        <span class="switch-slider"></span>
+      </label>
+    </div>
+    <div id="sectorDrbSwitchMsg" style="font-size:11.5px; display:none; margin-top:6px;"></div>
+
     <div class="settings-divider"></div>
 
     <div id="strategyFocusWrap">
@@ -3882,16 +3894,7 @@ function internalSectorFilterFor(realIndexName){
 // indices whose Explore button opens a broader internal category than the
 // real index itself (Explorer can't isolate the exact subset yet).
 const BROADER_FILTER_INDICES = new Set(["Nifty PSU Bank", "Nifty Private Bank", "Nifty Bank", "Nifty Realty", "Nifty Consumer Durables"]);
-
-let sectorIdxTab = "sector"; // "sector" | "broader"
 let sectorIdxRealData = { sector: [], broader: [] };
-
-function switchSectorIdxTab(tab){
-  sectorIdxTab = tab;
-  document.getElementById("sidxTabSector").classList.toggle("active", tab === "sector");
-  document.getElementById("sidxTabBroader").classList.toggle("active", tab === "broader");
-  renderSectorTrend();
-}
 
 async function fetchSectorIndexData(){
   const base = getBackendUrl();
@@ -3933,7 +3936,7 @@ function renderSectorTrend(){
     return { count: breaks.length, dir: buys >= sells ? "bull" : "bear" };
   };
 
-  const realRows = sectorIdxTab === "sector" ? sectorIdxRealData.sector : sectorIdxRealData.broader;
+  const realRows = sectorIdxRealData.sector;
   document.getElementById("sectorIdxEmpty").style.display = realRows.length ? "none" : "block";
   document.getElementById("sectorIdxCount").textContent = realRows.length ? realRows.length + " indices" : "";
   if(!realRows.length){
@@ -4025,7 +4028,7 @@ function renderSectorTrend(){
         ${!internalFilter ? '<span class="cell-sub" style="font-size:11px;">—</span>' : `
         <div class="sector-jump">
           ${sectorOrbEnabled ? `<button type="button" class="sector-jump-btn orb ${sc.orbBreak.count > 0 ? 'has-break ' + sc.orbBreak.dir : ''}" onclick="openExplorer('ORB','all','${internalFilter.replace(/'/g,"\\'")}','${sc.name.replace(/'/g,"\\'")}',${sc.avgChg})" title="${BROADER_FILTER_INDICES.has(sc.name) ? `ORB breakouts — uses the broader ${internalFilter} list, since ${sc.name} isn't split out separately yet` : `ORB breakouts in ${sc.name}`}">ORB${sc.orbBreak.count > 0 ? `<span class="jump-break-badge">${sc.orbBreak.count}</span>` : ''}</button>` : ''}
-          <button type="button" class="sector-jump-btn drb ${sc.drbBreak.count > 0 ? 'has-break ' + sc.drbBreak.dir : ''}" onclick="openExplorer('DRB','all','${internalFilter.replace(/'/g,"\\'")}','${sc.name.replace(/'/g,"\\'")}',${sc.avgChg})" title="${BROADER_FILTER_INDICES.has(sc.name) ? `DRB breakouts — uses the broader ${internalFilter} list, since ${sc.name} isn't split out separately yet` : `DRB breakouts in ${sc.name}`}">DRB${sc.drbBreak.count > 0 ? `<span class="jump-break-badge">${sc.drbBreak.count}</span>` : ''}</button>
+          ${sectorDrbEnabled ? `<button type="button" class="sector-jump-btn drb ${sc.drbBreak.count > 0 ? 'has-break ' + sc.drbBreak.dir : ''}" onclick="openExplorer('DRB','all','${internalFilter.replace(/'/g,"\\'")}','${sc.name.replace(/'/g,"\\'")}',${sc.avgChg})" title="${BROADER_FILTER_INDICES.has(sc.name) ? `DRB breakouts — uses the broader ${internalFilter} list, since ${sc.name} isn't split out separately yet` : `DRB breakouts in ${sc.name}`}">DRB${sc.drbBreak.count > 0 ? `<span class="jump-break-badge">${sc.drbBreak.count}</span>` : ''}</button>` : ''}
           <button type="button" class="sector-alert-bell ${alertEnabledSectors.has(sc.name) ? 'on' : ''}" data-sector="${sc.name.replace(/"/g,'&quot;')}" title="${alertEnabledSectors.has(sc.name) ? 'ORB alerts ON for ' + sc.name + ' — click to turn off' : 'Turn on ORB alerts for ' + sc.name}"><i class="bi bi-bell${alertEnabledSectors.has(sc.name) ? '-fill' : ''}"></i></button>
         </div>`}
       </td>
@@ -6034,6 +6037,54 @@ document.getElementById("sectorOrbSwitchToggle").addEventListener("change", asyn
       msg.style.color = "var(--bear)";
     } else {
       sectorOrbEnabled = newVal;
+      msg.textContent = "Saved.";
+      msg.style.color = "var(--bull)";
+      renderSectorTrend();
+    }
+  } catch(err){
+    this.checked = !newVal;
+    msg.textContent = "Couldn't reach the server.";
+    msg.style.color = "var(--bear)";
+  } finally {
+    this.disabled = false;
+    msg.style.display = "block";
+    setTimeout(() => { msg.style.display = "none"; }, 2500);
+  }
+});
+
+let sectorDrbEnabled = true;
+async function fetchAndApplySectorDrbSwitch(){
+  const base = getBackendUrl();
+  if(!base) return;
+  try {
+    const res = await fetch(base + "/sector-drb-switch");
+    if(!res.ok) throw new Error("HTTP " + res.status);
+    const data = await res.json();
+    if(typeof data.enabled === "boolean") sectorDrbEnabled = data.enabled;
+  } catch(err){
+    // keep whatever we last knew
+  }
+  document.getElementById("sectorDrbSwitchToggle").checked = sectorDrbEnabled;
+  renderSectorTrend();
+}
+fetchAndApplySectorDrbSwitch();
+setInterval(throttleWhenHidden(fetchAndApplySectorDrbSwitch, 90000), 20000);
+
+document.getElementById("sectorDrbSwitchToggle").addEventListener("change", async function(){
+  const msg = document.getElementById("sectorDrbSwitchMsg");
+  const newVal = this.checked;
+  this.disabled = true;
+  try {
+    const res = await fetch(getBackendUrl() + "/sector-drb-switch", {
+      method: "POST", headers: adminHeaders(), body: JSON.stringify({ enabled: newVal })
+    });
+    const data = await res.json();
+    if(!data.success){
+      this.checked = !newVal;
+      msg.textContent = data.error === "unauthorized" ? "Admin PIN check failed." : "Couldn't save. Try again.";
+      msg.style.color = "var(--bear)";
+    } else {
+      sectorDrbEnabled = newVal;
       msg.textContent = "Saved.";
       msg.style.color = "var(--bull)";
       renderSectorTrend();
