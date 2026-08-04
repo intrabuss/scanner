@@ -6381,7 +6381,7 @@ async function loadEtfSwing(silent){
       }
     } else {
       etfSwingData = data.etfs || [];
-      document.getElementById("etfSwingCount").textContent = `${data.universe_size || etfSwingData.length} ETFs · live · updated ${data.computed_at || ''}`;
+      document.getElementById("etfSwingCount").textContent = `${etfSwingData.length} ETFs · live · updated ${data.computed_at || ''}`;
       if(!etfSwingData.length && !silent) empty.textContent = "No ETF data returned — check the symbols still match your data source's instrument list.";
     }
     populateEtfSectorFilter();
