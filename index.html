@@ -4348,7 +4348,12 @@ function checkForNewBreaksAndAlert(strategy, rows){
       const key = `${r.sym}|${e.time}|${e.dir}`;
       if(seen.has(key)) return;
       seen.add(key);
-      if(breakBaselineSet[strategy]) newBreaks.push({ symbol: r.sym, price: r.price, dir: e.dir, time: e.time, rovl: r.rovl || 0, sector: r.sector });
+      // The alert must show the RVOL that was FROZEN at the moment this
+      // break was confirmed (e.rvol, from the backend's break log entry) —
+      // not the row's live/current RVOL (r.rvol), which keeps changing on
+      // every later poll and would make the alert show a drifted number
+      // instead of what was actually true at breakout.
+      if(breakBaselineSet[strategy]) newBreaks.push({ symbol: r.sym, price: r.price, dir: e.dir, time: e.time, rovl: (e.rvol != null ? e.rvol : (r.rvol || 0)), sector: r.sector });
     });
   });
   breakBaselineSet[strategy] = true;
@@ -4493,7 +4498,7 @@ function renderBreakLog(entries){
       color = isUp ? "var(--bull)" : "var(--bear)";
       arrow = isUp ? "↑" : "↓";
     }
-    const label = e.rvol != null ? `(${e.rvol}x)` : "";
+    const label = e.rvol != null ? ` (${e.rvol}x)` : "";
     return `<span style="color:${color}; white-space:nowrap; margin-right:8px;">${arrow}${e.time}${label}</span>`;
   }).join("");
 }
