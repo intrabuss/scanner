@@ -815,6 +815,23 @@ tr.pinned-row{ background:var(--brand-dim); }
 .dashboard-top-disclaimer i{ font-size:14px; margin-top:1px; flex-shrink:0; color:var(--text-secondary); }
 
 .market-news-bar{
+.sentiment-banner{
+  display:flex; align-items:center; gap:14px;
+  border-radius:var(--radius-md); padding:14px 18px; margin-bottom:16px;
+  border:1px solid var(--border-soft);
+}
+.sentiment-emoji{ font-size:28px; line-height:1; flex-shrink:0; }
+.sentiment-label{ font-size:15px; font-weight:800; letter-spacing:.01em; }
+.sentiment-detail{ font-size:12px; color:var(--text-muted); margin-top:2px; }
+.sentiment-banner.bullish{ background:var(--bull-dim); border-color:rgba(34,197,94,.35); }
+.sentiment-banner.bullish .sentiment-label{ color:var(--bull); }
+.sentiment-banner.bearish{ background:var(--bear-dim); border-color:rgba(239,68,68,.35); }
+.sentiment-banner.bearish .sentiment-label{ color:var(--bear); }
+.sentiment-banner.sideways{ background:rgba(234,179,8,.12); border-color:rgba(234,179,8,.35); }
+.sentiment-banner.sideways .sentiment-label{ color:#EAB308; }
+.sentiment-banner.volatile{ background:rgba(249,115,22,.12); border-color:rgba(249,115,22,.35); }
+.sentiment-banner.volatile .sentiment-label{ color:#F97316; }
+
   display:flex; align-items:center; gap:12px;
   background:var(--bg-surface); border:1px solid var(--border-soft); border-radius:var(--radius-md);
   padding:9px 14px; margin-bottom:16px; overflow:hidden;
@@ -1762,6 +1779,15 @@ html.hide-etf #etfSwingSection{ display:none !important; }
         <div class="market-news-track" id="marketNewsTrack">
           <span class="market-news-item cell-sub">Loading live headlines…</span>
         </div>
+      </div>
+    </div>
+
+    <!-- MARKET SENTIMENT (India VIX + Nifty trend) -->
+    <div class="sentiment-banner" id="sentimentBanner" style="display:none;">
+      <span class="sentiment-emoji" id="sentimentEmoji">—</span>
+      <div>
+        <div class="sentiment-label" id="sentimentLabel">—</div>
+        <div class="sentiment-detail" id="sentimentDetail">—</div>
       </div>
     </div>
 
@@ -4791,6 +4817,7 @@ function hideChartMsg(){
    through the ORB level (from the backend break log).
 ===================================================================== */
 const CHART_PANELS = [
+  { key: "3min",  label: "3min Chart",  showOrb: true  },
   { key: "5min",  label: "5min Chart",  showOrb: true  },
   { key: "15min", label: "15min Chart", showOrb: true  },
   { key: "60min", label: "Hour Chart",  showOrb: true  },
@@ -5094,6 +5121,7 @@ function renderQuadChart(data, isEtf){
         <div class="chart-tf-toggle">
           <button type="button" class="chart-tf-btn" id="chartTfDaily">1D</button>
           <button type="button" class="chart-tf-btn" id="chartTfIntraday">15min</button>
+          <button type="button" class="chart-tf-btn" id="chartTf3min">3min</button>
         </div>
       </div>
       <div class="chart-quad-ema-legend"></div>
@@ -5109,6 +5137,7 @@ function renderQuadChart(data, isEtf){
     window.addEventListener("resize", debounce(() => drawCurrentChartPanel(), 150));
     document.getElementById("chartTfDaily").addEventListener("click", () => switchChartTimeframe("daily"));
     document.getElementById("chartTfIntraday").addEventListener("click", () => switchChartTimeframe("15min"));
+    document.getElementById("chartTf3min").addEventListener("click", () => switchChartTimeframe("3min"));
   }
 
   updateChartTfToggleUI();
@@ -5154,9 +5183,11 @@ function switchChartTimeframe(tf){
 function updateChartTfToggleUI(){
   const dailyBtn = document.getElementById("chartTfDaily");
   const intradayBtn = document.getElementById("chartTfIntraday");
+  const threeMinBtn = document.getElementById("chartTf3min");
   if(!dailyBtn) return;
   dailyBtn.classList.toggle("active", currentChartTimeframe === "daily");
   intradayBtn.classList.toggle("active", currentChartTimeframe === "15min");
+  threeMinBtn.classList.toggle("active", currentChartTimeframe === "3min");
 }
 
 async function loadChart(symbol){
@@ -6116,6 +6147,37 @@ async function fetchAndApplySectorDrbSwitch(){
 }
 fetchAndApplySectorDrbSwitch();
 setInterval(throttleWhenHidden(fetchAndApplySectorDrbSwitch, 90000), 20000);
+
+/* ---------------- Market Sentiment (India VIX + Nifty trend) ---------------- */
+const SENTIMENT_CONFIG = {
+  bullish:  { emoji: "🟢", label: "Bullish" },
+  bearish:  { emoji: "🔴", label: "Bearish" },
+  sideways: { emoji: "🟡", label: "Sideways" },
+  volatile: { emoji: "🟠", label: "Volatile" },
+};
+async function fetchMarketSentiment(){
+  const base = getBackendUrl();
+  if(!base) return;
+  try {
+    const res = await fetch(base + "/market-sentiment");
+    if(!res.ok) return;
+    const data = await res.json();
+    const banner = document.getElementById("sentimentBanner");
+    if(!data.available){ banner.style.display = "none"; return; }
+    const cfg = SENTIMENT_CONFIG[data.sentiment];
+    if(!cfg) return;
+    banner.className = "sentiment-banner " + data.sentiment;
+    banner.style.display = "flex";
+    document.getElementById("sentimentEmoji").textContent = cfg.emoji;
+    document.getElementById("sentimentLabel").textContent = cfg.label;
+    document.getElementById("sentimentDetail").textContent =
+      `India VIX ${data.vix.toFixed(2)} · Nifty 50 ${data.nifty_chg >= 0 ? '+' : ''}${data.nifty_chg.toFixed(2)}%`;
+  } catch(err){
+    // keep showing whatever was last known
+  }
+}
+fetchMarketSentiment();
+setInterval(throttleWhenHidden(fetchMarketSentiment, 120000), 20000);
 
 document.getElementById("sectorDrbSwitchToggle").addEventListener("change", async function(){
   const msg = document.getElementById("sectorDrbSwitchMsg");
