@@ -1750,6 +1750,9 @@ html.hide-etf #etfSwingSection{ display:none !important; }
         <button class="icon-btn" id="refreshBtn" title="Refresh data">
           <i class="bi bi-arrow-clockwise"></i>
         </button>
+        <button class="icon-btn" id="alertHistoryBtn" title="Alert history">
+          <i class="bi bi-bell-fill"></i>
+        </button>
 
         <span class="role-badge user" id="roleBadge" style="display:none;"></span>
         <button class="header-logout-btn" id="headerLogoutBtn" title="Log out" style="display:none;">
@@ -2605,6 +2608,23 @@ broke_low  = live_price &lt; yesterday_low</code></pre>
 
 <!-- BREAK ALERT TOASTS -->
 <div id="breakToastWrap"></div>
+
+<!-- ============ ALERT HISTORY MODAL ============ -->
+<div class="modal-overlay" id="alertHistoryOverlay">
+  <div class="modal-box">
+    <div class="modal-head">
+      <div style="font-weight:800; font-size:16px;"><i class="bi bi-bell-fill"></i> Alert History</div>
+      <button class="icon-btn" id="alertHistoryClose"><i class="bi bi-x-lg"></i></button>
+    </div>
+    <div style="display:flex; gap:8px; padding:14px 20px 0;">
+      <button type="button" class="sidx-tab active" id="alertHistTabOrb">ORB Alerts</button>
+      <button type="button" class="sidx-tab" id="alertHistTabRvol">RVOL Alerts</button>
+    </div>
+    <div class="explorer-body table-scroll" style="padding:14px 20px 20px; max-height:400px;">
+      <div id="alertHistoryList"></div>
+    </div>
+  </div>
+</div>
 
 <script>
 /* =====================================================================
@@ -4298,6 +4318,44 @@ function processRvolAlertQueue(){
   setTimeout(processRvolAlertQueue, ALERT_QUEUE_SPACING_MS);
 }
 
+/* ---------------- Alert History modal — one tab per independent channel ---------------- */
+let alertHistoryTab = "orb";
+function renderAlertHistory(){
+  const list = document.getElementById("alertHistoryList");
+  const history = alertHistoryTab === "orb" ? orbAlertHistory : rvolAlertHistory;
+  if(!history.length){
+    list.innerHTML = `<div class="cell-sub" style="text-align:center; padding:24px 0;">No ${alertHistoryTab === "orb" ? "ORB" : "RVOL"} alerts fired yet this session.</div>`;
+    return;
+  }
+  list.innerHTML = history.map(h => `
+    <div class="admin-mobile-row" style="align-items:center;">
+      <span>
+        <strong>${h.symbol}</strong>
+        <span class="cell-sub" style="font-size:11px; margin-left:6px;">${h.channelLabel} · ${h.dir === 'up' ? 'BUY' : 'SELL'} · ₹${h.price.toLocaleString('en-IN')}${h.rovl ? ' · RVOL ' + h.rovl + 'x' : ''}</span>
+      </span>
+      <span class="mono cell-sub" style="font-size:11px;">${h.firedAt}</span>
+    </div>
+  `).join("");
+}
+function switchAlertHistoryTab(tab){
+  alertHistoryTab = tab;
+  document.getElementById("alertHistTabOrb").classList.toggle("active", tab === "orb");
+  document.getElementById("alertHistTabRvol").classList.toggle("active", tab === "rvol");
+  renderAlertHistory();
+}
+document.getElementById("alertHistTabOrb").addEventListener("click", () => switchAlertHistoryTab("orb"));
+document.getElementById("alertHistTabRvol").addEventListener("click", () => switchAlertHistoryTab("rvol"));
+document.getElementById("alertHistoryBtn").addEventListener("click", () => {
+  renderAlertHistory();
+  document.getElementById("alertHistoryOverlay").classList.add("show");
+});
+document.getElementById("alertHistoryClose").addEventListener("click", () => {
+  document.getElementById("alertHistoryOverlay").classList.remove("show");
+});
+document.getElementById("alertHistoryOverlay").addEventListener("click", function(e){
+  if(e.target === this) this.classList.remove("show");
+});
+
 function fireBreakNotification(strategy, symbol, price, dir, qty, time, rovl, channelLabel){
   playAlertBell();
   showBreakToast(strategy, symbol, price, dir, qty, time, rovl, channelLabel || strategy);
@@ -5689,717 +5747,3 @@ async function fetchLiveData(){
     showBackendBanner("online", `Connected — ${orbRows.length} symbols<span id="backendFreshness"> · updated just now</span>`);
     contactAdminShownForOutage = false;
     renderAll();
-    hasLoadedOnce = true;
-    hideInitialLoadOverlay();
-  } catch(err){
-    showBackendBanner("offline", "Can't reach the live backend right now — check the server is running.");
-    if(!hasLoadedOnce) showInitialLoadError("Can't reach the backend — check your Live Data Source in Settings.");
-
-    const session = getSession();
-    const isAdmin = session && session.mobile === ADMIN_MOBILE;
-    if(!isAdmin && !contactAdminShownForOutage){
-      contactAdminShownForOutage = true;
-      document.getElementById("contactAdminOverlay").classList.add("show");
-    }
-  } finally {
-    hideCalcPill();
-    fetchLiveDataInFlight = false;
-  }
-}
-
-function startBackendPolling(){
-  fetchLiveData();
-  fetchMarketNews();
-  if(backendPollTimer) clearInterval(backendPollTimer);
-  // Was 20s when every poll meant a fresh Upstox REST call server-side.
-  // Now that get_live_rows() just reads the WebSocket feed's in-memory
-  // tick cache (no network call per request), that constraint is gone —
-  // tightened to 3s. Kept conservative rather than going to ~1s since the
-  // droplet is only 1 vCPU and this hasn't been load-tested for real;
-  // worth tuning further once you've seen it hold up under a live session.
-  backendPollTimer = setInterval(throttleWhenHidden(fetchLiveData, 60000), 3000);
-}
-
-document.getElementById("backendUrlSaveBtn").addEventListener("click", function(){
-  const val = document.getElementById("backendUrlInput").value.trim();
-  localStorage.setItem(BACKEND_URL_KEY, val);
-  const msg = document.getElementById("backendUrlMsg");
-  msg.style.display = "block";
-  setTimeout(() => { msg.style.display = "none"; }, 2000);
-  startBackendPolling();
-});
-
-document.getElementById("saveWindowsBtn").addEventListener("click", async function(){
-  const orbMin = document.getElementById("orbWindowSelect").value;
-  const drbMin = document.getElementById("drbWindowSelect").value;
-  const base = getBackendUrl();
-  const msg = document.getElementById("windowsMsg");
-  if(!base){
-    msg.textContent = "Set your Live Data Source first.";
-    msg.style.color = "var(--bear)";
-    msg.style.display = "block";
-    return;
-  }
-  try {
-    const res = await fetch(base + "/config", {
-      method: "POST",
-      headers: adminHeaders(),
-      body: JSON.stringify({ orb_window_minutes: parseInt(orbMin), drb_window_minutes: parseInt(drbMin) })
-    });
-    if(!res.ok) throw new Error("HTTP " + res.status);
-    msg.textContent = "Saved — server will use these from tomorrow's cache build.";
-    msg.style.color = "var(--bull)";
-  } catch(err){
-    msg.textContent = "Couldn't reach the server to save this.";
-    msg.style.color = "var(--bear)";
-  }
-  msg.style.display = "block";
-  setTimeout(() => { msg.style.display = "none"; }, 3000);
-});
-
-/* ---------------- Scan Size ---------------- */
-let scanModePollTimer = null;
-
-function setScanModeButtonsState(mode, rebuilding){
-  document.querySelectorAll("#scanModeSection .scan-mode-btn").forEach(btn => {
-    btn.classList.toggle("active", btn.dataset.mode === mode);
-    btn.classList.toggle("rebuilding", rebuilding);
-  });
-}
-
-async function refreshScanModeUI(){
-  const base = getBackendUrl();
-  if(!base) return;
-  try {
-    const res = await fetch(base + "/health");
-    if(!res.ok) throw new Error("HTTP " + res.status);
-    const data = await res.json();
-    const sizes = data.scan_mode_sizes || {};
-    const activeLoaded = data.daily_cache_size;
-    const nifty500Sub = sizes.nifty500 != null ? `${sizes.nifty500.toLocaleString('en-IN')} stocks · ~3 min rebuild` : '';
-    const fullSub = sizes.full != null ? `${sizes.full.toLocaleString('en-IN')} stocks · ~20-25 min rebuild` : '';
-    document.getElementById("scanModeNifty500Sub").textContent =
-      (data.scan_mode === "nifty500" && activeLoaded != null) ? `${nifty500Sub} · ${activeLoaded.toLocaleString('en-IN')} loaded now` : nifty500Sub;
-    document.getElementById("scanModeFullSub").textContent =
-      (data.scan_mode === "full" && activeLoaded != null) ? `${fullSub} · ${activeLoaded.toLocaleString('en-IN')} loaded now` : fullSub;
-
-    // Reflect whatever the admin actually has selected on the server —
-    // not just a hardcoded default — so this stays accurate after a
-    // page reload, a different device, or a restart.
-    const rebuilding = data.universe_rebuild && data.universe_rebuild.state === "rebuilding";
-    setScanModeButtonsState(data.scan_mode, rebuilding);
-
-    const msg = document.getElementById("scanModeMsg");
-    if(rebuilding){
-      msg.textContent = `Rebuilding for "${data.universe_rebuild.mode === 'nifty500' ? 'Nifty 500' : 'Full Market'}" (started ${data.universe_rebuild.started_at}) — dashboard keeps serving today's existing data meanwhile.`;
-      msg.style.color = "var(--text-muted)";
-      msg.style.display = "block";
-      if(!scanModePollTimer) scanModePollTimer = setInterval(throttleWhenHidden(refreshScanModeUI, 60000), 15000);
-    } else {
-      if(scanModePollTimer){ clearInterval(scanModePollTimer); scanModePollTimer = null; }
-      msg.style.display = "none";
-    }
-  } catch(err){
-    // silent — settings panel just won't show live state until reachable
-  }
-}
-
-document.querySelectorAll("#scanModeSection .scan-mode-btn").forEach(btn => {
-  btn.addEventListener("click", async function(){
-    const mode = this.dataset.mode;
-    const base = getBackendUrl();
-    const msg = document.getElementById("scanModeMsg");
-    if(!base){
-      msg.textContent = "Set your Live Data Source first.";
-      msg.style.color = "var(--bear)";
-      msg.style.display = "block";
-      return;
-    }
-    try {
-      const res = await fetch(base + "/config/scan-mode", {
-        method: "POST",
-        headers: adminHeaders(),
-        body: JSON.stringify({ mode })
-      });
-      const data = await res.json();
-      if(data.error){
-        msg.textContent = data.error;
-        msg.style.color = "var(--bear)";
-        msg.style.display = "block";
-        return;
-      }
-      refreshScanModeUI();
-    } catch(err){
-      msg.textContent = "Couldn't reach the server to switch scan size.";
-      msg.style.color = "var(--bear)";
-      msg.style.display = "block";
-    }
-  });
-});
-
-// Refresh scan-mode info whenever Settings is opened
-document.getElementById("settingsBtn")?.addEventListener("click", refreshScanModeUI);
-
-/* ---------------- Email Alerts ---------------- */
-async function loadEmailConfig(){
-  const base = getBackendUrl();
-  if(!base) return;
-  try {
-    const res = await fetch(base + "/email-config");
-    if(!res.ok) return;
-    const data = await res.json();
-    document.getElementById("emailToInput").value = data.to || "";
-    if(!data.configured){
-      const msg = document.getElementById("emailAlertsMsg");
-      msg.textContent = "No email provider configured on the server yet (RESEND_API_KEY or EMAIL_FROM/EMAIL_APP_PASSWORD) — sending will fail until set.";
-      msg.style.color = "var(--text-muted)";
-      msg.style.display = "block";
-    }
-  } catch(err){
-    // settings panel just won't prefill the address until reachable
-  }
-}
-document.getElementById("settingsBtn")?.addEventListener("click", loadEmailConfig);
-
-document.getElementById("emailToSaveBtn").addEventListener("click", async function(){
-  const base = getBackendUrl();
-  const msg = document.getElementById("emailAlertsMsg");
-  const to = document.getElementById("emailToInput").value.trim();
-  if(!base){ msg.textContent = "Set your Live Data Source first."; msg.style.color = "var(--bear)"; msg.style.display = "block"; return; }
-  try {
-    const res = await fetch(base + "/email-config", {
-      method: "POST", headers: adminHeaders(), body: JSON.stringify({ to })
-    });
-    const data = await res.json();
-    if(!data.success){
-      msg.textContent = data.error === "unauthorized" ? "Admin PIN check failed — try logging out and back in." : data.error === "invalid_email" ? "Enter a valid email address." : "Couldn't save that.";
-      msg.style.color = "var(--bear)";
-    } else {
-      msg.textContent = `Saved — alerts will go to ${data.to}.`;
-      msg.style.color = "var(--bull)";
-    }
-    msg.style.display = "block";
-  } catch(err){
-    msg.textContent = "Couldn't reach the server to save this.";
-    msg.style.color = "var(--bear)";
-    msg.style.display = "block";
-  }
-});
-
-document.getElementById("emailEtfSendBtn").addEventListener("click", async function(){
-  const base = getBackendUrl();
-  const msg = document.getElementById("emailAlertsMsg");
-  const btn = this;
-  if(!base){ msg.textContent = "Set your Live Data Source first."; msg.style.color = "var(--bear)"; msg.style.display = "block"; return; }
-  btn.disabled = true;
-  btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Sending…';
-  try {
-    const res = await fetch(base + "/email/etf-buy-list", { method: "POST", headers: adminHeaders() });
-    const data = await res.json();
-    msg.textContent = data.success ? data.message : (data.error === "unauthorized" ? "Admin PIN check failed — try logging out and back in." : data.message || "Send failed.");
-    msg.style.color = data.success ? "var(--bull)" : "var(--bear)";
-    msg.style.display = "block";
-  } catch(err){
-    msg.textContent = "Couldn't reach the server to send this.";
-    msg.style.color = "var(--bear)";
-    msg.style.display = "block";
-  } finally {
-    btn.disabled = false;
-    btn.innerHTML = '<i class="bi bi-envelope"></i> Send ETF Buy List Now';
-  }
-});
-
-/* ---------------- Email Alerts: daily auto-send schedule ---------------- */
-async function loadEmailSchedule(){
-  const base = getBackendUrl();
-  if(!base) return;
-  try {
-    const res = await fetch(base + "/email-schedule");
-    if(!res.ok) return;
-    const data = await res.json();
-    document.getElementById("emailScheduleToggle").checked = !!data.enabled;
-    if(data.time) document.getElementById("emailScheduleTime").value = data.time;
-  } catch(err){
-    // settings panel just won't prefill the schedule until reachable
-  }
-}
-document.getElementById("settingsBtn")?.addEventListener("click", loadEmailSchedule);
-
-async function saveEmailSchedule(){
-  const base = getBackendUrl();
-  const msg = document.getElementById("emailScheduleMsg");
-  const enabled = document.getElementById("emailScheduleToggle").checked;
-  const scheduleTime = document.getElementById("emailScheduleTime").value || "09:00";
-  if(!base){ msg.textContent = "Set your Live Data Source first."; msg.style.color = "var(--bear)"; msg.style.display = "block"; return; }
-  try {
-    const res = await fetch(base + "/email-schedule", {
-      method: "POST", headers: adminHeaders(), body: JSON.stringify({ enabled, time: scheduleTime })
-    });
-    const data = await res.json();
-    if(!data.success){
-      msg.textContent = data.error === "unauthorized" ? "Admin PIN check failed — try logging out and back in." : data.error === "invalid_time" ? "Enter a valid time." : "Couldn't save that.";
-      msg.style.color = "var(--bear)";
-    } else {
-      msg.textContent = data.enabled ? `Auto-send is ON — daily at ${data.time}.` : "Auto-send is OFF.";
-      msg.style.color = "var(--bull)";
-    }
-    msg.style.display = "block";
-  } catch(err){
-    msg.textContent = "Couldn't reach the server to save this.";
-    msg.style.color = "var(--bear)";
-    msg.style.display = "block";
-  }
-}
-document.getElementById("emailScheduleToggle").addEventListener("change", saveEmailSchedule);
-document.getElementById("emailScheduleTime").addEventListener("change", saveEmailSchedule);
-
-
-/* ---------------- Strategy Focus ----------------
-   Server-side setting (see /strategy-focus in main.py) — applies to
-   EVERY user, not just the admin's own browser. Data-driven so a
-   future 3rd/4th strategy is just one more entry here — no rewrite of
-   the toggle UI needed. Each entry needs a matching CSS rule
-   (html.hide-<key> .sector-jump-btn.<key>, html.hide-<key> #<key>StrategyCard
-   or equivalent) added when that strategy's own UI elements get built. */
-const STRATEGIES = [
-  { key: "orb", label: "ORB Breakout" },
-  { key: "drb", label: "DRB Breakout" },
-  { key: "etf", label: "ETF Swing Screener" },
-];
-
-let lastKnownEnabledStrategies = STRATEGIES.map(s => s.key); // default until the server responds
-
-async function fetchAndApplyStrategyFocus(){
-  const base = getBackendUrl();
-  if(!base){ applyStrategyFocus(lastKnownEnabledStrategies); return; }
-  try {
-    const res = await fetch(base + "/strategy-focus");
-    if(!res.ok) throw new Error("HTTP " + res.status);
-    const data = await res.json();
-    if(Array.isArray(data.enabled) && data.enabled.length){
-      lastKnownEnabledStrategies = data.enabled;
-    }
-  } catch(err){
-    // couldn't reach the server — keep showing whatever we last knew rather than guessing
-  }
-  applyStrategyFocus(lastKnownEnabledStrategies);
-}
-
-function applyStrategyFocus(enabledKeys){
-  STRATEGIES.forEach(s => {
-    document.documentElement.classList.toggle("hide-" + s.key, !enabledKeys.includes(s.key));
-  });
-  document.querySelectorAll("#strategyFocusList .switch input").forEach(input => {
-    input.checked = enabledKeys.includes(input.dataset.key);
-  });
-
-  // Backtest strategy dropdown lets you pick ORB/DRB independently of the
-  // cards/sector buttons — gate it too, and bump the selection off a
-  // disabled option so a hidden-but-still-selected value can't linger.
-  const backtestSelect = document.getElementById("backtestStrategy");
-  if(backtestSelect){
-    Array.from(backtestSelect.options).forEach(opt => {
-      opt.disabled = !enabledKeys.includes(opt.value.toLowerCase());
-      opt.hidden = opt.disabled;
-    });
-    if(backtestSelect.selectedOptions[0]?.disabled){
-      const firstEnabled = Array.from(backtestSelect.options).find(o => !o.disabled);
-      if(firstEnabled) backtestSelect.value = firstEnabled.value;
-    }
-  }
-
-  // If the Trade Explorer is currently open showing a strategy that just
-  // got turned off, close it rather than leave disabled data on screen.
-  if(currentExplorerStrategy && !enabledKeys.includes(currentExplorerStrategy.toLowerCase())){
-    document.getElementById("explorerOverlay")?.classList.remove("show");
-  }
-}
-
-function renderStrategyFocusList(){
-  const list = document.getElementById("strategyFocusList");
-  list.innerHTML = STRATEGIES.map(s => `
-    <div class="toggle-row">
-      <div class="toggle-row-title">${s.label}</div>
-      <label class="switch">
-        <input type="checkbox" data-key="${s.key}">
-        <span class="switch-slider"></span>
-      </label>
-    </div>
-  `).join("");
-  list.querySelectorAll("input[type=checkbox]").forEach(input => {
-    input.addEventListener("change", async function(){
-      const key = this.dataset.key;
-      const next = this.checked
-        ? [...new Set([...lastKnownEnabledStrategies, key])]
-        : lastKnownEnabledStrategies.filter(k => k !== key);
-      const msg = document.getElementById("strategyFocusMsg");
-      if(next.length === 0){
-        this.checked = true; // block turning off the last remaining strategy
-        msg.textContent = "At least one strategy must stay on.";
-        msg.style.color = "var(--bear)";
-        msg.style.display = "block";
-        setTimeout(() => { msg.style.display = "none"; }, 2500);
-        return;
-      }
-      const base = getBackendUrl();
-      if(!base){
-        this.checked = !this.checked;
-        msg.textContent = "Set your Live Data Source first.";
-        msg.style.color = "var(--bear)";
-        msg.style.display = "block";
-        return;
-      }
-      try {
-        const res = await fetch(base + "/strategy-focus", {
-          method: "POST",
-          headers: adminHeaders(),
-          body: JSON.stringify({ enabled: next })
-        });
-        const data = await res.json();
-        if(!data.success){
-          this.checked = !this.checked; // revert the checkbox
-          msg.textContent = data.error === "unauthorized" ? "Admin PIN check failed — try logging out and back in." : "Couldn't save that.";
-          msg.style.color = "var(--bear)";
-          msg.style.display = "block";
-          return;
-        }
-        lastKnownEnabledStrategies = data.enabled;
-        applyStrategyFocus(lastKnownEnabledStrategies);
-      } catch(err){
-        this.checked = !this.checked;
-        msg.textContent = "Couldn't reach the server to save this.";
-        msg.style.color = "var(--bear)";
-        msg.style.display = "block";
-      }
-    });
-  });
-}
-renderStrategyFocusList();
-updateExplorerAlertToggleUI(); // initial sync so the main switch + test button reflect the real (default: off) state on page load
-fetchAndApplyStrategyFocus();
-// Every user (not just admin) re-checks this periodically, so a change
-// the admin makes actually reaches everyone else's already-open tab.
-setInterval(throttleWhenHidden(fetchAndApplyStrategyFocus, 90000), 20000);
-
-/* ---------------- Sector ORB Switch ---------------- */
-let sectorOrbEnabled = true; // safe default until the real value loads
-async function fetchAndApplySectorOrbSwitch(){
-  const base = getBackendUrl();
-  if(!base) return;
-  try {
-    const res = await fetch(base + "/sector-orb-switch");
-    if(!res.ok) throw new Error("HTTP " + res.status);
-    const data = await res.json();
-    if(typeof data.enabled === "boolean") sectorOrbEnabled = data.enabled;
-  } catch(err){
-    // keep whatever we last knew
-  }
-  document.getElementById("sectorOrbSwitchToggle").checked = sectorOrbEnabled;
-  renderSectorTrend(); // re-render so the change actually shows immediately
-}
-fetchAndApplySectorOrbSwitch();
-setInterval(throttleWhenHidden(fetchAndApplySectorOrbSwitch, 90000), 20000);
-
-document.getElementById("sectorOrbSwitchToggle").addEventListener("change", async function(){
-  const msg = document.getElementById("sectorOrbSwitchMsg");
-  const newVal = this.checked;
-  this.disabled = true;
-  try {
-    const res = await fetch(getBackendUrl() + "/sector-orb-switch", {
-      method: "POST", headers: adminHeaders(), body: JSON.stringify({ enabled: newVal })
-    });
-    const data = await res.json();
-    if(!data.success){
-      this.checked = !newVal; // revert on failure
-      msg.textContent = data.error === "unauthorized" ? "Admin PIN check failed." : "Couldn't save. Try again.";
-      msg.style.color = "var(--bear)";
-    } else {
-      sectorOrbEnabled = newVal;
-      msg.textContent = "Saved.";
-      msg.style.color = "var(--bull)";
-      renderSectorTrend();
-    }
-  } catch(err){
-    this.checked = !newVal;
-    msg.textContent = "Couldn't reach the server.";
-    msg.style.color = "var(--bear)";
-  } finally {
-    this.disabled = false;
-    msg.style.display = "block";
-    setTimeout(() => { msg.style.display = "none"; }, 2500);
-  }
-});
-
-let sectorDrbEnabled = true;
-async function fetchAndApplySectorDrbSwitch(){
-  const base = getBackendUrl();
-  if(!base) return;
-  try {
-    const res = await fetch(base + "/sector-drb-switch");
-    if(!res.ok) throw new Error("HTTP " + res.status);
-    const data = await res.json();
-    if(typeof data.enabled === "boolean") sectorDrbEnabled = data.enabled;
-  } catch(err){
-    // keep whatever we last knew
-  }
-  document.getElementById("sectorDrbSwitchToggle").checked = sectorDrbEnabled;
-  renderSectorTrend();
-}
-fetchAndApplySectorDrbSwitch();
-setInterval(throttleWhenHidden(fetchAndApplySectorDrbSwitch, 90000), 20000);
-
-/* ---------------- Market Sentiment (India VIX + Nifty trend) ---------------- */
-const SENTIMENT_CONFIG = {
-  bullish:  { emoji: "🟢", label: "Bullish" },
-  bearish:  { emoji: "🔴", label: "Bearish" },
-  sideways: { emoji: "🟡", label: "Sideways" },
-  volatile: { emoji: "🟠", label: "Volatile" },
-};
-async function fetchMarketSentiment(){
-  const base = getBackendUrl();
-  if(!base) return;
-  try {
-    const res = await fetch(base + "/market-sentiment");
-    if(!res.ok) return;
-    const data = await res.json();
-    const banner = document.getElementById("sentimentBanner");
-    if(!data.available){ banner.style.display = "none"; return; }
-    const cfg = SENTIMENT_CONFIG[data.sentiment];
-    if(!cfg) return;
-    banner.className = "sentiment-banner " + data.sentiment;
-    banner.style.display = "flex";
-    document.getElementById("sentimentEmoji").textContent = cfg.emoji;
-    document.getElementById("sentimentLabel").textContent = cfg.label;
-    document.getElementById("sentimentDetail").textContent =
-      `India VIX ${data.vix.toFixed(2)} · Nifty 50 ${data.nifty_chg >= 0 ? '+' : ''}${data.nifty_chg.toFixed(2)}%`;
-  } catch(err){
-    // keep showing whatever was last known
-  }
-}
-fetchMarketSentiment();
-setInterval(throttleWhenHidden(fetchMarketSentiment, 120000), 20000);
-
-document.getElementById("sectorDrbSwitchToggle").addEventListener("change", async function(){
-  const msg = document.getElementById("sectorDrbSwitchMsg");
-  const newVal = this.checked;
-  this.disabled = true;
-  try {
-    const res = await fetch(getBackendUrl() + "/sector-drb-switch", {
-      method: "POST", headers: adminHeaders(), body: JSON.stringify({ enabled: newVal })
-    });
-    const data = await res.json();
-    if(!data.success){
-      this.checked = !newVal;
-      msg.textContent = data.error === "unauthorized" ? "Admin PIN check failed." : "Couldn't save. Try again.";
-      msg.style.color = "var(--bear)";
-    } else {
-      sectorDrbEnabled = newVal;
-      msg.textContent = "Saved.";
-      msg.style.color = "var(--bull)";
-      renderSectorTrend();
-    }
-  } catch(err){
-    this.checked = !newVal;
-    msg.textContent = "Couldn't reach the server.";
-    msg.style.color = "var(--bear)";
-  } finally {
-    this.disabled = false;
-    msg.style.display = "block";
-    setTimeout(() => { msg.style.display = "none"; }, 2500);
-  }
-});
-
-
-
-/* ---------------- Refresh button ---------------- */
-document.getElementById("contactAdminClose").addEventListener("click", function(){
-  document.getElementById("contactAdminOverlay").classList.remove("show");
-});
-
-document.getElementById("refreshBtn").addEventListener("click", function(){
-  this.classList.add("spinning");
-  fetchLiveData();
-  setTimeout(() => this.classList.remove("spinning"), 600);
-});
-
-/* =====================================================================
-   BOOTSTRAP: theme + session on load
-===================================================================== */
-applyTheme(localStorage.getItem(THEME_KEY) || "dark");
-applyBreakLogVisible(localStorage.getItem(BREAKLOG_VISIBLE_KEY) !== "0");
-
-document.getElementById("backendUrlInput").value = getBackendUrl();
-
-const existingSession = getSession();
-if(existingSession && existingSession.mobile && !isSessionExpired(existingSession)){
-  showApp(existingSession);
-  startBackendPolling();
-} else {
-  if(existingSession) clearSession(); // stale/expired — clear it so it doesn't linger
-  showGate();
-}
-
-// Catch sessions that expire while the tab stays open (no reload needed to notice)
-setInterval(() => {
-  const session = getSession();
-  if(session && isSessionExpired(session)){
-    clearSession();
-    if(backendPollTimer) clearInterval(backendPollTimer);
-    showGate();
-    showLoginMsg("Your session expired after 3 hours. Please log in again.", "info");
-  }
-}, 60000);
-
-/* ---------------- ETF Swing Screener ---------------- */
-let etfSwingData = [];
-let etfSwingSort = { key: "chg_1mo", dir: 1 }; // most fallen (most negative) first by default
-let etfSignalFilter = "all";
-
-function etfChgTxt(v){
-  if(v == null) return '<span class="cell-sub">—</span>';
-  return `<span class="chg-txt ${v >= 0 ? 'up' : 'down'}">${v >= 0 ? '+' : ''}${v.toFixed(2)}%</span>`;
-}
-
-function formatVolume(v){
-  if(v == null) return '—';
-  if(v >= 1e7) return (v / 1e7).toFixed(2) + ' Cr';
-  if(v >= 1e5) return (v / 1e5).toFixed(2) + ' L';
-  if(v >= 1e3) return (v / 1e3).toFixed(1) + ' K';
-  return Math.round(v).toString();
-}
-
-function renderEtfSwingTable(){
-  const tbody = document.getElementById("etfSwingBody");
-  const empty = document.getElementById("etfSwingEmpty");
-  const sectorFilter = document.getElementById("etfSwingSectorFilter").value;
-  let filtered = sectorFilter === "all" ? etfSwingData : etfSwingData.filter(r => r.sector === sectorFilter);
-  if(etfSignalFilter !== "all") filtered = filtered.filter(r => (r.signal || "WATCH") === etfSignalFilter);
-
-  if(!filtered.length){
-    tbody.innerHTML = "";
-    empty.style.display = "block";
-    empty.textContent = etfSwingData.length ? "No ETFs match these filters." : "Click Refresh to load — this scans the full NSE ETF list (~1-3 min depending on how many are listed).";
-    return;
-  }
-  empty.style.display = "none";
-
-  const SIGNAL_RANK = { BUY: 0, SELL: 1, WATCH: 2 };
-  const sorted = [...filtered].sort((a, b) => {
-    const rankDiff = (SIGNAL_RANK[a.signal || "WATCH"] ?? 2) - (SIGNAL_RANK[b.signal || "WATCH"] ?? 2);
-    if(rankDiff !== 0) return rankDiff;
-    const av = a[etfSwingSort.key], bv = b[etfSwingSort.key];
-    if(av == null) return 1;
-    if(bv == null) return -1;
-    if(typeof av === "string") return av.localeCompare(bv) * etfSwingSort.dir;
-    return (av - bv) * etfSwingSort.dir;
-  });
-
-  tbody.innerHTML = sorted.map(r => `
-    <tr>
-      <td>
-        <div class="sym sym-link" onclick="openChartModal('${r.symbol}', true)">${r.symbol} <i class="bi bi-graph-up"></i></div>${copyIconHtml(r.symbol)}
-        <div class="cell-sub" style="font-size:11px;">${r.name}</div>
-      </td>
-      <td class="cell-sub">${r.sector || 'Other'}</td>
-      <td class="mono">${r.price != null ? r.price.toLocaleString('en-IN') : '—'}</td>
-      <td>${etfChgTxt(r.chg_20d)}</td>
-      <td>${etfChgTxt(r.chg_3mo)}</td>
-      <td>${etfChgTxt(r.chg_1mo)}</td>
-      <td class="mono">${formatVolume(r.volume)}</td>
-      <td><span class="rovl-tag ${r.rvol != null && r.rvol > 1.2 ? 'hot' : 'normal'}">${r.rvol != null ? r.rvol + 'x' : '—'}</span></td>
-      <td class="mono">${r.rsi14 != null ? r.rsi14 : '—'}</td>
-      <td><span class="combo-chip ${(r.signal || 'watch').toLowerCase()}" title="${r.above_200dma === true ? 'Above' : r.above_200dma === false ? 'Below' : '—'} 200-day avg">
-        <span class="c-score">${Math.round((r.score || 50) / 10)}/10</span><span class="c-signal">${r.signal || 'WATCH'}</span>
-      </span></td>
-    </tr>
-  `).join("");
-}
-
-function populateEtfSectorFilter(){
-  const select = document.getElementById("etfSwingSectorFilter");
-  const current = select.value;
-  const sectors = [...new Set(etfSwingData.map(r => r.sector || "Other"))].sort();
-  select.innerHTML = '<option value="all">All Sectors</option>' + sectors.map(s => `<option value="${s}">${s}</option>`).join("");
-  if(sectors.includes(current)) select.value = current;
-}
-
-async function loadEtfSwing(silent){
-  const btn = document.getElementById("etfSwingRefreshBtn");
-  const empty = document.getElementById("etfSwingEmpty");
-  const base = getBackendUrl();
-  if(!base){
-    if(!silent){
-      empty.style.display = "block";
-      empty.textContent = "Set your Live Data Source in Settings first.";
-    }
-    return;
-  }
-  if(!silent){
-    btn.disabled = true;
-    btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Loading…';
-    document.getElementById("etfSwingBody").innerHTML = "";
-    empty.style.display = "block";
-    empty.textContent = "Loading the full NSE ETF universe — this can take a couple of minutes the first time (fetching ~400 days of history per ETF); after that, price/volume stay live on a fast refresh.";
-  }
-  try {
-    const res = await fetch(base + "/scan/etf-swing");
-    if(!res.ok) throw new Error("HTTP " + res.status);
-    const data = await res.json();
-    if(data.error){
-      if(!silent){
-        empty.textContent = data.error === "not_logged_in" ? "Log in to your data source to load this." : "Couldn't load ETF data right now.";
-        etfSwingData = [];
-      }
-    } else {
-      etfSwingData = data.etfs || [];
-      document.getElementById("etfSwingCount").textContent = `${data.universe_size || etfSwingData.length} ETFs · live · updated ${data.computed_at || ''}`;
-      if(!etfSwingData.length && !silent) empty.textContent = "No ETF data returned — check the symbols still match your data source's instrument list.";
-    }
-    populateEtfSectorFilter();
-    renderEtfSwingTable();
-  } catch(err){
-    if(!silent){
-      empty.style.display = "block";
-      empty.textContent = "Couldn't reach the backend for ETF data.";
-      etfSwingData = [];
-    }
-  } finally {
-    if(!silent){
-      btn.disabled = false;
-      btn.innerHTML = '<i class="bi bi-arrow-clockwise"></i> Refresh';
-    }
-  }
-}
-let etfSwingPollTimer = null;
-async function loadEtfSwingAndStartPolling(silent){
-  await loadEtfSwing(silent);
-  // Load succeeded — start (or keep) a quiet background refresh so
-  // price/volume stay live without re-running the expensive history fetch.
-  if(etfSwingData.length && !etfSwingPollTimer){
-    etfSwingPollTimer = setInterval(throttleWhenHidden(() => loadEtfSwing(true), 90000), 20000);
-  }
-}
-document.getElementById("etfSwingRefreshBtn").addEventListener("click", function(){
-  loadEtfSwingAndStartPolling(false);
-});
-document.getElementById("etfSwingSectorFilter").addEventListener("change", renderEtfSwingTable);
-document.querySelectorAll("#etfSwingSection .filter-chip").forEach(chip => {
-  chip.addEventListener("click", function(){
-    etfSignalFilter = this.dataset.signal;
-    document.querySelectorAll("#etfSwingSection .filter-chip").forEach(c => c.classList.toggle("active", c === this));
-    renderEtfSwingTable();
-  });
-});
-document.querySelectorAll("#etfSwingTable th.sortable").forEach(th => {
-  th.addEventListener("click", function(){
-    const key = this.dataset.key;
-    if(etfSwingSort.key === key) etfSwingSort.dir *= -1;
-    else { etfSwingSort.key = key; etfSwingSort.dir = key.startsWith("chg_") ? 1 : -1; }
-    renderEtfSwingTable();
-  });
-});
-
-</script>
-
-</body>
-</html>
