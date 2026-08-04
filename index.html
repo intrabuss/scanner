@@ -1449,14 +1449,15 @@ html.breaklog-hidden .break-log-cell,
 html.breaklog-hidden th.col-breaklog,
 html.breaklog-hidden .exp-card-breaklog{ display:none !important; }
 
-/* Strategy Focus (admin) — hides one strategy's UI surface entirely when
-   the admin wants the dashboard scoped to just ORB or just DRB */
-html.hide-orb #orbStrategyCard,
-html.hide-orb .sector-jump-btn.orb{ display:none !important; }
-html.hide-drb #drbStrategyCard,
-html.hide-drb .sector-jump-btn.drb{ display:none !important; }
-html.hide-orb .sector-jump,
-html.hide-drb .sector-jump{ display:flex; }
+/* Strategy Focus (admin) — hides one strategy's Live Strategies card when
+   the admin wants the dashboard scoped to just ORB or just DRB.
+   Deliberately does NOT touch Sector Indices' Explore buttons — those are
+   controlled independently by the separate Sector ORB Switch / Sector DRB
+   Switch further down (see sectorOrbEnabled/sectorDrbEnabled in JS). The
+   two systems must stay fully decoupled: turning Strategy Focus ORB on/off
+   should never change what Sector Indices shows, and vice versa. */
+html.hide-orb #orbStrategyCard{ display:none !important; }
+html.hide-drb #drbStrategyCard{ display:none !important; }
 html.hide-etf #etfSwingSection{ display:none !important; }
 
 /* ---- Toggle switch (used for Break Log visibility, etc.) ---- */
@@ -4184,10 +4185,24 @@ let currentExplorerStrategy = null;
    host/deploy. First poll after enabling (or after a page load) only
    establishes the baseline — it deliberately doesn't alert on breaks
    that already existed before you turned it on. */
-let alertEnabled = { DRB: false, LS: false };
+// LS_LONG and LS_SHORT are separate switches — the Long Opportunities and
+// Short Opportunities modals reuse the same on-screen toggle button, but
+// each direction's on/off state is tracked independently so turning alerts
+// on while viewing Long never also turns on Short alerts, and vice versa.
+let alertEnabled = { DRB: false, LS_LONG: false, LS_SHORT: false };
 try {
   const saved = JSON.parse(localStorage.getItem("breakAlertEnabled"));
-  if(saved && typeof saved === "object") alertEnabled = { DRB: !!saved.DRB, LS: !!saved.LS };
+  if(saved && typeof saved === "object"){
+    // saved.LS is the old combined flag from before Long/Short alerts were
+    // split — migrate it to both new flags once so existing users don't
+    // silently lose a setting they'd already turned on.
+    const legacyLS = !!saved.LS;
+    alertEnabled = {
+      DRB: !!saved.DRB,
+      LS_LONG: saved.LS_LONG !== undefined ? !!saved.LS_LONG : legacyLS,
+      LS_SHORT: saved.LS_SHORT !== undefined ? !!saved.LS_SHORT : legacyLS,
+    };
+  }
 } catch(e){}
 
 // ORB alerts are per-sector, not a single on/off — the bell icon on each
@@ -4249,12 +4264,16 @@ function showBreakToast(strategy, symbol, price, dir, qty, time, rovl, channelLa
 }
 
 // ---------------------------------------------------------------------
-// TWO fully independent alert channels — ORB/DRB breakout alerts and
-// RVOL (Top 10) alerts each get their own queue, spacing timer, and
-// notification history. Neither can block or delay the other; a burst
-// of ORB breaks queuing up has zero effect on when an RVOL alert fires,
-// and vice versa. Previously these shared one single queue, which is
-// exactly what caused them to interfere with each other.
+// THREE fully independent alert channels — ORB/DRB breakout alerts,
+// RVOL Long (Top 10 gainers), and RVOL Short (Top 10 losers) each get
+// their own queue, spacing timer, and notification history. None of
+// them can block or delay any other; a burst queuing up on one channel
+// has zero effect on when an alert on a different channel fires.
+// Previously RVOL Long and RVOL Short shared a single queue, which is
+// exactly what caused them to interfere with each other — a run of
+// Long entries could push Short alerts back in the queue and delay
+// them, and vice versa. They are now split the same way ORB/DRB was
+// already split from RVOL.
 // ---------------------------------------------------------------------
 const ALERT_QUEUE_SPACING_MS = 10500; // must exceed the 10s display duration above, so same-channel alerts never visually overlap
 
@@ -4262,9 +4281,13 @@ let orbAlertQueue = [];
 let orbAlertQueueRunning = false;
 let orbAlertHistory = []; // {symbol, dir, time, strategy, firedAt} — most recent first, capped
 
-let rvolAlertQueue = [];
-let rvolAlertQueueRunning = false;
-let rvolAlertHistory = [];
+let rvolLongAlertQueue = [];
+let rvolLongAlertQueueRunning = false;
+let rvolLongAlertHistory = [];
+
+let rvolShortAlertQueue = [];
+let rvolShortAlertQueueRunning = false;
+let rvolShortAlertHistory = [];
 
 const ALERT_HISTORY_MAX = 50;
 
@@ -4283,19 +4306,37 @@ function processOrbAlertQueue(){
   setTimeout(processOrbAlertQueue, ALERT_QUEUE_SPACING_MS);
 }
 
+// strategy is always "LONG" or "SHORT" here (see checkTopLongShortAndAlert) —
+// route straight into the matching independent queue so the two directions
+// never share a timer.
 function queueRvolAlert(strategy, symbol, price, dir, qty, time, rovl){
   const channelLabel = `RVOL ${dir === "up" ? "Long" : "Short"}`;
-  rvolAlertQueue.push({ strategy, symbol, price, dir, qty, time, rovl, channelLabel });
-  if(!rvolAlertQueueRunning) processRvolAlertQueue();
+  const entry = { strategy, symbol, price, dir, qty, time, rovl, channelLabel };
+  if(strategy === "LONG"){
+    rvolLongAlertQueue.push(entry);
+    if(!rvolLongAlertQueueRunning) processRvolLongAlertQueue();
+  } else {
+    rvolShortAlertQueue.push(entry);
+    if(!rvolShortAlertQueueRunning) processRvolShortAlertQueue();
+  }
 }
-function processRvolAlertQueue(){
-  if(!rvolAlertQueue.length){ rvolAlertQueueRunning = false; return; }
-  rvolAlertQueueRunning = true;
-  const next = rvolAlertQueue.shift();
+function processRvolLongAlertQueue(){
+  if(!rvolLongAlertQueue.length){ rvolLongAlertQueueRunning = false; return; }
+  rvolLongAlertQueueRunning = true;
+  const next = rvolLongAlertQueue.shift();
   fireBreakNotification(next.strategy, next.symbol, next.price, next.dir, next.qty, next.time, next.rovl, next.channelLabel);
-  rvolAlertHistory.unshift({ ...next, firedAt: new Date().toLocaleTimeString('en-IN', { hour:'2-digit', minute:'2-digit' }) });
-  if(rvolAlertHistory.length > ALERT_HISTORY_MAX) rvolAlertHistory.length = ALERT_HISTORY_MAX;
-  setTimeout(processRvolAlertQueue, ALERT_QUEUE_SPACING_MS);
+  rvolLongAlertHistory.unshift({ ...next, firedAt: new Date().toLocaleTimeString('en-IN', { hour:'2-digit', minute:'2-digit' }) });
+  if(rvolLongAlertHistory.length > ALERT_HISTORY_MAX) rvolLongAlertHistory.length = ALERT_HISTORY_MAX;
+  setTimeout(processRvolLongAlertQueue, ALERT_QUEUE_SPACING_MS);
+}
+function processRvolShortAlertQueue(){
+  if(!rvolShortAlertQueue.length){ rvolShortAlertQueueRunning = false; return; }
+  rvolShortAlertQueueRunning = true;
+  const next = rvolShortAlertQueue.shift();
+  fireBreakNotification(next.strategy, next.symbol, next.price, next.dir, next.qty, next.time, next.rovl, next.channelLabel);
+  rvolShortAlertHistory.unshift({ ...next, firedAt: new Date().toLocaleTimeString('en-IN', { hour:'2-digit', minute:'2-digit' }) });
+  if(rvolShortAlertHistory.length > ALERT_HISTORY_MAX) rvolShortAlertHistory.length = ALERT_HISTORY_MAX;
+  setTimeout(processRvolShortAlertQueue, ALERT_QUEUE_SPACING_MS);
 }
 
 function fireBreakNotification(strategy, symbol, price, dir, qty, time, rovl, channelLabel){
@@ -4355,19 +4396,23 @@ function checkTopLongShortAndAlert(allOrbRows){
   const newLongSet = new Set(longCandidates.map(r => r.sym));
   const newShortSet = new Set(shortCandidates.map(r => r.sym));
 
-  if(top10BaselineSet && alertEnabled.LS){
-    longCandidates.forEach(r => {
-      if(!prevTop10Long.has(r.sym)){
-        const qty = Math.max(0, Math.floor(getBuyingPowerPerTrade() / r.price));
-        queueRvolAlert("LONG", r.sym, r.price, "up", qty, "Top 10", r.rovl);
-      }
-    });
-    shortCandidates.forEach(r => {
-      if(!prevTop10Short.has(r.sym)){
-        const qty = Math.max(0, Math.floor(getBuyingPowerPerTrade() / r.price));
-        queueRvolAlert("SHORT", r.sym, r.price, "down", qty, "Top 10", r.rovl);
-      }
-    });
+  if(top10BaselineSet){
+    if(alertEnabled.LS_LONG){
+      longCandidates.forEach(r => {
+        if(!prevTop10Long.has(r.sym)){
+          const qty = Math.max(0, Math.floor(getBuyingPowerPerTrade() / r.price));
+          queueRvolAlert("LONG", r.sym, r.price, "up", qty, "Top 10", r.rovl);
+        }
+      });
+    }
+    if(alertEnabled.LS_SHORT){
+      shortCandidates.forEach(r => {
+        if(!prevTop10Short.has(r.sym)){
+          const qty = Math.max(0, Math.floor(getBuyingPowerPerTrade() / r.price));
+          queueRvolAlert("SHORT", r.sym, r.price, "down", qty, "Top 10", r.rovl);
+        }
+      });
+    }
   }
   top10BaselineSet = true;
   prevTop10Long = newLongSet;
@@ -4424,12 +4469,25 @@ document.getElementById("explorerAlertTestBtn").addEventListener("click", functi
   fireBreakNotification(strategy, sample.sym, sample.price, Math.random() > 0.5 ? "up" : "down", qty, timeStr + " (test)", sample.rovl || 1.5);
 });
 
+// The button is shared by both the Long and Short Opportunities modals,
+// but always acts on the flag for whichever direction is currently open
+// (lsDirection) — so it only ever switches that one direction's alerts.
+function updateLsAlertToggleUI(){
+  const flagKey = lsDirection === "long" ? "LS_LONG" : "LS_SHORT";
+  const on = !!alertEnabled[flagKey];
+  const dirLabel = lsDirection === "long" ? "Long" : "Short";
+  document.getElementById("lsAlertToggle").classList.toggle("on", on);
+  document.getElementById("lsAlertToggleLbl").textContent = `${dirLabel} Alerts: ${on ? "On" : "Off"}`;
+  const hint = document.querySelector("#lsOverlay .alert-toggle-hint");
+  if(hint) hint.textContent = `Alerts when a stock newly enters the Top 10 by RVOL (RVOL > 1.2) — ${dirLabel} only. Short alerts are a separate switch, toggled from the Short Opportunities view.`;
+}
+
 document.getElementById("lsAlertToggle").addEventListener("click", function(){
-  alertEnabled.LS = !alertEnabled.LS;
+  const flagKey = lsDirection === "long" ? "LS_LONG" : "LS_SHORT";
+  alertEnabled[flagKey] = !alertEnabled[flagKey];
   localStorage.setItem("breakAlertEnabled", JSON.stringify(alertEnabled));
-  this.classList.toggle("on", alertEnabled.LS);
-  document.getElementById("lsAlertToggleLbl").textContent = `Top 10 Alerts: ${alertEnabled.LS ? "On" : "Off"}`;
-  if(alertEnabled.LS){
+  updateLsAlertToggleUI();
+  if(alertEnabled[flagKey]){
     if("Notification" in window && Notification.permission === "default") Notification.requestPermission();
     playAlertBell();
   }
@@ -4755,6 +4813,7 @@ function openLongShort(direction){
 
   document.getElementById("lsSub").textContent = `Sorted by Score · flat/opposite-direction stocks excluded`;
 
+  updateLsAlertToggleUI();
   renderLongShort();
   document.getElementById("lsOverlay").classList.add("show");
 }
@@ -4787,7 +4846,7 @@ document.querySelectorAll("#lsTable thead th.sortable").forEach(th => {
 let currentChartSymbol = null;
 let currentUserIsAdmin = false;
 let currentChartIsEtf = false;
-let currentChartTimeframe = "daily"; // "daily" | "15min" — single panel, toggled, defaults to Daily on open
+let currentChartTimeframe = "3min"; // "daily" | "15min" | "3min" | "5min" | "60min" — single panel, toggled, defaults to 3min on open
 let currentChartCanvasEl = null;      // tracks the live canvas/legend/tooltip so refreshes redraw in place, no DOM rebuild/flash
 let currentChartLegendEl = null;
 let currentChartTooltipEl = null;
@@ -5320,13 +5379,13 @@ document.getElementById("chartNewsCloseBtn").addEventListener("click", closeChar
 function openChartModal(symbol, isEtf){
   currentChartSymbol = symbol;
   currentChartIsEtf = !!isEtf;
-  currentChartTimeframe = "daily"; // always opens on Daily by default
+  currentChartTimeframe = "3min"; // always opens on 3min by default
   currentChartCanvasEl = null; // forces a fresh DOM build for this (possibly new) symbol
   const row = findRowForSymbol(symbol);
   document.getElementById("chartTitle").textContent = symbol;
   document.getElementById("chartSub").textContent = row
     ? `${row.name || ""} · ${row.sector || ""} · ₹${row.price.toLocaleString('en-IN')}`
-    : "Live daily chart";
+    : "Live 3min chart";
   document.getElementById("chartBreakSummary").style.display = isEtf ? "none" : "";
   renderChartBreakSummary(row);
   renderChartLevels(row);
