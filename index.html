@@ -2352,14 +2352,16 @@ html.hide-etf #etfSwingSection{ display:none !important; }
       <h4><span class="doc-tag orb">ORB</span> Opening Range Breakout</h4>
       <p><strong>The level:</strong> The high and low formed during the first 15 minutes of today's session (9:15–9:30 AM), captured fresh once per day right after the window closes.</p>
       <p><strong>The idea:</strong> The opening 15 minutes reflects where buyers and sellers first agree on value for the day. A decisive move beyond that range signals which side is in control for the session.</p>
-      <p><strong>How a break is confirmed:</strong> Unlike a simple live-price check, ORB does <strong>not</strong> count a break the moment price ticks across the line. Instead:</p>
+      <p><strong>How a break is confirmed:</strong> Unlike a simple live-price check, ORB does <strong>not</strong> count a break the moment price ticks across the line, and it does <strong>not</strong> keep re-counting a break just because price is still sitting beyond the level. Instead, it uses the same crossover/crossunder logic as the Pine Script version:</p>
       <ol>
         <li>Price data is resampled into 3-minute candles.</li>
-        <li>Every ~3 minutes, the scanner checks the <strong>most recently closed</strong> 3-minute candle (not the one still forming).</li>
-        <li>A break only counts if that candle's <strong>close</strong> is beyond the opening range high or low.</li>
+        <li>Every ~3 minutes, the scanner checks the <strong>two most recently closed</strong> 3-minute candles (never the one still forming, and never a live WebSocket tick).</li>
+        <li>A break only counts on a genuine <strong>crossover</strong>: the previous closed candle's close was at-or-inside the range, and the current closed candle's close is beyond it (and symmetrically for a crossunder on the low).</li>
       </ol>
-      <div class="doc-callout"><i class="bi bi-info-circle-fill"></i><div>This filters out brief "wick pokes" — a stock spiking across the level for a few seconds and snapping back doesn't get logged as a breakout.</div></div>
-      <p><strong>Reversal handling:</strong> If a stock was confirmed broken and a later 3-minute candle closes back inside the range, that's logged as a distinct <strong>"reversed"</strong> event in the break log — not silently deleted. This keeps the full history of a stock's behavior visible.</p>
+      <div class="doc-callout"><i class="bi bi-info-circle-fill"></i><div>This filters out both brief "wick pokes" (a stock spiking across the level for a few seconds and snapping back) and repeat detections while a stock simply stays beyond the level candle after candle.</div></div>
+      <p><strong>Re-entry handling:</strong> If a stock was confirmed broken and a later 3-minute candle closes back inside the range, that only resets the internal breakout state — it is <strong>not</strong> written to the Break Log. If price then crosses out again later, that's logged as a brand-new break, same as Pine Script only incrementing its breakout count on an actual crossover/crossunder.</p>
+      <p><strong>RVOL at breakout:</strong> Calculated once, at the moment of the crossover — this candle's own volume ÷ the average volume of the previous 20 completed 3-minute candles — and frozen into that Break Log entry permanently.</p>
+      <p><strong>Break time:</strong> The candle's own close time is recorded, not the wall-clock time the scan happened to run.</p>
       <p><strong>Why 3-minute candles:</strong> It's a middle ground — fast enough to catch the move early in the session, slow enough to avoid reacting to 1-minute noise.</p>
 
       <hr>
@@ -2409,10 +2411,10 @@ broke_low  = live_price &lt; yesterday_low</code></pre>
           <thead><tr><th></th><th>ORB</th><th>DRB</th></tr></thead>
           <tbody>
             <tr><td>Level used</td><td>First 15-min opening range (today)</td><td>Previous day's high/low</td></tr>
-            <tr><td>Confirmation</td><td>3-min candle <strong>close</strong> beyond level</td><td>Live tick crossing the level</td></tr>
+            <tr><td>Confirmation</td><td>3-min candle-close <strong>crossover</strong> of level</td><td>Live tick crossing the level</td></tr>
             <tr><td>Speed</td><td>Slower, filters out noise</td><td>Faster, more reactive</td></tr>
             <tr><td>Early-session handling</td><td>N/A — window defines itself at 9:30</td><td>Breakouts ignored for first 15 min (gap filter)</td></tr>
-            <tr><td>Reversal tracking</td><td>Explicit "reversed" log entry</td><td>Re-evaluated on every poll</td></tr>
+            <tr><td>Reversal tracking</td><td>Silent state reset, no log entry</td><td>Re-evaluated on every poll</td></tr>
             <tr><td>Best suited for</td><td>Trend/momentum days building off the open</td><td>Stocks pushing into genuinely new territory vs. the prior session</td></tr>
           </tbody>
         </table>
@@ -4488,16 +4490,12 @@ let explorerSort = { key: "chg", dir: -1 };
 
 function renderBreakLog(entries){
   if(!entries || entries.length === 0) return '<span style="color:var(--text-muted);">—</span>';
+  // Every entry here is a genuine confirmed crossover/crossunder — re-entering
+  // the range resets state silently on the backend and never produces an entry.
   return entries.map(e => {
-    let color, arrow;
-    if(e.dir === "reversed"){
-      color = "var(--text-muted)";
-      arrow = "↩";
-    } else {
-      const isUp = e.dir === "up";
-      color = isUp ? "var(--bull)" : "var(--bear)";
-      arrow = isUp ? "↑" : "↓";
-    }
+    const isUp = e.dir === "up";
+    const color = isUp ? "var(--bull)" : "var(--bear)";
+    const arrow = isUp ? "↑" : "↓";
     const label = e.rvol != null ? ` (${e.rvol}x)` : "";
     return `<span style="color:${color}; white-space:nowrap; margin-right:8px;">${arrow}${e.time}${label}</span>`;
   }).join("");
