@@ -1143,6 +1143,19 @@ tr.pinned-row{ background:var(--brand-dim); }
   flex-shrink:0; text-align:center; padding:10px 10px 6px;
   font-size:12.5px; font-weight:700; color:var(--text-secondary); letter-spacing:.01em;
 }
+.chart-quad-panel-head-row{
+  flex-shrink:0; display:flex; align-items:center; justify-content:center;
+  gap:12px; padding:10px 10px 6px; position:relative;
+}
+.chart-quad-panel-head-row .chart-quad-panel-head{ padding:0; }
+.chart-tf-toggle{
+  display:flex; gap:4px; position:absolute; right:10px; top:50%; transform:translateY(-50%);
+}
+.chart-tf-btn{
+  padding:4px 11px; border-radius:14px; font-size:11.5px; font-weight:700;
+  background:var(--bg-raised); border:1px solid var(--border-soft); color:var(--text-secondary);
+}
+.chart-tf-btn.active{ background:var(--brand-dim); border-color:var(--brand); color:var(--brand); }
 .chart-quad-stale{ font-weight:600; color:var(--text-muted); text-transform:none; letter-spacing:0; }
 .chart-quad-ema-legend{
   flex-shrink:0; display:flex; justify-content:center; gap:9px;
@@ -4716,6 +4729,11 @@ document.querySelectorAll("#lsTable thead th.sortable").forEach(th => {
 let currentChartSymbol = null;
 let currentUserIsAdmin = false;
 let currentChartIsEtf = false;
+let currentChartTimeframe = "daily"; // "daily" | "15min" — single panel, toggled, defaults to Daily on open
+let currentChartCanvasEl = null;      // tracks the live canvas/legend/tooltip so refreshes redraw in place, no DOM rebuild/flash
+let currentChartLegendEl = null;
+let currentChartTooltipEl = null;
+let currentChartData = null;          // last fetched payload, so a timeframe toggle can redraw instantly without a re-fetch
 let chartRefreshTimer = null; // periodic re-fetch while the chart modal is open — see openChartModal
 let currentChartNewsTitles = [];
 
@@ -4983,7 +5001,7 @@ function timeToMinutes(t){
   return 0; // daily labels ("dd Mon") don't need this — markers aren't drawn on the daily panel
 }
 
-function attachQuadTooltip(canvas, tooltip, panelKey){
+function attachQuadTooltip(canvas, tooltip){
   canvas.addEventListener("mousemove", e => {
     const d = canvas._chartData;
     if(!d || !d.candles.length) return;
@@ -4992,11 +5010,13 @@ function attachQuadTooltip(canvas, tooltip, panelKey){
     let idx = Math.floor(mx / d.slot);
     idx = Math.max(0, Math.min(d.candles.length - 1, idx));
     const c = d.candles[idx];
-    // Intraday panels (5min/15min/60min) only ever hold today's session —
-    // their "t" is just "HH:MM", so prefix today's date explicitly rather
-    // than leaving the date implicit. The daily panel's "t" is already a
-    // date ("dd Mon"), nothing to prefix.
-    const isDaily = panelKey === "daily";
+    // Intraday panels only ever hold today's session — their "t" is just
+    // "HH:MM", so prefix today's date explicitly rather than leaving the
+    // date implicit. The daily panel's "t" is already a date ("dd Mon"),
+    // nothing to prefix. Read currentChartTimeframe live (not a captured
+    // value) since this same canvas/tooltip is now reused across Daily/
+    // 15min toggles instead of being rebuilt fresh each time.
+    const isDaily = currentChartTimeframe === "daily";
     const dateLabel = isDaily ? c.t : new Date().toLocaleDateString('en-IN', { day:'2-digit', month:'short' }) + ", " + c.t;
     tooltip.innerHTML = `<span class="lbl">${dateLabel}</span> O ${c.o} H ${c.h} L ${c.l} C ${c.c}`;
     tooltip.style.display = "block";
@@ -5013,16 +5033,10 @@ const EMA_LENGTHS_ETF = [ // ETF charts specifically use 9/20/50, not the full 9
 ];
 
 function renderQuadChart(data, isEtf){
+  currentChartData = data; // cached so switchChartTimeframe() can redraw without a re-fetch
   const container = document.getElementById("tvChartContainer");
-  container.classList.add("chart-quad-grid");
-  container.innerHTML = "";
-
-  // Both stocks and ETFs now show exactly 2 panels side by side: 15-min
-  // (with ORB high/low lines for stocks — harmless no-op for ETFs, which
-  // simply have no ORB data) and Daily. Replaces the old 4-panel grid.
-  const panelsToRender = CHART_PANELS.filter(p => p.key === "15min" || p.key === "daily");
-  container.classList.toggle("chart-quad-single", false);
-  container.classList.toggle("chart-quad-double", true);
+  container.classList.add("chart-quad-grid", "chart-quad-single");
+  container.classList.remove("chart-quad-double");
 
   const marketFrozen = !isTradingDay(new Date()) || (() => {
     const now = new Date();
@@ -5032,41 +5046,41 @@ function renderQuadChart(data, isEtf){
     return !(afterOpen && beforeClose);
   })();
 
-  panelsToRender.forEach(panel => {
-    const candles = (data.timeframes && data.timeframes[panel.key]) || [];
-    const showStaleNote = data.stale_intraday && panel.key !== "daily";
+  // Build the panel's DOM exactly once per symbol. Every later call here —
+  // which includes the 5-second background auto-refresh — skips straight
+  // to just redrawing onto the SAME canvas instead of tearing the whole
+  // thing down and rebuilding it, which is what was causing the chart to
+  // visibly flash/reload every few seconds.
+  const needsFullBuild = !currentChartCanvasEl || !container.contains(currentChartCanvasEl);
+  if(needsFullBuild){
+    container.innerHTML = "";
     const box = document.createElement("div");
     box.className = "chart-quad-panel";
-    const panelLabel = panel.label;
     box.innerHTML = `
-      <div class="chart-quad-panel-head">${panelLabel}${showStaleNote ? ` <span class="chart-quad-stale">· last session (${data.intraday_as_of})</span>` : ''}</div>
+      <div class="chart-quad-panel-head-row">
+        <div class="chart-quad-panel-head" id="chartPanelHeadLabel"></div>
+        <div class="chart-tf-toggle">
+          <button type="button" class="chart-tf-btn" id="chartTfDaily">1D</button>
+          <button type="button" class="chart-tf-btn" id="chartTfIntraday">15min</button>
+        </div>
+      </div>
       <div class="chart-quad-ema-legend"></div>
       <div class="chart-quad-panel-canvas-wrap">
         <canvas></canvas>
         <div class="chart-quad-tooltip"></div>
       </div>`;
     container.appendChild(box);
-    const canvas = box.querySelector("canvas");
-    const legendEl = box.querySelector(".chart-quad-ema-legend");
-    const tooltip = box.querySelector(".chart-quad-tooltip");
-    const emaLengths = isEtf ? EMA_LENGTHS_ETF : EMA_LENGTHS;
-    const opts = {
-      orbHigh: data.orb_high, orbLow: data.orb_low,
-      orbHigh15: data.orb_high_15, orbLow15: data.orb_low_15,
-      markers: data.markers, showOrb: panel.showOrb, emaLengths,
-    };
-    const draw = () => {
-      const drawn = drawQuadPanel(canvas, candles, opts);
-      const drawnLengths = new Set(drawn.map(s => s.length));
-      legendEl.innerHTML = emaLengths.map(cfg => {
-        const live = drawnLengths.has(cfg.length);
-        return `<span class="ema-legend-item${live ? '' : ' dim'}" title="${live ? cfg.label : cfg.label + ' — not enough candles on this panel yet'}"><i style="background:${cfg.color}"></i>${cfg.label}</span>`;
-      }).join("");
-    };
-    draw();
-    attachQuadTooltip(canvas, tooltip, panel.key);
-    window.addEventListener("resize", debounce(draw, 150));
-  });
+    currentChartCanvasEl = box.querySelector("canvas");
+    currentChartLegendEl = box.querySelector(".chart-quad-ema-legend");
+    currentChartTooltipEl = box.querySelector(".chart-quad-tooltip");
+    attachQuadTooltip(currentChartCanvasEl, currentChartTooltipEl);
+    window.addEventListener("resize", debounce(() => drawCurrentChartPanel(), 150));
+    document.getElementById("chartTfDaily").addEventListener("click", () => switchChartTimeframe("daily"));
+    document.getElementById("chartTfIntraday").addEventListener("click", () => switchChartTimeframe("15min"));
+  }
+
+  updateChartTfToggleUI();
+  drawCurrentChartPanel();
 
   const badge = document.getElementById("chartMarketStatusBadge");
   if(marketFrozen){
@@ -5077,11 +5091,47 @@ function renderQuadChart(data, isEtf){
   }
 }
 
+function drawCurrentChartPanel(){
+  if(!currentChartData || !currentChartCanvasEl) return;
+  const data = currentChartData;
+  const panelConf = CHART_PANELS.find(p => p.key === currentChartTimeframe);
+  const candles = (data.timeframes && data.timeframes[currentChartTimeframe]) || [];
+  const showStaleNote = data.stale_intraday && currentChartTimeframe !== "daily";
+  const headEl = document.getElementById("chartPanelHeadLabel");
+  if(headEl) headEl.innerHTML = `${panelConf.label}${showStaleNote ? ` <span class="chart-quad-stale">· last session (${data.intraday_as_of})</span>` : ''}`;
+  const emaLengths = currentChartIsEtf ? EMA_LENGTHS_ETF : EMA_LENGTHS;
+  const opts = {
+    orbHigh: data.orb_high, orbLow: data.orb_low,
+    orbHigh15: data.orb_high_15, orbLow15: data.orb_low_15,
+    markers: data.markers, showOrb: panelConf.showOrb, emaLengths,
+  };
+  const drawn = drawQuadPanel(currentChartCanvasEl, candles, opts);
+  const drawnLengths = new Set(drawn.map(s => s.length));
+  currentChartLegendEl.innerHTML = emaLengths.map(cfg => {
+    const live = drawnLengths.has(cfg.length);
+    return `<span class="ema-legend-item${live ? '' : ' dim'}" title="${live ? cfg.label : cfg.label + ' — not enough candles on this panel yet'}"><i style="background:${cfg.color}"></i>${cfg.label}</span>`;
+  }).join("");
+}
+
+function switchChartTimeframe(tf){
+  currentChartTimeframe = tf;
+  updateChartTfToggleUI();
+  drawCurrentChartPanel();
+}
+
+function updateChartTfToggleUI(){
+  const dailyBtn = document.getElementById("chartTfDaily");
+  const intradayBtn = document.getElementById("chartTfIntraday");
+  if(!dailyBtn) return;
+  dailyBtn.classList.toggle("active", currentChartTimeframe === "daily");
+  intradayBtn.classList.toggle("active", currentChartTimeframe === "15min");
+}
+
 async function loadChart(symbol){
-  showChartMsg("Loading chart…", "bi-hourglass-split");
+  const isFirstLoad = !currentChartCanvasEl;
+  if(isFirstLoad) showChartMsg("Loading chart…", "bi-hourglass-split");
   const container = document.getElementById("tvChartContainer");
   container.classList.add("chart-quad-grid");
-  container.innerHTML = "";
   try{
     const base = getBackendUrl();
     const row = findRowForSymbol(symbol);
@@ -5098,7 +5148,11 @@ async function loadChart(symbol){
     document.getElementById("chartLastUpdated").textContent = "Updated " + now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
     hideChartMsg();
   } catch(err){
-    showChartMsg("Couldn't reach the chart data backend.", "bi-wifi-off");
+    if(isFirstLoad) showChartMsg("Couldn't reach the chart data backend.", "bi-wifi-off");
+    // On a background refresh, a transient network blip just leaves the
+    // chart showing its last good data — no reason to interrupt the view
+    // with an error overlay for something that'll likely resolve itself
+    // on the next 5-second tick.
   }
 }
 
@@ -5203,6 +5257,8 @@ document.getElementById("chartNewsCloseBtn").addEventListener("click", closeChar
 function openChartModal(symbol, isEtf){
   currentChartSymbol = symbol;
   currentChartIsEtf = !!isEtf;
+  currentChartTimeframe = "daily"; // always opens on Daily by default
+  currentChartCanvasEl = null; // forces a fresh DOM build for this (possibly new) symbol
   const row = findRowForSymbol(symbol);
   document.getElementById("chartTitle").textContent = symbol;
   document.getElementById("chartSub").textContent = row
@@ -5236,6 +5292,10 @@ function closeChartModal(){
   document.getElementById("chartNewsList").innerHTML = "";
   closeChartPopovers();
   currentChartSymbol = null;
+  currentChartCanvasEl = null;
+  currentChartLegendEl = null;
+  currentChartTooltipEl = null;
+  currentChartData = null;
   if(chartRefreshTimer){ clearInterval(chartRefreshTimer); chartRefreshTimer = null; }
 }
 document.getElementById("chartClose").addEventListener("click", closeChartModal);
@@ -5513,58 +5573,6 @@ setInterval(() => {
   const el = document.getElementById("backendFreshness");
   if(el && lastSuccessfulFetchAt) el.textContent = " · " + freshnessTickerText();
 }, 1000);
-
-function renderSectorIndices(rows){
-  const barsEl = document.getElementById("sectorIdxBars");
-  const emptyEl = document.getElementById("sectorIdxEmpty");
-  const countEl = document.getElementById("sectorIdxCount");
-  if(!barsEl) return;
-  if(!rows || !rows.length){
-    barsEl.innerHTML = "";
-    emptyEl.style.display = "block";
-    if(countEl) countEl.textContent = "";
-    return;
-  }
-  emptyEl.style.display = "none";
-  if(countEl) countEl.textContent = rows.length + " indices";
-  const sorted = [...rows].sort((a,b) => b.chg - a.chg);
-  const maxAbs = Math.max(...sorted.map(r => Math.abs(r.chg)), 0.1);
-  barsEl.innerHTML = sorted.map(r => {
-    const dir = r.chg >= 0 ? "up" : "down";
-    const widthPct = Math.min((Math.abs(r.chg) / maxAbs) * 50, 50); // half-track max, bar grows from center
-    return `<div class="sidx-row">
-      <div class="sidx-name">${r.name}</div>
-      <div class="sidx-bar-track">
-        <div class="sidx-center-line"></div>
-        <div class="sidx-bar ${dir}" style="width:${widthPct}%"></div>
-      </div>
-      <div class="sidx-chg ${dir}">${r.chg >= 0 ? '+' : ''}${r.chg.toFixed(2)}%</div>
-    </div>`;
-  }).join("");
-}
-
-let sectorIndicesInFlight = false;
-async function fetchSectorIndices(){
-  if(sectorIndicesInFlight) return;
-  sectorIndicesInFlight = true;
-  const base = getBackendUrl();
-  if(!base){ sectorIndicesInFlight = false; return; }
-  try {
-    const res = await fetch(base + "/sector-indices");
-    if(res.ok){
-      const data = await res.json();
-      renderSectorIndices(data);
-    }
-  } catch(err){
-    // Silent — this panel just keeps showing its last known values, same
-    // as everything else does when a poll fails; the main backendBanner
-    // already covers the "can't reach backend at all" case.
-  } finally {
-    sectorIndicesInFlight = false;
-  }
-}
-fetchSectorIndices();
-setInterval(throttleWhenHidden(fetchSectorIndices, 120000), 20000);
 
 let fetchLiveDataInFlight = false;
 async function fetchLiveData(){
