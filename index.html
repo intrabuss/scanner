@@ -6056,11 +6056,17 @@ function applyStrategyFocus(enabledKeys){
     }
   }
 
-  // If the Trade Explorer is currently open showing a strategy that just
-  // got turned off, close it rather than leave disabled data on screen.
-  if(currentExplorerStrategy && !enabledKeys.includes(currentExplorerStrategy.toLowerCase())){
-    document.getElementById("explorerOverlay")?.classList.remove("show");
-  }
+  // NOTE: we deliberately do NOT force-close an already-open Trade Explorer
+  // here anymore. This used to remove the "show" class on every poll tick
+  // (every ~20s) whenever the current strategy wasn't in the enabled list —
+  // which meant the popup could vanish out from under someone actively
+  // viewing it, and (since the Chart modal renders on top of the Explorer)
+  // closing a chart opened from inside it would land back on the plain
+  // dashboard instead of returning to the Explorer, because the Explorer
+  // underneath had already been silently hidden. The strategy-focus toggle
+  // still hides the relevant dashboard cards/buttons via the CSS classes
+  // above; a popup the user explicitly opened now only closes when they
+  // close it themselves (X button, clicking outside, or Escape).
 }
 
 function renderStrategyFocusList(){
