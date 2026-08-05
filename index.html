@@ -3063,7 +3063,7 @@ document.getElementById("loginForm").addEventListener("submit", async function(e
       });
       const data = await res.json();
       if(!data.ok){
-        showLoginMsg(data.error === "wrong_pin" ? "Incorrect admin PIN." : "Admin login failed.", "error");
+        showLoginMsg(data.error === "wrong_pin" ? "Incorrect admin PIN." : data.error === "rate_limited" ? (data.message || "Too many failed attempts — try again shortly.") : "Admin login failed.", "error");
         return;
       }
       if(data.warning) console.warn(data.warning);
