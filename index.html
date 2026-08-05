@@ -182,9 +182,16 @@ img, svg{ max-width:100%; }
   padding:20px 26px 90px;
   max-width:1500px;
   width:100%;
+  margin:0 auto;
 }
 @media (max-width: 767.98px){
   .main{ padding:16px 14px 96px; }
+}
+@media (min-width: 1920px){
+  /* Genuinely large monitors (2K/4K) — a modest increase from the 1500px
+     cap, not full edge-to-edge, which would stretch tables/charts into
+     awkwardly long rows. Centered either way via the margin above. */
+  .main{ max-width:1760px; }
 }
 
 /* ============ MOBILE SCALE-UP ============
@@ -1476,12 +1483,18 @@ html.hide-etf #etfSwingSection{ display:none !important; }
   position:fixed; top:16px; right:16px; z-index:1200;
   display:flex; flex-direction:column; gap:8px; pointer-events:none;
 }
+@media (max-width: 767.98px){
+  #breakToastWrap{ top:12px; right:12px; left:12px; }
+}
 .break-toast{
   display:flex; align-items:flex-start; gap:10px; width:280px;
   padding:12px 14px; border-radius:var(--radius-md);
   background:var(--bg-raised); border:1px solid var(--border-med);
   box-shadow:0 12px 32px -8px rgba(0,0,0,.5);
   opacity:0; transform:translateX(20px); transition:opacity .25s ease, transform .25s ease;
+}
+@media (max-width: 767.98px){
+  .break-toast{ width:100%; }
 }
 .break-toast.show{ opacity:1; transform:translateX(0); }
 .break-toast.buy{ border-color:rgba(34,197,94,.4); }
