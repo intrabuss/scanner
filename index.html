@@ -5207,9 +5207,10 @@ function renderExplorer(){
   document.getElementById("statTotal").textContent = statScope.length.toLocaleString("en-IN");
   document.getElementById("statBreakouts").textContent = statBreakouts.length.toLocaleString("en-IN");
   document.getElementById("statHotRovl").textContent = statBreakouts.filter(r => r.rovl > 1.2).length.toLocaleString("en-IN");
+  const sortLabel = { latestBreakTime: "most recent break", chg: "% change" }[explorerSort.key] || explorerSort.key;
   document.getElementById("explorerSub").textContent = sector === "all"
-    ? `${explorerData.length} symbols across ${SECTORS.length} sectors · sorted by ROVL · flat stocks (<0.5% move) hidden`
-    : `${statScope.length} symbols in ${sector} · sorted by ROVL · flat stocks (<0.5% move) hidden`;
+    ? `${explorerData.length} symbols across ${SECTORS.length} sectors · sorted by ${sortLabel} · flat stocks (<0.5% move) hidden`
+    : `${statScope.length} symbols in ${sector} · sorted by ${sortLabel} · flat stocks (<0.5% move) hidden`;
 
   document.getElementById("explorerBody").innerHTML = rows.map(r => `
     <tr class="rail-${r.status}${pinnedSymbols.has(r.sym) ? ' pinned-row' : ''}">
@@ -5284,7 +5285,11 @@ function openExplorer(strategy, initialSignal, initialSector, realIndexName, rea
   currentExplorerStrategy = strategy;
   explorerData = isORB ? orbRows : drbRows;
   explorerSignal = initialSignal || "all";
-  explorerSort = { key: "chg", dir: -1 };
+  // Opened by clicking a sector index's ORB/DRB button (realIndexName is set)
+  // -> the point is "what just broke out in this sector", so default to most
+  // recent break first. Opened generically (the main ORB/DRB view buttons,
+  // no realIndexName) -> keep the original % change sort.
+  explorerSort = realIndexName ? { key: "latestBreakTime", dir: -1 } : { key: "chg", dir: -1 };
   updateExplorerAlertToggleUI();
 
   document.getElementById("explorerAddStockToggle").style.display = currentUserIsAdmin ? "inline-flex" : "none";
