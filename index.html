@@ -287,6 +287,11 @@ img, svg{ max-width:100%; }
 .status-dot.pulse{ animation:pulse 1.6s infinite ease-in-out; }
 @keyframes pulse{ 0%,100%{ opacity:1; } 50%{ opacity:.35; } }
 
+.last-updated-badge{
+  font-size:11px; color:var(--text-muted); font-family:var(--font-data);
+  padding:5px 10px; border-radius:14px; background:var(--bg-raised); border:1px solid var(--border-soft);
+}
+
 .market-closed-pop{
   position:absolute; top:calc(100% + 8px); right:0; z-index:60;
   width:270px; background:var(--bg-surface); border:1px solid var(--border-med);
@@ -1783,6 +1788,7 @@ html.hide-etf #etfSwingSection{ display:none !important; }
         <span class="status-pill open" id="marketStatus">
           <span class="status-dot pulse" id="marketStatusDot"></span> <span id="marketStatusLabel">Market Open</span>
         </span>
+        <span class="last-updated-badge d-none d-sm-inline" id="lastUpdatedBadge" style="display:none;"></span>
 
         <button class="icon-btn" id="holidayListBtn" title="NSE Holidays 2026" style="position:relative;">
           <i class="bi bi-calendar-week"></i>
@@ -6273,6 +6279,7 @@ function renderHolidayListPopover(now){
   `;
 }
 
+let lastSuccessfulFetchAt = null;
 function tick(){
   const now = new Date();
   const t = now.toLocaleTimeString('en-IN', { hour12:false });
@@ -6289,6 +6296,15 @@ function tick(){
   pill.className = "status-pill " + (open ? "open" : "closed");
   document.getElementById("marketStatusDot").className = "status-dot " + (open ? "pulse" : "");
   document.getElementById("marketStatusLabel").textContent = open ? "Market Open" : (reason ? `Market Closed — ${reason}` : "Market Closed");
+
+  const lastUpdatedBadge = document.getElementById("lastUpdatedBadge");
+  if(!open && lastSuccessfulFetchAt){
+    const lastUpdateTime = new Date(lastSuccessfulFetchAt).toLocaleTimeString('en-IN', { hour12:true, hour:'2-digit', minute:'2-digit', second:'2-digit' });
+    lastUpdatedBadge.textContent = `Last Updated: ${lastUpdateTime}`;
+    lastUpdatedBadge.style.display = "inline";
+  } else {
+    lastUpdatedBadge.style.display = "none";
+  }
 }
 tick();
 setInterval(tick, 1000);
@@ -6406,8 +6422,6 @@ function showBackendBanner(state, text){
 
 let contactAdminShownForOutage = false;
 let hasLoadedOnce = false;
-let lastSuccessfulFetchAt = null;
-
 function showCalcPill(){
   const pill = document.getElementById("calcPill");
   pill.classList.add("show");
