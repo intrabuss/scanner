@@ -392,6 +392,39 @@ html[data-theme="light"] .avatar{ background:linear-gradient(160deg,#E3E7EE,#F3F
 }
 @media (max-width: 1199.98px){ .idx-grid{ grid-template-columns:repeat(3, 1fr); } }
 
+/* Market Breadth (Advance/Decline) */
+.breadth-sentiment-badge{
+  display:inline-flex; align-items:center; gap:8px;
+  padding:8px 16px; border-radius:var(--radius-md);
+  font-size:14px; font-weight:800;
+  background:var(--bg-raised); border:1px solid var(--border-med);
+}
+.breadth-sentiment-badge.strong-bull{ background:rgba(34,197,94,.15); border-color:rgba(34,197,94,.4); color:var(--bull); }
+.breadth-sentiment-badge.bull{ background:rgba(34,197,94,.08); border-color:rgba(34,197,94,.25); color:var(--bull); }
+.breadth-sentiment-badge.neutral{ background:rgba(234,179,8,.1); border-color:rgba(234,179,8,.3); color:#EAB308; }
+.breadth-sentiment-badge.bear{ background:rgba(239,68,68,.08); border-color:rgba(239,68,68,.25); color:var(--bear); }
+.breadth-sentiment-badge.strong-bear{ background:rgba(239,68,68,.15); border-color:rgba(239,68,68,.4); color:var(--bear); }
+.breadth-bar-wrap{ margin-bottom:18px; }
+.breadth-bar{
+  display:flex; height:22px; border-radius:6px; overflow:hidden;
+  background:var(--bg-raised); border:1px solid var(--border-soft);
+}
+.breadth-bar-seg{ height:100%; transition:width .3s ease; }
+.breadth-bar-seg.adv{ background:var(--bull); }
+.breadth-bar-seg.unch{ background:var(--text-muted); opacity:.4; }
+.breadth-bar-seg.dec{ background:var(--bear); }
+.breadth-bar-labels{
+  display:flex; justify-content:space-between; margin-top:8px;
+  font-size:11.5px; font-weight:600; flex-wrap:wrap; gap:6px;
+}
+.breadth-stats-grid{
+  display:grid; grid-template-columns:repeat(4, 1fr); gap:12px;
+}
+.breadth-stat{ text-align:center; padding:10px 6px; background:var(--bg-raised); border-radius:var(--radius-sm); border:1px solid var(--border-soft); }
+.breadth-stat-val{ font-size:20px; font-weight:800; font-family:var(--font-data); color:var(--text-primary); }
+.breadth-stat-lbl{ font-size:11px; color:var(--text-muted); margin-top:2px; text-transform:uppercase; letter-spacing:.02em; }
+@media (max-width: 575.98px){ .breadth-stats-grid{ grid-template-columns:repeat(2, 1fr); } }
+
 /* Sector Indices — real NSE index bars, sorted strongest to weakest */
 .sidx-row{
   display:grid; grid-template-columns:170px 1fr 60px; align-items:center; gap:10px;
@@ -1746,6 +1779,58 @@ html.hide-etf #etfSwingSection{ display:none !important; }
       <div class="section-title">Market Snapshot</div>
     </div>
     <div class="idx-grid" id="idxGrid"></div>
+
+    <!-- MARKET BREADTH (Advance/Decline) — computed client-side from the
+         same live scan data already being polled every 3s (orbRows), no
+         separate fetch needed. Reflects the current scan universe
+         (nifty500 by default), same honest framing as "Total Market" in
+         Top Movers — a real Nifty Total Market index has ~750 stocks,
+         narrower than the full universe, so this is the scanned set, not
+         a claim of exact index-membership match. -->
+    <div class="section-head" style="margin-top:26px;">
+      <div class="section-title">Market Breadth <span class="count" id="breadthUpdatedAt"></span></div>
+    </div>
+    <div class="card-x" id="breadthPanel" style="padding:18px 20px;">
+      <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; margin-bottom:16px;">
+        <div id="breadthSentimentBadge" class="breadth-sentiment-badge">—</div>
+        <div style="display:flex; gap:20px; flex-wrap:wrap; font-size:12.5px; color:var(--text-muted);">
+          <span>A:D Ratio <strong id="breadthAdRatio" class="mono" style="color:var(--text-primary);">—</strong></span>
+          <span>Net Advances <strong id="breadthNetAdv" class="mono" style="color:var(--text-primary);">—</strong></span>
+        </div>
+      </div>
+
+      <div class="breadth-bar-wrap">
+        <div class="breadth-bar">
+          <div class="breadth-bar-seg adv" id="breadthBarAdv"></div>
+          <div class="breadth-bar-seg unch" id="breadthBarUnch"></div>
+          <div class="breadth-bar-seg dec" id="breadthBarDec"></div>
+        </div>
+        <div class="breadth-bar-labels">
+          <span style="color:var(--bull);"><span id="breadthAdvPct">—</span>% Advancing</span>
+          <span style="color:var(--text-muted);"><span id="breadthUnchPct">—</span>% Unchanged</span>
+          <span style="color:var(--bear);"><span id="breadthDecPct">—</span>% Declining</span>
+        </div>
+      </div>
+
+      <div class="breadth-stats-grid">
+        <div class="breadth-stat">
+          <div class="breadth-stat-val" style="color:var(--bull);" id="breadthAdvCount">—</div>
+          <div class="breadth-stat-lbl">Advancing</div>
+        </div>
+        <div class="breadth-stat">
+          <div class="breadth-stat-val" style="color:var(--bear);" id="breadthDecCount">—</div>
+          <div class="breadth-stat-lbl">Declining</div>
+        </div>
+        <div class="breadth-stat">
+          <div class="breadth-stat-val" id="breadthUnchCount">—</div>
+          <div class="breadth-stat-lbl">Unchanged</div>
+        </div>
+        <div class="breadth-stat">
+          <div class="breadth-stat-val" id="breadthTotalCount">—</div>
+          <div class="breadth-stat-lbl">Total Scanned</div>
+        </div>
+      </div>
+    </div>
 
     <!-- SECTOR INDICES (real NSE data) — replaces the old computed-average
          Sector Trend table entirely. % Change is the real, official index
@@ -4046,8 +4131,56 @@ function getLatestOrbBreakOpportunities(direction, limit){
     .map(x => x.row);
 }
 
+function renderMarketBreadth(){
+  const total = orbRows.length;
+  if(total === 0) return; // no data yet — leave the "—" placeholders showing rather than a misleading 0
+
+  const advancing = orbRows.filter(r => r.chg > 0).length;
+  const declining = orbRows.filter(r => r.chg < 0).length;
+  const unchanged = total - advancing - declining;
+
+  const advPct = (advancing / total) * 100;
+  const decPct = (declining / total) * 100;
+  const unchPct = (unchanged / total) * 100;
+  const netAdvances = advancing - declining;
+  // A:D ratio — undefined (shown as "∞") when nothing is declining rather
+  // than a divide-by-zero artifact.
+  const adRatio = declining > 0 ? (advancing / declining) : (advancing > 0 ? Infinity : 0);
+
+  document.getElementById("breadthAdvCount").textContent = advancing.toLocaleString('en-IN');
+  document.getElementById("breadthDecCount").textContent = declining.toLocaleString('en-IN');
+  document.getElementById("breadthUnchCount").textContent = unchanged.toLocaleString('en-IN');
+  document.getElementById("breadthTotalCount").textContent = total.toLocaleString('en-IN');
+  document.getElementById("breadthAdvPct").textContent = advPct.toFixed(1);
+  document.getElementById("breadthDecPct").textContent = decPct.toFixed(1);
+  document.getElementById("breadthUnchPct").textContent = unchPct.toFixed(1);
+  document.getElementById("breadthAdRatio").textContent = adRatio === Infinity ? "∞" : adRatio.toFixed(2);
+  document.getElementById("breadthNetAdv").textContent = (netAdvances >= 0 ? "+" : "") + netAdvances.toLocaleString('en-IN');
+
+  document.getElementById("breadthBarAdv").style.width = advPct + "%";
+  document.getElementById("breadthBarUnch").style.width = unchPct + "%";
+  document.getElementById("breadthBarDec").style.width = decPct + "%";
+
+  // Sentiment thresholds — based on % of scanned universe advancing.
+  // Documented here since these are a judgment call, not a standard:
+  //   >=70% advancing -> Strong Bullish, >=55% -> Bullish,
+  //   45-55% -> Neutral, <=30% -> Strong Bearish, else Bearish.
+  const badge = document.getElementById("breadthSentimentBadge");
+  let cls, label, emoji;
+  if(advPct >= 70){ cls = "strong-bull"; label = "Strong Bullish"; emoji = "🟢"; }
+  else if(advPct >= 55){ cls = "bull"; label = "Bullish"; emoji = "🟢"; }
+  else if(advPct > 45){ cls = "neutral"; label = "Neutral"; emoji = "🟡"; }
+  else if(advPct > 30){ cls = "bear"; label = "Bearish"; emoji = "🔴"; }
+  else { cls = "strong-bear"; label = "Strong Bearish"; emoji = "🔴"; }
+  badge.className = "breadth-sentiment-badge " + cls;
+  badge.textContent = `${emoji} ${label}`;
+
+  document.getElementById("breadthUpdatedAt").textContent = `as of ${new Date().toLocaleTimeString('en-IN', { hour12:false })}`;
+}
+
 function renderAll(){
   renderSectorTrend();
+  renderMarketBreadth();
 
   const longs = getLatestOrbBreakOpportunities("up", 10);
   const shorts = getLatestOrbBreakOpportunities("down", 10);
@@ -4154,7 +4287,6 @@ let breakBaselineSet = { ORB: false, DRB: false };
 let prevTop10Long = new Set();
 let prevTop10Short = new Set();
 let top10BaselineSet = false;
-const LS_ALERT_MIN_RVOL = 1.2;
 const LS_ALERT_TOP_N = 10;
 
 let audioCtx = null;
@@ -4245,7 +4377,7 @@ function processOrbAlertQueue(){
 // route straight into the matching independent queue so the two directions
 // never share a timer.
 function queueRvolAlert(strategy, symbol, price, dir, qty, time, rovl){
-  const channelLabel = `RVOL ${dir === "up" ? "Long" : "Short"}`;
+  const channelLabel = `ORB Break ${dir === "up" ? "Long" : "Short"}`;
   const entry = { strategy, symbol, price, dir, qty, time, rovl, channelLabel };
   if(strategy === "LONG"){
     rvolLongAlertQueue.push(entry);
@@ -4326,16 +4458,13 @@ function checkForNewBreaksAndAlert(strategy, rows){
 }
 
 function checkTopLongShortAndAlert(allOrbRows){
-  // Deliberately INDEPENDENT of the ORB-break criteria the Long/Short
-  // Opportunities table now uses. This channel answers a genuinely
-  // different question — "which stocks are unusually busy right now" —
-  // not "which stocks just had a confirmed breakout". A stock can be a
-  // RVOL alert candidate with zero ORB breaks today, and that's the
-  // whole point of having two separate channels instead of one.
-  const longCandidates = allOrbRows.filter(r => r.chg >= 0 && r.rovl > LS_ALERT_MIN_RVOL)
-    .sort((a, b) => b.rovl - a.rovl).slice(0, LS_ALERT_TOP_N);
-  const shortCandidates = allOrbRows.filter(r => r.chg < 0 && r.rovl > LS_ALERT_MIN_RVOL)
-    .sort((a, b) => b.rovl - a.rovl).slice(0, LS_ALERT_TOP_N);
+  // ROVL-based alerting removed from this module entirely, per explicit
+  // request. Uses the exact same criteria as the Long/Short table itself
+  // — a stock needs an actual, current confirmed ORB break to be a
+  // candidate — and getLatestOrbBreakOpportunities() already sorts by
+  // most recent break first.
+  const longCandidates = getLatestOrbBreakOpportunities("up", LS_ALERT_TOP_N);
+  const shortCandidates = getLatestOrbBreakOpportunities("down", LS_ALERT_TOP_N);
 
   const newLongSet = new Set(longCandidates.map(r => r.sym));
   const newShortSet = new Set(shortCandidates.map(r => r.sym));
