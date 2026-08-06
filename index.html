@@ -1795,7 +1795,7 @@ html.hide-etf #etfSwingSection{ display:none !important; }
           <div class="market-closed-pop" id="holidayListPop"></div>
         </button>
 
-        <button class="rotation-dashboard-btn" id="rotationDashboardBtn" title="Sector Rotation Dashboard">
+        <button class="rotation-dashboard-btn" id="rotationDashboardBtn" title="Sector Rotation Dashboard" style="display:none;">
           <i class="bi bi-recycle"></i> <span class="d-none d-md-inline">Sector Rotation</span>
         </button>
 
@@ -2251,6 +2251,17 @@ html.hide-etf #etfSwingSection{ display:none !important; }
       </div>
       <div id="adminMsg" style="font-size:11.5px; color:var(--bear); margin-bottom:8px; display:none;"></div>
       <div id="adminMobileList" style="display:flex; flex-direction:column; gap:6px; max-height:170px; overflow-y:auto;"></div>
+
+      <div class="settings-divider"></div>
+
+      <div class="modal-section-lbl">Sector Rotation Access <span style="color:var(--text-muted); font-weight:500; text-transform:none; letter-spacing:0;">(admin only) · defaults to admin-only</span></div>
+      <div class="section-sub" style="font-size:11.5px; color:var(--text-muted); margin-bottom:8px;">Separate from general login access above — a number needs to be added here too before it can open the Sector Rotation Dashboard.</div>
+      <div style="display:flex; gap:8px; margin-bottom:8px;">
+        <input type="tel" id="rotationAccessNewMobile" inputmode="numeric" maxlength="10" placeholder="Add 10-digit mobile number" style="flex:1; background:var(--bg-raised); border:1px solid var(--border-med); border-radius:var(--radius-sm); padding:9px 10px; color:var(--text-primary); font-size:13px;">
+        <button class="icon-btn" id="rotationAccessAddBtn" title="Add number"><i class="bi bi-plus-lg"></i></button>
+      </div>
+      <div id="rotationAccessMsg" style="font-size:11.5px; color:var(--bear); margin-bottom:8px; display:none;"></div>
+      <div id="rotationAccessMobileList" style="display:flex; flex-direction:column; gap:6px; max-height:170px; overflow-y:auto;"></div>
 
       <div class="settings-divider"></div>
 
@@ -2854,6 +2865,23 @@ async function verifyAccess(mobile){
   return allowed.includes(mobile) ? "allowed" : "denied";
 }
 
+// Separate, narrower allow-list from the general login above — being in
+// allowed_mobiles only gets you into the app; the Sector Rotation
+// Dashboard needs a mobile number in THIS list too (defaults to
+// admin-only, admin grants it from Settings). Same pattern as
+// getAllowedMobiles: null means "couldn't verify", not "no access".
+async function getRotationAccessMobiles(){
+  try {
+    const res = await fetch(getBackendUrl() + "/rotation-access");
+    if(!res.ok) throw new Error("HTTP " + res.status);
+    const data = await res.json();
+    if(Array.isArray(data.mobiles)) return data.mobiles;
+  } catch(e){
+    console.warn("Couldn't reach backend for rotation-access list:", e);
+  }
+  return null;
+}
+
 const SESSION_KEY = "ib_session";
 const SESSION_MAX_AGE_MS = 3 * 60 * 60 * 1000; // fixed 3-hour session, regardless of activity
 
@@ -2899,6 +2927,21 @@ function showApp(session){
   document.getElementById("emailAlertsNonAdminMsg").style.display = isAdmin ? "none" : "block";
   if(isAdmin) renderAdminList();
   if(isAdmin) refreshScanModeUI(); // pull the real configured stock counts (e.g. 424 / 4,515) from /health right away — admin-only section
+  if(isAdmin) renderRotationAccessList();
+
+  // Sector Rotation Dashboard button — hidden by default (see the HTML),
+  // only shown once we've confirmed this mobile number has rotation
+  // access (admin always does; anyone else needs to be on the
+  // admin-managed rotation_access_mobiles list).
+  const rotationBtn = document.getElementById("rotationDashboardBtn");
+  if(isAdmin){
+    rotationBtn.style.display = "";
+  } else {
+    rotationBtn.style.display = "none";
+    getRotationAccessMobiles().then(list => {
+      rotationBtn.style.display = (Array.isArray(list) && list.includes(session.mobile)) ? "" : "none";
+    });
+  }
 
   const roleBadge = document.getElementById("roleBadge");
   roleBadge.style.display = "inline-flex";
@@ -2992,6 +3035,73 @@ function showAdminMsg(text){
   el.style.display = "block";
   setTimeout(() => { el.style.display = "none"; }, 2500);
 }
+
+/* ---------------- Admin: manage Sector Rotation access ---------------- */
+async function renderRotationAccessList(){
+  const listEl = document.getElementById("rotationAccessMobileList");
+  listEl.innerHTML = `<div class="admin-mobile-loading">Loading…</div>`;
+  const list = await getRotationAccessMobiles();
+  if(list === null){
+    listEl.innerHTML = `<div class="admin-mobile-loading">Couldn't reach the server — check your connection and reopen this panel.</div>`;
+    return;
+  }
+  listEl.innerHTML = list.map(m => `
+    <div class="admin-mobile-row">
+      <span class="mono">${m}${m === ADMIN_MOBILE ? '<span class="admin-tag">ADMIN</span>' : ''}</span>
+      ${m === ADMIN_MOBILE ? '' : `<button class="rm-x" data-mobile="${m}" title="Remove"><i class="bi bi-x-lg"></i></button>`}
+    </div>
+  `).join("");
+
+  document.querySelectorAll("#rotationAccessMobileList .rm-x").forEach(btn => {
+    btn.addEventListener("click", async function(){
+      this.disabled = true;
+      try {
+        const res = await fetch(getBackendUrl() + "/rotation-access/" + encodeURIComponent(this.dataset.mobile), { method: "DELETE", headers: adminHeaders() });
+        const data = await res.json();
+        if(!data.success){ showRotationAccessMsg("Couldn't remove that number. Try again."); return; }
+        renderRotationAccessList();
+      } catch(e){
+        showRotationAccessMsg("Couldn't reach the server. Try again.");
+      }
+    });
+  });
+}
+
+function showRotationAccessMsg(text){
+  const el = document.getElementById("rotationAccessMsg");
+  el.textContent = text;
+  el.style.display = "block";
+  setTimeout(() => { el.style.display = "none"; }, 2500);
+}
+
+document.getElementById("rotationAccessAddBtn").addEventListener("click", async function(){
+  const input = document.getElementById("rotationAccessNewMobile");
+  const mobile = input.value.trim();
+  if(!/^[0-9]{10}$/.test(mobile)){
+    showRotationAccessMsg("Enter a valid 10-digit mobile number.");
+    return;
+  }
+  const btn = this;
+  btn.disabled = true;
+  try {
+    const res = await fetch(getBackendUrl() + "/rotation-access", {
+      method: "POST",
+      headers: adminHeaders(),
+      body: JSON.stringify({ mobile })
+    });
+    const data = await res.json();
+    if(!data.success){
+      showRotationAccessMsg(data.error === "unauthorized" ? "Admin PIN check failed — try logging out and back in." : data.error === "invalid_mobile" ? "Enter a valid 10-digit mobile number." : "Couldn't add that number. Try again.");
+      return;
+    }
+    input.value = "";
+    renderRotationAccessList();
+  } catch(e){
+    showRotationAccessMsg("Couldn't reach the server. Check your connection and try again.");
+  } finally {
+    btn.disabled = false;
+  }
+});
 
 document.getElementById("adminAddBtn").addEventListener("click", async function(){
   const input = document.getElementById("adminNewMobile");
@@ -4098,6 +4208,7 @@ const SECTOR_TO_REAL_INDEX = {
   "Metals": "Nifty Metal",
   "Media & Entertainment": "Nifty Media",
   "Energy": "Nifty Energy",
+  "Oil & Gas": "Nifty Oil & Gas",
   "Construction": "Nifty Construction",
   "Consumer Goods": "Nifty FMCG",
   "Financial Services": "Nifty Financial Services",
@@ -4124,8 +4235,7 @@ const CONSUMER_DURABLES_SYMBOLS = new Set(["TITAN","DIXON","HAVELLS","VOLTAS","K
 // only adds more sectors' worth of matched stocks feeding into it.
 const INDIA_DEFENCE_SYMBOLS = new Set(["BEL","HAL","SOLARINDS","MAZDOCK","BHARATFORG","BDL","COCHINSHIP","GRSE","MTARTECH","DATAPATTNS","BEML","ASTRAMICRO","AXISCADES","PARAS","ZENTEC"]);
 const CHEMICALS_SYMBOLS = new Set(["PIDILITIND","SOLARINDS","SRF","COROMANDEL","LINDEINDIA","GUJFLUORO","UPL","PIIND","NAVINFLUOR","HSCL","SUMICHEM","DEEPAKNTR","ATUL","BAYERCROP","CHAMBLFERT","AARTIIND","TATACHEM","EIDPARRY","PCBL","GNFC"]);
-const MIDCAP_SELECT_SYMBOLS = new Set(["INDHOTEL","PERSISTENT","VOLTAS","FEDERALBNK","CUMMINSIND","MAXHEALTH","COFORGE","YESBANK","BANKBARODA","ASHOKLEY","SUZLON","UNIONBANK","FORTIS","PRESTIGE","POLICYBZR"]);
-const MNC_SYMBOLS = new Set(["NESTLEIND","ABB","HINDUNILVR","SIEMENS","BRITANNIA","COLPAL","MARUTI","BOSCHLTD","CUMMINSIND","GLAXO","VOLTAS","MCDOWELL-N","HONAUT","3MINDIA","LINDEINDIA","WHIRLPOOL","PGHH","CASTROLIND","SANOFI","BAYERCROP"]);
+
 const PSE_SYMBOLS = new Set(["NTPC","POWERGRID","ONGC","COALINDIA","IOC","PFC","RECLTD","GAIL","BEL","HAL","BPCL","NHPC","SJVN","NMDC","CONCOR"]);
 const SERVICES_SECTOR_SYMBOLS = new Set(["HDFCBANK","ICICIBANK","BHARTIARTL","SBIN","TCS","KOTAKBANK","INFY","AXISBANK","BAJFINANCE","HCLTECH","ADANIPORTS","WIPRO","INDUSINDBK","TECHM","INDIGO"]);
 
@@ -4147,8 +4257,6 @@ function realIndicesForRow(r){
   // (confirmed happening during testing before this fix).
   if(INDIA_DEFENCE_SYMBOLS.has(r.sym)) matches.push("Nifty India Defence");
   if(CHEMICALS_SYMBOLS.has(r.sym)) matches.push("Nifty Chemicals");
-  if(MIDCAP_SELECT_SYMBOLS.has(r.sym)) matches.push("Nifty Midcap Select");
-  if(MNC_SYMBOLS.has(r.sym)) matches.push("Nifty MNC");
   if(PSE_SYMBOLS.has(r.sym)) matches.push("Nifty PSE");
   if(SERVICES_SECTOR_SYMBOLS.has(r.sym)) matches.push("Nifty Services Sector");
   const mapped = SECTOR_TO_REAL_INDEX[r.sector];
@@ -4181,12 +4289,6 @@ function internalSectorFilterFor(realIndexName){
   // Financial Services is the larger half, so used as the approximation,
   // same reasoning as the Bank cases.
   if(realIndexName === "Nifty Services Sector") return "Financial Services";
-  // Midcap Select and MNC deliberately have NO fallback here — their
-  // constituent lists span too many unrelated categories (hotels, IT,
-  // banks, auto, healthcare, FMCG, industrial, pharma all mixed
-  // together) for any single broader category to be a meaningful
-  // approximation. Explore intentionally shows "—" for these two rather
-  // than open a misleadingly narrow or irrelevant stock list.
   const entry = Object.entries(SECTOR_TO_REAL_INDEX).find(([, real]) => real === realIndexName);
   return entry ? entry[0] : null;
 }
@@ -5499,15 +5601,31 @@ const ROTATION_STATUS_COLORS = {
 function rotationChangeColor(v){ return v == null ? "var(--text-muted)" : (v >= 0 ? "var(--bull)" : "var(--bear)"); }
 function rotationFmtPct(v){ return v == null ? "—" : `${v >= 0 ? '+' : ''}${v}%`; }
 
+let rotationPollTimer = null;
+
 async function openRotationDashboard(){
   document.getElementById("rotationOverlay").classList.add("show");
   document.getElementById("rotationBody").innerHTML = `<tr><td colspan="8" style="text-align:center; padding:24px; color:var(--text-muted);">Loading…</td></tr>`;
+  await fetchAndRenderRotation();
+  // Backend keeps this cache warm in the background on its own cadence
+  // (see scheduler_loop server-side) and freezes it after market close —
+  // this poll just re-reads that cache every 60s while the panel is
+  // open, so it stays current without ever forcing a fresh compute.
+  clearInterval(rotationPollTimer);
+  rotationPollTimer = setInterval(fetchAndRenderRotation, 60000);
+}
+
+async function fetchAndRenderRotation(){
   try {
-    const res = await fetch(getBackendUrl() + "/sector-rotation");
+    const session = getSession();
+    const mobile = (session && session.mobile) || "";
+    const res = await fetch(getBackendUrl() + "/sector-rotation?mobile=" + encodeURIComponent(mobile));
     const data = await res.json();
     if(!data.sectors || !data.sectors.length){
       const emptyEl = document.getElementById("rotationEmpty");
-      emptyEl.textContent = data.error === "not_logged_in"
+      emptyEl.textContent = data.error === "unauthorized"
+        ? "This number doesn't have access to the Sector Rotation Dashboard. Contact your admin."
+        : data.error === "not_logged_in"
         ? "Not logged in to Upstox yet today — sector rotation needs a live session and has no cached data to fall back on."
         : "Couldn't load sector rotation data.";
       emptyEl.style.display = "block";
@@ -5525,7 +5643,9 @@ async function openRotationDashboard(){
 function renderRotationDashboard(data){
   const b = data.breadth;
   const updatedLabel = data.computed_at ? `updated ${data.computed_at}` : "";
-  document.getElementById("rotationUpdatedAt").textContent = data.stale
+  document.getElementById("rotationUpdatedAt").textContent = data.frozen
+    ? `frozen as of ${data.frozen_at || updatedLabel || "last close"} · market closed`
+    : data.stale
     ? `${updatedLabel} · showing last known data (${data.error === "not_logged_in" ? "not logged in" : "live feed unavailable"})`
     : updatedLabel;
 
@@ -5564,8 +5684,8 @@ function renderRotationDashboard(data){
 }
 
 document.getElementById("rotationDashboardBtn").addEventListener("click", openRotationDashboard);
-document.getElementById("rotationClose").addEventListener("click", () => document.getElementById("rotationOverlay").classList.remove("show"));
-document.getElementById("rotationOverlay").addEventListener("click", function(e){ if(e.target === this) this.classList.remove("show"); });
+document.getElementById("rotationClose").addEventListener("click", () => { document.getElementById("rotationOverlay").classList.remove("show"); clearInterval(rotationPollTimer); });
+document.getElementById("rotationOverlay").addEventListener("click", function(e){ if(e.target === this){ this.classList.remove("show"); clearInterval(rotationPollTimer); } });
 
 function openTopMovers(direction){
   topMoversDirection = direction;
