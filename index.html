@@ -363,6 +363,41 @@ img, svg{ max-width:100%; }
 .rotation-dashboard-btn:active{ transform:scale(.96); }
 .rotation-dashboard-btn i{ font-size:14px; }
 
+.notif-badge{
+  position:absolute; top:-4px; right:-4px;
+  min-width:16px; height:16px; padding:0 4px;
+  background:var(--bear); color:#fff; font-size:10px; font-weight:800;
+  border-radius:8px; display:flex; align-items:center; justify-content:center;
+  border:2px solid var(--bg-surface);
+}
+.notif-row{
+  display:flex; gap:10px; padding:10px 14px; border-bottom:1px solid var(--border-soft);
+  cursor:pointer; transition:.1s ease; position:relative;
+}
+.notif-row:hover{ background:var(--bg-hover); }
+.notif-row.unread{ background:rgba(76,141,255,.05); }
+.notif-row.unread::before{ content:""; position:absolute; left:4px; top:16px; width:6px; height:6px; border-radius:50%; background:var(--brand); }
+.notif-priority-dot{ width:8px; height:8px; border-radius:50%; margin-top:5px; flex-shrink:0; }
+.notif-priority-dot.high{ background:var(--bear); }
+.notif-priority-dot.medium{ background:#EAB308; }
+.notif-priority-dot.low{ background:var(--brand); }
+.notif-body{ flex:1; min-width:0; }
+.notif-top-row{ display:flex; justify-content:space-between; gap:8px; align-items:baseline; }
+.notif-cat-tag{ font-size:10px; font-weight:700; text-transform:uppercase; color:var(--text-muted); letter-spacing:.02em; }
+.notif-time{ font-size:10.5px; color:var(--text-muted); white-space:nowrap; }
+.notif-msg{ font-size:12.5px; color:var(--text-primary); margin-top:2px; }
+.notif-actions{ display:flex; gap:6px; margin-top:4px; }
+.notif-action-btn{ background:none; border:none; color:var(--text-muted); font-size:13px; padding:2px 4px; cursor:pointer; }
+.notif-action-btn:hover{ color:var(--text-primary); }
+.notif-action-btn.active{ color:#EAB308; }
+.notif-filter-chip{
+  padding:5px 12px; border-radius:14px; font-size:11.5px; font-weight:600;
+  background:var(--bg-raised); border:1px solid var(--border-soft); color:var(--text-secondary);
+  cursor:pointer; white-space:nowrap;
+}
+.notif-filter-chip.active{ background:var(--brand-dim); border-color:rgba(76,141,255,.4); color:var(--brand); }
+.notif-toggle-row{ display:flex; align-items:center; justify-content:space-between; padding:8px 0; font-size:12.5px; }
+
 .avatar{
   width:36px; height:36px; border-radius:9px;
   background:linear-gradient(160deg,#2A313F,#171C24);
@@ -1758,6 +1793,11 @@ html.hide-etf #etfSwingSection{ display:none !important; }
           <i class="bi bi-recycle"></i> <span class="d-none d-md-inline">Sector Rotation</span>
         </button>
 
+        <button class="icon-btn" id="notifBellBtn" title="Notifications" style="position:relative;">
+          <i class="bi bi-bell-fill"></i>
+          <span id="notifBadge" class="notif-badge" style="display:none;">0</span>
+        </button>
+
         <div class="clock-block d-none d-sm-block">
           <div class="clock-time mono" id="clockTime">09:41:22</div>
           <div class="clock-date" id="clockDate">Fri, 31 Jul 2026</div>
@@ -2515,7 +2555,65 @@ html.hide-etf #etfSwingSection{ display:none !important; }
   </div>
 </div>
 
+<!-- ============ NOTIFICATION PANEL ============ -->
+<div class="modal-overlay" id="notifOverlay">
+  <div class="modal-box" style="max-width:420px; padding:0; display:flex; flex-direction:column; max-height:85vh;">
+    <div class="modal-head" style="padding:16px 16px 10px;">
+      <div style="font-weight:800; font-size:15px;">Notifications</div>
+      <div style="display:flex; gap:6px; align-items:center;">
+        <button class="icon-btn" id="notifSettingsToggle" title="Settings" style="width:30px; height:30px;"><i class="bi bi-gear"></i></button>
+        <button class="icon-btn" id="notifExportBtn" title="Export CSV" style="width:30px; height:30px;"><i class="bi bi-download"></i></button>
+        <button class="icon-btn" id="notifClose" style="width:30px; height:30px;"><i class="bi bi-x-lg"></i></button>
+      </div>
+    </div>
+
+    <div id="notifSettingsPanel" style="display:none; padding:10px 16px; border-bottom:1px solid var(--border-soft); background:var(--bg-raised);">
+      <div class="notif-toggle-row">
+        <span>Sound</span>
+        <input type="checkbox" id="notifSoundToggle">
+      </div>
+      <div class="notif-toggle-row">
+        <span>Desktop notifications</span>
+        <input type="checkbox" id="notifDesktopToggle">
+      </div>
+      <div class="notif-toggle-row">
+        <span>Auto-remove after (days)</span>
+        <input type="number" id="notifRetentionInput" min="1" max="90" style="width:60px; background:var(--bg-surface); border:1px solid var(--border-med); border-radius:6px; padding:3px 6px; color:var(--text-primary);">
+      </div>
+      <div class="notif-toggle-row">
+        <span>Cooldown per stock (minutes)</span>
+        <input type="number" id="notifCooldownInput" min="0" max="120" style="width:60px; background:var(--bg-surface); border:1px solid var(--border-med); border-radius:6px; padding:3px 6px; color:var(--text-primary);">
+      </div>
+    </div>
+
+    <div style="padding:10px 16px;">
+      <input type="text" id="notifSearchInput" placeholder="Search notifications…" style="width:100%; background:var(--bg-raised); border:1px solid var(--border-med); border-radius:var(--radius-sm); padding:8px 10px; color:var(--text-primary); font-size:12.5px;">
+      <div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:8px;">
+        <button class="notif-filter-chip active" data-filter="all">All</button>
+        <button class="notif-filter-chip" data-filter="today">Today</button>
+        <button class="notif-filter-chip" data-filter="ORB">ORB</button>
+        <button class="notif-filter-chip" data-filter="DRB">DRB</button>
+        <button class="notif-filter-chip" data-filter="long">Long</button>
+        <button class="notif-filter-chip" data-filter="short">Short</button>
+        <button class="notif-filter-chip" data-filter="sector">Sector</button>
+        <button class="notif-filter-chip" data-filter="starred">★ Starred</button>
+      </div>
+    </div>
+
+    <div style="overflow-y:auto; flex:1;" id="notifListWrap">
+      <div id="notifList"></div>
+      <div id="notifEmpty" style="display:none; text-align:center; padding:30px 16px; color:var(--text-muted); font-size:12.5px;">No notifications match your filters.</div>
+    </div>
+
+    <div style="padding:10px 16px; border-top:1px solid var(--border-soft); display:flex; justify-content:space-between;">
+      <button class="btn-view" id="notifMarkAllRead" style="font-size:11.5px; padding:6px 10px;">Mark all read</button>
+      <button class="btn-view" id="notifClearAll" style="font-size:11.5px; padding:6px 10px; color:var(--bear);">Clear all</button>
+    </div>
+  </div>
+</div>
+
 <!-- ============ GLOBAL MARKETS MODAL ============ -->
+
 <div class="modal-overlay" id="globalMarketsOverlay">
   <div class="modal-box wide">
     <div class="modal-head">
@@ -4039,6 +4137,43 @@ function internalSectorFilterFor(realIndexName){
 const BROADER_FILTER_INDICES = new Set(["Nifty PSU Bank", "Nifty Private Bank", "Nifty Bank", "Nifty Realty", "Nifty Consumer Durables"]);
 let sectorIdxRealData = { sector: [], broader: [] };
 
+const _sectorNotifSeenCount = { ORB: {}, DRB: {} };
+let _sectorNotifBaselineSet = false;
+
+function checkSectorBreakNotifications(sectorData){
+  // First call just establishes the baseline (how many entries already
+  // exist) — same reasoning as the stock-level Top-10 alert baseline:
+  // don't fire a notification for every sector's entire day-so-far
+  // history the moment the page loads.
+  const isBaseline = !_sectorNotifBaselineSet;
+  sectorData.forEach(entry => {
+    const name = entry.name;
+    const orbLog = entry.orb_break_log || [];
+    const drbLog = entry.drb_break_log || [];
+
+    const prevOrbCount = _sectorNotifSeenCount.ORB[name] || 0;
+    if(!isBaseline && orbLog.length > prevOrbCount){
+      const latest = orbLog[orbLog.length - 1];
+      addNotification({
+        category: "SECTOR_ORB", symbol: name, dir: latest.dir, time: latest.time,
+        message: `${name} sector broke its ORB ${latest.dir === "up" ? "high" : "low"}`,
+      });
+    }
+    _sectorNotifSeenCount.ORB[name] = orbLog.length;
+
+    const prevDrbCount = _sectorNotifSeenCount.DRB[name] || 0;
+    if(!isBaseline && drbLog.length > prevDrbCount){
+      const latest = drbLog[drbLog.length - 1];
+      addNotification({
+        category: "SECTOR_DRB", symbol: name, dir: latest.dir, time: latest.time,
+        message: `${name} sector broke yesterday's ${latest.dir === "up" ? "high" : "low"}`,
+      });
+    }
+    _sectorNotifSeenCount.DRB[name] = drbLog.length;
+  });
+  _sectorNotifBaselineSet = true;
+}
+
 async function fetchSectorIndexData(){
   const base = getBackendUrl();
   if(!base) return;
@@ -4049,6 +4184,7 @@ async function fetchSectorIndexData(){
     ]);
     sectorIdxRealData.sector = sectorRes.ok ? await sectorRes.json() : [];
     sectorIdxRealData.broader = broaderRes.ok ? await broaderRes.json() : [];
+    if(sectorIdxRealData.sector.length) checkSectorBreakNotifications(sectorIdxRealData.sector);
     renderSectorTrend();
   } catch(err){
     // Silent — keeps showing last known values, same pattern as the
@@ -4462,10 +4598,308 @@ let rvolShortAlertHistory = [];
 
 const ALERT_HISTORY_MAX = 50;
 
+/* =====================================================================
+   UNIFIED NOTIFICATION CENTER
+   Consolidates ORB, DRB, Sector ORB, Sector DRB, and System messages
+   into one store — replaces the previously separate, disconnected
+   orbAlertHistory/rvolLongAlertHistory/rvolShortAlertHistory arrays as
+   the single source of truth for the notification panel (those arrays
+   still exist and still drive the existing toast popups, unrelated to
+   this addition).
+===================================================================== */
+const NOTIF_STORE_KEY = "ib_notifications";
+const NOTIF_SETTINGS_KEY = "ib_notification_settings";
+const NOTIF_MAX_STORED = 500; // hard cap regardless of auto-remove age, so a misconfigured long retention period can't grow this unbounded
+
+// Priority assignment is a documented judgment call, not a standard:
+// a sector-level break affects many stocks at once, so it's ranked
+// above an individual stock's break; System messages are informational
+// only.
+const NOTIF_CATEGORY_PRIORITY = { ORB: "medium", DRB: "medium", SECTOR_ORB: "high", SECTOR_DRB: "high", SYSTEM: "low" };
+const NOTIF_CATEGORY_LABEL = { ORB: "ORB", DRB: "DRB", SECTOR_ORB: "Sector ORB", SECTOR_DRB: "Sector DRB", SYSTEM: "System" };
+
+function loadNotificationSettings(){
+  try {
+    const saved = JSON.parse(localStorage.getItem(NOTIF_SETTINGS_KEY) || "null");
+    return Object.assign({ soundEnabled: true, desktopEnabled: false, retentionDays: 7, cooldownMinutes: 5 }, saved || {});
+  } catch(e){
+    return { soundEnabled: true, desktopEnabled: false, retentionDays: 7, cooldownMinutes: 5 };
+  }
+}
+function saveNotificationSettings(s){ localStorage.setItem(NOTIF_SETTINGS_KEY, JSON.stringify(s)); }
+let notificationSettings = loadNotificationSettings();
+
+function loadNotificationStore(){
+  try { return JSON.parse(localStorage.getItem(NOTIF_STORE_KEY) || "[]"); }
+  catch(e){ return []; }
+}
+function saveNotificationStore(){
+  // Hard cap first (oldest dropped), THEN persist — never let a runaway
+  // list silently consume unbounded localStorage.
+  if(notificationStore.length > NOTIF_MAX_STORED) notificationStore.length = NOTIF_MAX_STORED;
+  localStorage.setItem(NOTIF_STORE_KEY, JSON.stringify(notificationStore));
+}
+let notificationStore = loadNotificationStore();
+
+function pruneOldNotifications(){
+  const cutoff = Date.now() - notificationSettings.retentionDays * 24 * 60 * 60 * 1000;
+  const before = notificationStore.length;
+  // Pinned notifications are exempt from auto-removal — a user pinning
+  // something is an explicit signal they want it kept regardless of age.
+  notificationStore = notificationStore.filter(n => n.pinned || n.firedAtMs >= cutoff);
+  if(notificationStore.length !== before) saveNotificationStore();
+}
+
+const _notifCooldownTracker = {}; // {category+symbol: lastFiredMs}
+function addNotification({ category, symbol, dir, message, time }){
+  const cooldownMs = notificationSettings.cooldownMinutes * 60 * 1000;
+  const cooldownKey = category + "|" + symbol;
+  const lastFired = _notifCooldownTracker[cooldownKey];
+  if(lastFired && (Date.now() - lastFired) < cooldownMs){
+    return null; // suppressed — same stock, same category, still within the cooldown window
+  }
+  _notifCooldownTracker[cooldownKey] = Date.now();
+
+  const notif = {
+    id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    category, priority: NOTIF_CATEGORY_PRIORITY[category] || "medium",
+    symbol: symbol || null, dir: dir || null, message, time: time || new Date().toLocaleTimeString('en-IN', { hour:'2-digit', minute:'2-digit' }),
+    firedAtMs: Date.now(),
+    read: false, starred: false, pinned: false,
+  };
+  notificationStore.unshift(notif);
+  pruneOldNotifications();
+  saveNotificationStore();
+  updateNotifBadge();
+  if(notificationSettings.soundEnabled) playNotifSound();
+  if(notificationSettings.desktopEnabled) sendDesktopNotification(notif);
+  return notif;
+}
+
+let _notifAudioCtx = null;
+function playNotifSound(){
+  try {
+    if(!_notifAudioCtx) _notifAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const ctx = _notifAudioCtx;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(880, ctx.currentTime);
+    gain.gain.setValueAtTime(0.15, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.25);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.25);
+  } catch(e){}
+}
+
+function sendDesktopNotification(notif){
+  // Browser desktop notifications — requires the user to have already
+  // granted permission via the toggle (see requestDesktopNotifPermission).
+  // This is separate from, and much simpler than, true mobile push
+  // notifications, which would need a service worker and a push
+  // subscription backend (FCM/APNs) — not implemented here.
+  if(!("Notification" in window) || Notification.permission !== "granted") return;
+  try {
+    new Notification(`IntraBuss — ${NOTIF_CATEGORY_LABEL[notif.category]}`, {
+      body: notif.message,
+      tag: notif.id,
+    });
+  } catch(e){}
+}
+
+/* ---------------- Notification panel UI ---------------- */
+let notifActiveFilter = "all";
+
+function updateNotifBadge(){
+  const unread = notificationStore.filter(n => !n.read).length;
+  const badge = document.getElementById("notifBadge");
+  if(unread > 0){
+    badge.textContent = unread > 99 ? "99+" : unread;
+    badge.style.display = "flex";
+  } else {
+    badge.style.display = "none";
+  }
+}
+
+function getFilteredNotifications(){
+  const search = document.getElementById("notifSearchInput").value.trim().toLowerCase();
+  let list = [...notificationStore];
+
+  if(notifActiveFilter === "today"){
+    const todayStart = new Date(); todayStart.setHours(0,0,0,0);
+    list = list.filter(n => n.firedAtMs >= todayStart.getTime());
+  } else if(notifActiveFilter === "long"){
+    list = list.filter(n => n.dir === "up");
+  } else if(notifActiveFilter === "short"){
+    list = list.filter(n => n.dir === "down");
+  } else if(notifActiveFilter === "sector"){
+    list = list.filter(n => n.category === "SECTOR_ORB" || n.category === "SECTOR_DRB");
+  } else if(notifActiveFilter === "starred"){
+    list = list.filter(n => n.starred);
+  } else if(notifActiveFilter === "ORB" || notifActiveFilter === "DRB"){
+    list = list.filter(n => n.category === notifActiveFilter || n.category === "SECTOR_" + notifActiveFilter);
+  }
+
+  if(search){
+    list = list.filter(n => (n.symbol || "").toLowerCase().includes(search) || n.message.toLowerCase().includes(search));
+  }
+
+  // Pinned always float to the top, most recent first within each group
+  list.sort((a, b) => (b.pinned - a.pinned) || (b.firedAtMs - a.firedAtMs));
+  return list;
+}
+
+function renderNotificationPanel(){
+  const list = getFilteredNotifications();
+  document.getElementById("notifEmpty").style.display = list.length ? "none" : "block";
+  document.getElementById("notifList").innerHTML = list.map(n => `
+    <div class="notif-row ${n.read ? '' : 'unread'}" data-id="${n.id}">
+      <div class="notif-priority-dot ${n.priority}"></div>
+      <div class="notif-body">
+        <div class="notif-top-row">
+          <span class="notif-cat-tag">${NOTIF_CATEGORY_LABEL[n.category] || n.category}${n.pinned ? ' <i class="bi bi-pin-angle-fill"></i>' : ''}</span>
+          <span class="notif-time">${n.time}</span>
+        </div>
+        <div class="notif-msg">${n.message}</div>
+        <div class="notif-actions">
+          <button class="notif-action-btn star-btn ${n.starred ? 'active' : ''}" title="Star"><i class="bi ${n.starred ? 'bi-star-fill' : 'bi-star'}"></i></button>
+          <button class="notif-action-btn pin-btn ${n.pinned ? 'active' : ''}" title="Pin"><i class="bi ${n.pinned ? 'bi-pin-angle-fill' : 'bi-pin-angle'}"></i></button>
+          <button class="notif-action-btn remove-btn" title="Remove"><i class="bi bi-trash3"></i></button>
+        </div>
+      </div>
+    </div>
+  `).join("");
+
+  document.querySelectorAll("#notifList .notif-row").forEach(row => {
+    const id = row.dataset.id;
+    row.addEventListener("click", function(e){
+      if(e.target.closest(".notif-action-btn")) return;
+      const n = notificationStore.find(x => x.id === id);
+      if(n && !n.read){ n.read = true; saveNotificationStore(); updateNotifBadge(); renderNotificationPanel(); }
+    });
+    const starBtn = row.querySelector(".star-btn");
+    if(starBtn) starBtn.addEventListener("click", function(e){
+      e.stopPropagation();
+      const n = notificationStore.find(x => x.id === id);
+      if(n){ n.starred = !n.starred; saveNotificationStore(); renderNotificationPanel(); }
+    });
+    const pinBtn = row.querySelector(".pin-btn");
+    if(pinBtn) pinBtn.addEventListener("click", function(e){
+      e.stopPropagation();
+      const n = notificationStore.find(x => x.id === id);
+      if(n){ n.pinned = !n.pinned; saveNotificationStore(); renderNotificationPanel(); }
+    });
+    const removeBtn = row.querySelector(".remove-btn");
+    if(removeBtn) removeBtn.addEventListener("click", function(e){
+      e.stopPropagation();
+      notificationStore = notificationStore.filter(x => x.id !== id);
+      saveNotificationStore();
+      updateNotifBadge();
+      renderNotificationPanel();
+    });
+  });
+}
+
+document.querySelectorAll(".notif-filter-chip").forEach(chip => {
+  chip.addEventListener("click", function(){
+    notifActiveFilter = this.dataset.filter;
+    document.querySelectorAll(".notif-filter-chip").forEach(c => c.classList.toggle("active", c === this));
+    renderNotificationPanel();
+  });
+});
+document.getElementById("notifSearchInput").addEventListener("input", renderNotificationPanel);
+
+document.getElementById("notifBellBtn").addEventListener("click", function(){
+  document.getElementById("notifOverlay").classList.add("show");
+  renderNotificationPanel();
+});
+document.getElementById("notifClose").addEventListener("click", () => document.getElementById("notifOverlay").classList.remove("show"));
+document.getElementById("notifOverlay").addEventListener("click", function(e){ if(e.target === this) this.classList.remove("show"); });
+
+document.getElementById("notifMarkAllRead").addEventListener("click", function(){
+  notificationStore.forEach(n => n.read = true);
+  saveNotificationStore();
+  updateNotifBadge();
+  renderNotificationPanel();
+});
+document.getElementById("notifClearAll").addEventListener("click", function(){
+  notificationStore = [];
+  saveNotificationStore();
+  updateNotifBadge();
+  renderNotificationPanel();
+});
+
+/* ---------------- Settings panel ---------------- */
+document.getElementById("notifSettingsToggle").addEventListener("click", function(){
+  const panel = document.getElementById("notifSettingsPanel");
+  panel.style.display = panel.style.display === "none" ? "block" : "none";
+});
+function syncNotifSettingsUI(){
+  document.getElementById("notifSoundToggle").checked = notificationSettings.soundEnabled;
+  document.getElementById("notifDesktopToggle").checked = notificationSettings.desktopEnabled;
+  document.getElementById("notifRetentionInput").value = notificationSettings.retentionDays;
+  document.getElementById("notifCooldownInput").value = notificationSettings.cooldownMinutes;
+}
+syncNotifSettingsUI();
+
+document.getElementById("notifSoundToggle").addEventListener("change", function(){
+  notificationSettings.soundEnabled = this.checked;
+  saveNotificationSettings(notificationSettings);
+});
+document.getElementById("notifDesktopToggle").addEventListener("change", async function(){
+  if(this.checked){
+    if(!("Notification" in window)){
+      this.checked = false;
+      return;
+    }
+    const perm = await Notification.requestPermission();
+    if(perm !== "granted"){ this.checked = false; return; }
+  }
+  notificationSettings.desktopEnabled = this.checked;
+  saveNotificationSettings(notificationSettings);
+});
+document.getElementById("notifRetentionInput").addEventListener("change", function(){
+  const v = Math.max(1, Math.min(90, parseInt(this.value) || 7));
+  this.value = v;
+  notificationSettings.retentionDays = v;
+  saveNotificationSettings(notificationSettings);
+  pruneOldNotifications();
+});
+document.getElementById("notifCooldownInput").addEventListener("change", function(){
+  const v = Math.max(0, Math.min(120, parseInt(this.value) || 5));
+  this.value = v;
+  notificationSettings.cooldownMinutes = v;
+  saveNotificationSettings(notificationSettings);
+});
+
+/* ---------------- CSV export ---------------- */
+document.getElementById("notifExportBtn").addEventListener("click", function(){
+  const rows = [["Time", "Category", "Priority", "Symbol", "Direction", "Message", "Read", "Starred", "Pinned"]];
+  notificationStore.forEach(n => {
+    rows.push([n.time, NOTIF_CATEGORY_LABEL[n.category] || n.category, n.priority, n.symbol || "", n.dir || "", n.message, n.read, n.starred, n.pinned]);
+  });
+  const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(",")).join("\n");
+  const blob = new Blob([csv], { type: "text/csv" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `intrabuss-notifications-${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+});
+
+updateNotifBadge();
+
 function queueOrbAlert(strategy, symbol, price, dir, qty, time, rovl){
   const channelLabel = `${strategy} ${dir === "up" ? "Long" : "Short"} Break`;
   orbAlertQueue.push({ strategy, symbol, price, dir, qty, time, rovl, channelLabel });
   if(!orbAlertQueueRunning) processOrbAlertQueue();
+  addNotification({
+    category: strategy, symbol, dir, time,
+    message: `${symbol} broke ${strategy} ${dir === "up" ? "high" : "low"} at ₹${price}`,
+  });
 }
 function processOrbAlertQueue(){
   if(!orbAlertQueue.length){ orbAlertQueueRunning = false; return; }
@@ -4483,6 +4917,10 @@ function processOrbAlertQueue(){
 function queueRvolAlert(strategy, symbol, price, dir, qty, time, rovl){
   const channelLabel = `ORB Break ${dir === "up" ? "Long" : "Short"}`;
   const entry = { strategy, symbol, price, dir, qty, time, rovl, channelLabel };
+  addNotification({
+    category: "ORB", symbol, dir, time,
+    message: `${symbol} entered Top 10 ${dir === "up" ? "Long" : "Short"} — ORB break at ₹${price}`,
+  });
   if(strategy === "LONG"){
     rvolLongAlertQueue.push(entry);
     if(!rvolLongAlertQueueRunning) processRvolLongAlertQueue();
