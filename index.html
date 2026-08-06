@@ -1817,7 +1817,7 @@ html.hide-etf #etfSwingSection{ display:none !important; }
           <i class="bi bi-recycle"></i> <span class="d-none d-md-inline">Sector Rotation</span>
         </button>
 
-        <button class="icon-btn" id="notifBellBtn" title="Notifications" style="position:relative;">
+        <button class="icon-btn" id="notifBellBtn" title="Notifications" style="position:relative; display:none;">
           <i class="bi bi-bell-fill"></i>
           <span id="notifBadge" class="notif-badge" style="display:none;">0</span>
         </button>
@@ -2303,6 +2303,17 @@ html.hide-etf #etfSwingSection{ display:none !important; }
       </div>
       <div id="rotationAccessMsg" style="font-size:11.5px; color:var(--bear); margin-bottom:8px; display:none;"></div>
       <div id="rotationAccessMobileList" style="display:flex; flex-direction:column; gap:6px; max-height:170px; overflow-y:auto;"></div>
+
+      <div class="settings-divider"></div>
+
+      <div class="modal-section-lbl">Notifications Access <span style="color:var(--text-muted); font-weight:500; text-transform:none; letter-spacing:0;">(admin only) · defaults to admin-only</span></div>
+      <div class="section-sub" style="font-size:11.5px; color:var(--text-muted); margin-bottom:8px;">Separate from general login access above — a number needs to be added here too before the notification bell shows up for them.</div>
+      <div style="display:flex; gap:8px; margin-bottom:8px;">
+        <input type="tel" id="notifAccessNewMobile" inputmode="numeric" maxlength="10" placeholder="Add 10-digit mobile number" style="flex:1; background:var(--bg-raised); border:1px solid var(--border-med); border-radius:var(--radius-sm); padding:9px 10px; color:var(--text-primary); font-size:13px;">
+        <button class="icon-btn" id="notifAccessAddBtn" title="Add number"><i class="bi bi-plus-lg"></i></button>
+      </div>
+      <div id="notifAccessMsg" style="font-size:11.5px; color:var(--bear); margin-bottom:8px; display:none;"></div>
+      <div id="notifAccessMobileList" style="display:flex; flex-direction:column; gap:6px; max-height:170px; overflow-y:auto;"></div>
 
       <div class="settings-divider"></div>
 
@@ -2923,6 +2934,21 @@ async function getRotationAccessMobiles(){
   return null;
 }
 
+// Same pattern, separate list — a mobile number needs to be granted
+// access here too before the notification bell shows up for them.
+// Defaults to admin-only.
+async function getNotifAccessMobiles(){
+  try {
+    const res = await fetch(getBackendUrl() + "/notif-access");
+    if(!res.ok) throw new Error("HTTP " + res.status);
+    const data = await res.json();
+    if(Array.isArray(data.mobiles)) return data.mobiles;
+  } catch(e){
+    console.warn("Couldn't reach backend for notif-access list:", e);
+  }
+  return null;
+}
+
 const SESSION_KEY = "ib_session";
 const SESSION_MAX_AGE_MS = 3 * 60 * 60 * 1000; // fixed 3-hour session, regardless of activity
 
@@ -2969,6 +2995,7 @@ function showApp(session){
   if(isAdmin) renderAdminList();
   if(isAdmin) refreshScanModeUI(); // pull the real configured stock counts (e.g. 424 / 4,515) from /health right away — admin-only section
   if(isAdmin) renderRotationAccessList();
+  if(isAdmin) renderNotifAccessList();
 
   // Sector Rotation Dashboard button — hidden by default (see the HTML),
   // only shown once we've confirmed this mobile number has rotation
@@ -2981,6 +3008,20 @@ function showApp(session){
     rotationBtn.style.display = "none";
     getRotationAccessMobiles().then(list => {
       rotationBtn.style.display = (Array.isArray(list) && list.includes(session.mobile)) ? "" : "none";
+    });
+  }
+
+  // Notification bell — same gated pattern as the Sector Rotation button
+  // above: hidden by default, only shown once this mobile number is
+  // confirmed to have notification access (admin always does; anyone
+  // else needs to be on the admin-managed notif_access_mobiles list).
+  const notifBtn = document.getElementById("notifBellBtn");
+  if(isAdmin){
+    notifBtn.style.display = "";
+  } else {
+    notifBtn.style.display = "none";
+    getNotifAccessMobiles().then(list => {
+      notifBtn.style.display = (Array.isArray(list) && list.includes(session.mobile)) ? "" : "none";
     });
   }
 
@@ -3139,6 +3180,73 @@ document.getElementById("rotationAccessAddBtn").addEventListener("click", async 
     renderRotationAccessList();
   } catch(e){
     showRotationAccessMsg("Couldn't reach the server. Check your connection and try again.");
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+/* ---------------- Admin: manage Notifications access ---------------- */
+async function renderNotifAccessList(){
+  const listEl = document.getElementById("notifAccessMobileList");
+  listEl.innerHTML = `<div class="admin-mobile-loading">Loading…</div>`;
+  const list = await getNotifAccessMobiles();
+  if(list === null){
+    listEl.innerHTML = `<div class="admin-mobile-loading">Couldn't reach the server — check your connection and reopen this panel.</div>`;
+    return;
+  }
+  listEl.innerHTML = list.map(m => `
+    <div class="admin-mobile-row">
+      <span class="mono">${m}${m === ADMIN_MOBILE ? '<span class="admin-tag">ADMIN</span>' : ''}</span>
+      ${m === ADMIN_MOBILE ? '' : `<button class="rm-x" data-mobile="${m}" title="Remove"><i class="bi bi-x-lg"></i></button>`}
+    </div>
+  `).join("");
+
+  document.querySelectorAll("#notifAccessMobileList .rm-x").forEach(btn => {
+    btn.addEventListener("click", async function(){
+      this.disabled = true;
+      try {
+        const res = await fetch(getBackendUrl() + "/notif-access/" + encodeURIComponent(this.dataset.mobile), { method: "DELETE", headers: adminHeaders() });
+        const data = await res.json();
+        if(!data.success){ showNotifAccessMsg("Couldn't remove that number. Try again."); return; }
+        renderNotifAccessList();
+      } catch(e){
+        showNotifAccessMsg("Couldn't reach the server. Try again.");
+      }
+    });
+  });
+}
+
+function showNotifAccessMsg(text){
+  const el = document.getElementById("notifAccessMsg");
+  el.textContent = text;
+  el.style.display = "block";
+  setTimeout(() => { el.style.display = "none"; }, 2500);
+}
+
+document.getElementById("notifAccessAddBtn").addEventListener("click", async function(){
+  const input = document.getElementById("notifAccessNewMobile");
+  const mobile = input.value.trim();
+  if(!/^[0-9]{10}$/.test(mobile)){
+    showNotifAccessMsg("Enter a valid 10-digit mobile number.");
+    return;
+  }
+  const btn = this;
+  btn.disabled = true;
+  try {
+    const res = await fetch(getBackendUrl() + "/notif-access", {
+      method: "POST",
+      headers: adminHeaders(),
+      body: JSON.stringify({ mobile })
+    });
+    const data = await res.json();
+    if(!data.success){
+      showNotifAccessMsg(data.error === "unauthorized" ? "Admin PIN check failed — try logging out and back in." : data.error === "invalid_mobile" ? "Enter a valid 10-digit mobile number." : "Couldn't add that number. Try again.");
+      return;
+    }
+    input.value = "";
+    renderNotifAccessList();
+  } catch(e){
+    showNotifAccessMsg("Couldn't reach the server. Check your connection and try again.");
   } finally {
     btn.disabled = false;
   }
