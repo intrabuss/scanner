@@ -351,6 +351,18 @@ img, svg{ max-width:100%; }
 .icon-btn.spinning i{ animation:spin .6s linear; }
 @keyframes spin{ to{ transform:rotate(360deg); } }
 
+.rotation-dashboard-btn{
+  display:flex; align-items:center; gap:7px;
+  padding:8px 14px; border-radius:var(--radius-sm);
+  background:linear-gradient(135deg, #4C8DFF, #7C5CFF);
+  border:none; color:#fff; font-weight:700; font-size:12.5px;
+  box-shadow:0 0 0 1px rgba(124,92,255,.3), 0 4px 14px -4px rgba(76,141,255,.6);
+  transition:.15s ease; white-space:nowrap;
+}
+.rotation-dashboard-btn:hover{ filter:brightness(1.1); transform:translateY(-1px); box-shadow:0 0 0 1px rgba(124,92,255,.4), 0 6px 18px -4px rgba(76,141,255,.7); }
+.rotation-dashboard-btn:active{ transform:scale(.96); }
+.rotation-dashboard-btn i{ font-size:14px; }
+
 .avatar{
   width:36px; height:36px; border-radius:9px;
   background:linear-gradient(160deg,#2A313F,#171C24);
@@ -424,6 +436,24 @@ html[data-theme="light"] .avatar{ background:linear-gradient(160deg,#E3E7EE,#F3F
 .breadth-stat-val{ font-size:20px; font-weight:800; font-family:var(--font-data); color:var(--text-primary); }
 .breadth-stat-lbl{ font-size:11px; color:var(--text-muted); margin-top:2px; text-transform:uppercase; letter-spacing:.02em; }
 @media (max-width: 575.98px){ .breadth-stats-grid{ grid-template-columns:repeat(2, 1fr); } }
+
+/* Sector Rotation Dashboard modal */
+.rotation-summary-grid{ display:grid; grid-template-columns:repeat(4, 1fr); gap:12px; margin-bottom:16px; }
+.rotation-summary-card{ background:var(--bg-raised); border:1px solid var(--border-soft); border-radius:var(--radius-sm); padding:12px 14px; }
+.rotation-summary-lbl{ font-size:10.5px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.02em; margin-bottom:4px; }
+.rotation-market-status{ font-size:15px; font-weight:800; }
+.rotation-market-status.bullish{ color:var(--bull); }
+.rotation-market-status.bearish{ color:var(--bear); }
+.rotation-market-status.mixed{ color:#EAB308; }
+.rotation-leadership-row{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+.rotation-leadership-col{ background:var(--bg-raised); border:1px solid var(--border-soft); border-radius:var(--radius-sm); padding:12px 14px; }
+.rotation-leadership-hdr{ font-size:11px; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:.02em; margin-bottom:8px; }
+.rotation-leader-row{ display:flex; justify-content:space-between; align-items:center; padding:5px 0; font-size:12.5px; }
+.rotation-status-chip{ font-size:10.5px; font-weight:700; padding:2px 8px; border-radius:5px; color:#fff; }
+@media (max-width: 767.98px){
+  .rotation-summary-grid{ grid-template-columns:repeat(2, 1fr); }
+  .rotation-leadership-row{ grid-template-columns:1fr; }
+}
 
 /* Sector Indices — real NSE index bars, sorted strongest to weakest */
 .sidx-row{
@@ -1724,6 +1754,10 @@ html.hide-etf #etfSwingSection{ display:none !important; }
           <div class="market-closed-pop" id="holidayListPop"></div>
         </button>
 
+        <button class="rotation-dashboard-btn" id="rotationDashboardBtn" title="Sector Rotation Dashboard">
+          <i class="bi bi-recycle"></i> <span class="d-none d-md-inline">Sector Rotation</span>
+        </button>
+
         <div class="clock-block d-none d-sm-block">
           <div class="clock-time mono" id="clockTime">09:41:22</div>
           <div class="clock-date" id="clockDate">Fri, 31 Jul 2026</div>
@@ -2407,6 +2441,76 @@ html.hide-etf #etfSwingSection{ display:none !important; }
         <tbody id="topMoversBody"></tbody>
       </table>
       <div class="explorer-empty" id="topMoversEmpty" style="display:none;">No symbols match your search.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ SECTOR ROTATION DASHBOARD MODAL ============ -->
+<div class="modal-overlay" id="rotationOverlay">
+  <div class="modal-box wide">
+    <div class="modal-head">
+      <div>
+        <div style="font-weight:800; font-size:16px;">Sector Rotation Dashboard</div>
+        <div class="explorer-meta">23 NSE sector indices, ranked by a composite strength score · <span id="rotationUpdatedAt">—</span></div>
+      </div>
+      <button class="icon-btn" id="rotationClose"><i class="bi bi-x-lg"></i></button>
+    </div>
+    <div class="explorer-body table-scroll" style="padding:16px 20px;">
+
+      <!-- Breadth + Leadership summary row -->
+      <div class="rotation-summary-grid">
+        <div class="rotation-summary-card">
+          <div class="rotation-summary-lbl">Market Status</div>
+          <div id="rotationMarketStatus" class="rotation-market-status">—</div>
+        </div>
+        <div class="rotation-summary-card">
+          <div class="rotation-summary-lbl">Strong / Weak / Neutral</div>
+          <div class="mono" style="font-size:15px; font-weight:700;">
+            <span style="color:var(--bull);" id="rotationStrongCount">—</span> /
+            <span style="color:var(--bear);" id="rotationWeakCount">—</span> /
+            <span style="color:var(--text-muted);" id="rotationNeutralCount">—</span>
+          </div>
+        </div>
+        <div class="rotation-summary-card">
+          <div class="rotation-summary-lbl">% Bullish / % Bearish</div>
+          <div class="mono" style="font-size:15px; font-weight:700;">
+            <span style="color:var(--bull);" id="rotationBullishPct">—</span> /
+            <span style="color:var(--bear);" id="rotationBearishPct">—</span>
+          </div>
+        </div>
+        <div class="rotation-summary-card">
+          <div class="rotation-summary-lbl">Rotation Speed</div>
+          <div id="rotationSpeed" class="mono" style="font-size:15px; font-weight:700;">—</div>
+        </div>
+      </div>
+
+      <div class="rotation-leadership-row">
+        <div class="rotation-leadership-col">
+          <div class="rotation-leadership-hdr">Top 3 Strongest</div>
+          <div id="rotationTop3"></div>
+        </div>
+        <div class="rotation-leadership-col">
+          <div class="rotation-leadership-hdr">Bottom 3 Weakest</div>
+          <div id="rotationBottom3"></div>
+        </div>
+      </div>
+
+      <table class="data-grid" style="margin-top:16px;">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Sector</th>
+            <th>09:15–10:00</th>
+            <th>09:15–Now</th>
+            <th>After 10:00</th>
+            <th>5min Mom</th>
+            <th>RS vs Nifty</th>
+            <th>Score / Status</th>
+          </tr>
+        </thead>
+        <tbody id="rotationBody"></tbody>
+      </table>
+      <div class="explorer-empty" id="rotationEmpty" style="display:none;">Couldn't load sector rotation data.</div>
     </div>
   </div>
 </div>
@@ -4879,6 +4983,74 @@ async function loadIndexMembership(){
     // unaffected either way since it doesn't need this data.
   }
 }
+
+/* ---------------- Sector Rotation Dashboard ---------------- */
+const ROTATION_STATUS_COLORS = {
+  6: "#009688", 5: "#089981", 4: "#26a69a", 3: "#78909c", 2: "#ff9800", 1: "#ef6c00", 0: "#f23645", 7: "rgba(120,144,156,.5)",
+};
+function rotationChangeColor(v){ return v == null ? "var(--text-muted)" : (v >= 0 ? "var(--bull)" : "var(--bear)"); }
+function rotationFmtPct(v){ return v == null ? "—" : `${v >= 0 ? '+' : ''}${v}%`; }
+
+async function openRotationDashboard(){
+  document.getElementById("rotationOverlay").classList.add("show");
+  document.getElementById("rotationBody").innerHTML = `<tr><td colspan="8" style="text-align:center; padding:24px; color:var(--text-muted);">Loading…</td></tr>`;
+  try {
+    const res = await fetch(getBackendUrl() + "/sector-rotation");
+    const data = await res.json();
+    if(!data.sectors || !data.sectors.length){
+      document.getElementById("rotationEmpty").style.display = "block";
+      document.getElementById("rotationBody").innerHTML = "";
+      return;
+    }
+    document.getElementById("rotationEmpty").style.display = "none";
+    renderRotationDashboard(data);
+  } catch(e){
+    document.getElementById("rotationEmpty").style.display = "block";
+    document.getElementById("rotationBody").innerHTML = "";
+  }
+}
+
+function renderRotationDashboard(data){
+  const b = data.breadth;
+  document.getElementById("rotationUpdatedAt").textContent = data.computed_at ? `updated ${data.computed_at}` : "";
+
+  const statusEl = document.getElementById("rotationMarketStatus");
+  statusEl.textContent = b.market_status;
+  statusEl.className = "rotation-market-status " + b.market_status.toLowerCase();
+  document.getElementById("rotationStrongCount").textContent = b.strong_count;
+  document.getElementById("rotationWeakCount").textContent = b.weak_count;
+  document.getElementById("rotationNeutralCount").textContent = b.neutral_count;
+  document.getElementById("rotationBullishPct").textContent = b.bullish_pct != null ? b.bullish_pct + "%" : "—";
+  document.getElementById("rotationBearishPct").textContent = b.bearish_pct != null ? b.bearish_pct + "%" : "—";
+  document.getElementById("rotationSpeed").textContent = b.rotation_speed;
+
+  const leaderRow = (s) => `
+    <div class="rotation-leader-row">
+      <span>${s.name}</span>
+      <span class="rotation-status-chip" style="background:${ROTATION_STATUS_COLORS[s.status_code]};">${s.status_text}</span>
+    </div>`;
+  document.getElementById("rotationTop3").innerHTML = data.leadership.top3.map(leaderRow).join("");
+  document.getElementById("rotationBottom3").innerHTML = data.leadership.bottom3.map(leaderRow).join("");
+
+  document.getElementById("rotationBody").innerHTML = data.sectors.map(s => {
+    const arrow = s.rotation_arrow === "up" ? ' <span style="color:var(--bull);">↑</span>' : s.rotation_arrow === "down" ? ' <span style="color:var(--bear);">↓</span>' : '';
+    return `
+    <tr>
+      <td class="mono cell-sub">${s.rank}</td>
+      <td><strong>${s.name}</strong>${arrow}</td>
+      <td class="mono" style="color:${rotationChangeColor(s.first_hour_chg)};">${rotationFmtPct(s.first_hour_chg)}</td>
+      <td class="mono" style="color:${rotationChangeColor(s.session_chg)};">${rotationFmtPct(s.session_chg)}</td>
+      <td class="mono" style="color:${rotationChangeColor(s.after_ten_chg)};">${rotationFmtPct(s.after_ten_chg)}</td>
+      <td class="mono" style="color:${rotationChangeColor(s.momentum)};">${rotationFmtPct(s.momentum)}</td>
+      <td class="mono" style="color:${rotationChangeColor(s.relative_strength)};">${rotationFmtPct(s.relative_strength)}</td>
+      <td><span class="rotation-status-chip" style="background:${ROTATION_STATUS_COLORS[s.status_code]};">${s.status_text} ${s.score}</span></td>
+    </tr>`;
+  }).join("");
+}
+
+document.getElementById("rotationDashboardBtn").addEventListener("click", openRotationDashboard);
+document.getElementById("rotationClose").addEventListener("click", () => document.getElementById("rotationOverlay").classList.remove("show"));
+document.getElementById("rotationOverlay").addEventListener("click", function(e){ if(e.target === this) this.classList.remove("show"); });
 
 function openTopMovers(direction){
   topMoversDirection = direction;
