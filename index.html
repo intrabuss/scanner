@@ -5142,7 +5142,18 @@ function renderNotificationPanel(){
     row.addEventListener("click", function(e){
       if(e.target.closest(".notif-action-btn")) return;
       const n = notificationStore.find(x => x.id === id);
-      if(n && !n.read){ n.read = true; saveNotificationStore(); updateNotifBadge(); renderNotificationPanel(); }
+      if(!n) return;
+      if(!n.read){ n.read = true; saveNotificationStore(); updateNotifBadge(); }
+      // Sector-level notifications (SECTOR_ORB/SECTOR_DRB) and the SYSTEM
+      // category have no single symbol attached — nothing to chart, so
+      // those just mark-as-read like before instead of opening a chart.
+      if(n.symbol){
+        chartOpenedFromNotifPanel = true;
+        document.getElementById("notifOverlay").classList.remove("show");
+        openChartModal(n.symbol, false);
+      } else {
+        renderNotificationPanel();
+      }
     });
     const starBtn = row.querySelector(".star-btn");
     if(starBtn) starBtn.addEventListener("click", function(e){
@@ -5999,6 +6010,7 @@ let currentChartLegendEl = null;
 let currentChartTooltipEl = null;
 let currentChartData = null;          // last fetched payload, so a timeframe toggle can redraw instantly without a re-fetch
 let chartRefreshTimer = null; // periodic re-fetch while the chart modal is open — see openChartModal
+let chartOpenedFromNotifPanel = false; // true when the chart was opened by clicking a notification — closing it returns to the notification panel instead of the dashboard
 let currentChartNewsTitles = [];
 
 function findRowForSymbol(symbol){
@@ -6566,6 +6578,11 @@ function closeChartModal(){
   currentChartTooltipEl = null;
   currentChartData = null;
   if(chartRefreshTimer){ clearInterval(chartRefreshTimer); chartRefreshTimer = null; }
+  if(chartOpenedFromNotifPanel){
+    chartOpenedFromNotifPanel = false;
+    document.getElementById("notifOverlay").classList.add("show");
+    renderNotificationPanel();
+  }
 }
 document.getElementById("chartClose").addEventListener("click", closeChartModal);
 document.getElementById("chartOverlay").addEventListener("click", function(e){
