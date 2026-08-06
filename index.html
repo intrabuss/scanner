@@ -2274,13 +2274,27 @@ html.hide-etf #etfSwingSection{ display:none !important; }
 
       <div class="settings-divider"></div>
 
-      <div class="modal-section-lbl">Manage Access <span style="color:var(--text-muted); font-weight:500; text-transform:none; letter-spacing:0;">(admin only)</span></div>
-      <div style="display:flex; gap:8px; margin-bottom:8px;">
-        <input type="tel" id="adminNewMobile" inputmode="numeric" maxlength="10" placeholder="Add 10-digit mobile number" style="flex:1; background:var(--bg-raised); border:1px solid var(--border-med); border-radius:var(--radius-sm); padding:9px 10px; color:var(--text-primary); font-size:13px;">
-        <button class="icon-btn" id="adminAddBtn" title="Add number"><i class="bi bi-plus-lg"></i></button>
+      <div class="modal-section-lbl">Access Management <span style="color:var(--text-muted); font-weight:500; text-transform:none; letter-spacing:0;">(admin only)</span></div>
+      <div class="section-sub" style="font-size:11.5px; color:var(--text-muted); margin-bottom:8px;">Grant a mobile number access to Login, Sector Rotation, and Notifications independently. Rotation and Notifications each require Login to be on — turning either of them on switches Login on automatically.</div>
+      <div style="display:flex; gap:8px; margin-bottom:10px;">
+        <input type="tel" id="accessMgmtNewMobile" inputmode="numeric" maxlength="10" placeholder="Add 10-digit mobile number" style="flex:1; background:var(--bg-raised); border:1px solid var(--border-med); border-radius:var(--radius-sm); padding:9px 10px; color:var(--text-primary); font-size:13px;">
+        <button class="icon-btn" id="accessMgmtAddBtn" title="Add number"><i class="bi bi-plus-lg"></i></button>
       </div>
-      <div id="adminMsg" style="font-size:11.5px; color:var(--bear); margin-bottom:8px; display:none;"></div>
-      <div id="adminMobileList" style="display:flex; flex-direction:column; gap:6px; max-height:170px; overflow-y:auto;"></div>
+      <div id="accessMgmtMsg" style="font-size:11.5px; color:var(--bear); margin-bottom:8px; display:none;"></div>
+      <div style="overflow-x:auto; margin-bottom:8px;">
+        <table style="width:100%; border-collapse:collapse; font-size:12.5px;">
+          <thead>
+            <tr style="color:var(--text-muted); text-align:left; font-size:11px; text-transform:uppercase;">
+              <th style="padding:6px 4px; font-weight:600;">Mobile</th>
+              <th style="padding:6px 4px; font-weight:600; text-align:center;">Login</th>
+              <th style="padding:6px 4px; font-weight:600; text-align:center;">Rotation</th>
+              <th style="padding:6px 4px; font-weight:600; text-align:center;">Notif.</th>
+              <th style="padding:6px 4px;"></th>
+            </tr>
+          </thead>
+          <tbody id="accessMgmtTableBody"></tbody>
+        </table>
+      </div>
 
       <div class="settings-divider"></div>
 
@@ -2292,28 +2306,6 @@ html.hide-etf #etfSwingSection{ display:none !important; }
         <button class="btn-primary" id="adminPinChangeBtn" style="align-self:flex-start; padding:8px 14px; font-size:13px;">Update PIN</button>
       </div>
       <div id="adminPinMsg" style="font-size:11.5px; margin-bottom:8px; display:none;"></div>
-
-      <div class="settings-divider"></div>
-
-      <div class="modal-section-lbl">Sector Rotation Access <span style="color:var(--text-muted); font-weight:500; text-transform:none; letter-spacing:0;">(admin only) · defaults to admin-only</span></div>
-      <div class="section-sub" style="font-size:11.5px; color:var(--text-muted); margin-bottom:8px;">Separate from general login access above — a number needs to be added here too before it can open the Sector Rotation Dashboard.</div>
-      <div style="display:flex; gap:8px; margin-bottom:8px;">
-        <input type="tel" id="rotationAccessNewMobile" inputmode="numeric" maxlength="10" placeholder="Add 10-digit mobile number" style="flex:1; background:var(--bg-raised); border:1px solid var(--border-med); border-radius:var(--radius-sm); padding:9px 10px; color:var(--text-primary); font-size:13px;">
-        <button class="icon-btn" id="rotationAccessAddBtn" title="Add number"><i class="bi bi-plus-lg"></i></button>
-      </div>
-      <div id="rotationAccessMsg" style="font-size:11.5px; color:var(--bear); margin-bottom:8px; display:none;"></div>
-      <div id="rotationAccessMobileList" style="display:flex; flex-direction:column; gap:6px; max-height:170px; overflow-y:auto;"></div>
-
-      <div class="settings-divider"></div>
-
-      <div class="modal-section-lbl">Notifications Access <span style="color:var(--text-muted); font-weight:500; text-transform:none; letter-spacing:0;">(admin only) · defaults to admin-only</span></div>
-      <div class="section-sub" style="font-size:11.5px; color:var(--text-muted); margin-bottom:8px;">Separate from general login access above — a number needs to be added here too before the notification bell shows up for them.</div>
-      <div style="display:flex; gap:8px; margin-bottom:8px;">
-        <input type="tel" id="notifAccessNewMobile" inputmode="numeric" maxlength="10" placeholder="Add 10-digit mobile number" style="flex:1; background:var(--bg-raised); border:1px solid var(--border-med); border-radius:var(--radius-sm); padding:9px 10px; color:var(--text-primary); font-size:13px;">
-        <button class="icon-btn" id="notifAccessAddBtn" title="Add number"><i class="bi bi-plus-lg"></i></button>
-      </div>
-      <div id="notifAccessMsg" style="font-size:11.5px; color:var(--bear); margin-bottom:8px; display:none;"></div>
-      <div id="notifAccessMobileList" style="display:flex; flex-direction:column; gap:6px; max-height:170px; overflow-y:auto;"></div>
 
       <div class="settings-divider"></div>
 
@@ -2329,6 +2321,7 @@ html.hide-etf #etfSwingSection{ display:none !important; }
       <label style="display:flex; align-items:center; gap:7px; font-size:12px; color:var(--text-secondary); margin-bottom:10px;">
         <input type="checkbox" id="backtestQuickTest" checked> Quick Test — 20 stocks only (~30 sec, not the full universe)
       </label>
+      <div id="adminMsg" style="font-size:11.5px; color:var(--bear); margin-bottom:8px; display:none;"></div>
       <button class="btn-primary" id="backtestRunBtn"><i class="bi bi-play-circle"></i> Run Backtest</button>
     </div>
   </div>
@@ -2992,10 +2985,8 @@ function showApp(session){
   document.getElementById("emailAlertsWrap").style.display = isAdmin ? "block" : "none";
   document.getElementById("explorerAlertTestBtn").style.display = isAdmin ? "" : "none";
   document.getElementById("emailAlertsNonAdminMsg").style.display = isAdmin ? "none" : "block";
-  if(isAdmin) renderAdminList();
   if(isAdmin) refreshScanModeUI(); // pull the real configured stock counts (e.g. 424 / 4,515) from /health right away — admin-only section
-  if(isAdmin) renderRotationAccessList();
-  if(isAdmin) renderNotifAccessList();
+  if(isAdmin) renderAccessManagementTable();
 
   // Sector Rotation Dashboard button — hidden by default (see the HTML),
   // only shown once we've confirmed this mobile number has rotation
@@ -3080,202 +3071,130 @@ document.getElementById("upstoxLoginBannerBtn").addEventListener("click", functi
 });
 setInterval(throttleWhenHidden(refreshUpstoxLoginBanner, 90000), 20000); // catches a login done from Settings, another tab, or the daily routine finishing on its own
 
-/* ---------------- Admin: manage allowed mobile numbers ---------------- */
-async function renderAdminList(){
-  const listEl = document.getElementById("adminMobileList");
-  listEl.innerHTML = `<div class="admin-mobile-loading">Loading…</div>`;
-  const list = await getAllowedMobiles();
-  if(list === null){
-    listEl.innerHTML = `<div class="admin-mobile-loading">Couldn't reach the server — check your connection and reopen this panel.</div>`;
-    return;
-  }
-  listEl.innerHTML = list.map(m => `
-    <div class="admin-mobile-row">
-      <span class="mono">${m}${m === ADMIN_MOBILE ? '<span class="admin-tag">ADMIN</span>' : ''}</span>
-      ${m === ADMIN_MOBILE ? '' : `<button class="rm-x" data-mobile="${m}" title="Remove"><i class="bi bi-x-lg"></i></button>`}
-    </div>
-  `).join("");
-
-  document.querySelectorAll("#adminMobileList .rm-x").forEach(btn => {
-    btn.addEventListener("click", async function(){
-      this.disabled = true;
-      try {
-        const res = await fetch(getBackendUrl() + "/allowed-mobiles/" + encodeURIComponent(this.dataset.mobile), { method: "DELETE", headers: adminHeaders() });
-        const data = await res.json();
-        if(!data.success){ showAdminMsg("Couldn't remove that number. Try again."); return; }
-        renderAdminList();
-      } catch(e){
-        showAdminMsg("Couldn't reach the server. Try again.");
-      }
-    });
-  });
-}
-
+/* ---------------- Admin: unified Access Management table ---------------- */
 function showAdminMsg(text){
+  // Used by the Backtest section below — kept generic/reusable, same
+  // #adminMsg element and pattern as before the access lists were
+  // consolidated into the Access Management table.
   const el = document.getElementById("adminMsg");
   el.textContent = text;
   el.style.display = "block";
   setTimeout(() => { el.style.display = "none"; }, 2500);
 }
 
-/* ---------------- Admin: manage Sector Rotation access ---------------- */
-async function renderRotationAccessList(){
-  const listEl = document.getElementById("rotationAccessMobileList");
-  listEl.innerHTML = `<div class="admin-mobile-loading">Loading…</div>`;
-  const list = await getRotationAccessMobiles();
-  if(list === null){
-    listEl.innerHTML = `<div class="admin-mobile-loading">Couldn't reach the server — check your connection and reopen this panel.</div>`;
-    return;
+async function getAccessManagementRows(){
+  try {
+    const res = await fetch(getBackendUrl() + "/access-management", { headers: adminHeaders() });
+    if(!res.ok) throw new Error("HTTP " + res.status);
+    const data = await res.json();
+    if(data.success && Array.isArray(data.rows)) return data.rows;
+  } catch(e){
+    console.warn("Couldn't reach backend for access-management list:", e);
   }
-  listEl.innerHTML = list.map(m => `
-    <div class="admin-mobile-row">
-      <span class="mono">${m}${m === ADMIN_MOBILE ? '<span class="admin-tag">ADMIN</span>' : ''}</span>
-      ${m === ADMIN_MOBILE ? '' : `<button class="rm-x" data-mobile="${m}" title="Remove"><i class="bi bi-x-lg"></i></button>`}
-    </div>
-  `).join("");
-
-  document.querySelectorAll("#rotationAccessMobileList .rm-x").forEach(btn => {
-    btn.addEventListener("click", async function(){
-      this.disabled = true;
-      try {
-        const res = await fetch(getBackendUrl() + "/rotation-access/" + encodeURIComponent(this.dataset.mobile), { method: "DELETE", headers: adminHeaders() });
-        const data = await res.json();
-        if(!data.success){ showRotationAccessMsg("Couldn't remove that number. Try again."); return; }
-        renderRotationAccessList();
-      } catch(e){
-        showRotationAccessMsg("Couldn't reach the server. Try again.");
-      }
-    });
-  });
+  return null;
 }
 
-function showRotationAccessMsg(text){
-  const el = document.getElementById("rotationAccessMsg");
+function showAccessMgmtMsg(text){
+  const el = document.getElementById("accessMgmtMsg");
   el.textContent = text;
   el.style.display = "block";
   setTimeout(() => { el.style.display = "none"; }, 2500);
 }
 
-document.getElementById("rotationAccessAddBtn").addEventListener("click", async function(){
-  const input = document.getElementById("rotationAccessNewMobile");
-  const mobile = input.value.trim();
-  if(!/^[0-9]{10}$/.test(mobile)){
-    showRotationAccessMsg("Enter a valid 10-digit mobile number.");
-    return;
-  }
-  const btn = this;
-  btn.disabled = true;
-  try {
-    const res = await fetch(getBackendUrl() + "/rotation-access", {
-      method: "POST",
-      headers: adminHeaders(),
-      body: JSON.stringify({ mobile })
-    });
-    const data = await res.json();
-    if(!data.success){
-      showRotationAccessMsg(data.error === "unauthorized" ? "Admin PIN check failed — try logging out and back in." : data.error === "invalid_mobile" ? "Enter a valid 10-digit mobile number." : "Couldn't add that number. Try again.");
-      return;
-    }
-    input.value = "";
-    renderRotationAccessList();
-  } catch(e){
-    showRotationAccessMsg("Couldn't reach the server. Check your connection and try again.");
-  } finally {
-    btn.disabled = false;
-  }
-});
+async function setAccessManagement(mobile, patch){
+  // patch is a partial {login, rotation, notifications} — merged onto the
+  // row's CURRENT state so ticking one checkbox doesn't clobber the others.
+  const rows = await getAccessManagementRows();
+  const existing = (rows || []).find(r => r.mobile === mobile) || { login: false, rotation: false, notifications: false };
+  const body = {
+    mobile,
+    login: patch.login !== undefined ? patch.login : existing.login,
+    rotation: patch.rotation !== undefined ? patch.rotation : existing.rotation,
+    notifications: patch.notifications !== undefined ? patch.notifications : existing.notifications,
+  };
+  const res = await fetch(getBackendUrl() + "/access-management", {
+    method: "POST",
+    headers: adminHeaders(),
+    body: JSON.stringify(body)
+  });
+  return await res.json();
+}
 
-/* ---------------- Admin: manage Notifications access ---------------- */
-async function renderNotifAccessList(){
-  const listEl = document.getElementById("notifAccessMobileList");
-  listEl.innerHTML = `<div class="admin-mobile-loading">Loading…</div>`;
-  const list = await getNotifAccessMobiles();
-  if(list === null){
-    listEl.innerHTML = `<div class="admin-mobile-loading">Couldn't reach the server — check your connection and reopen this panel.</div>`;
+async function renderAccessManagementTable(){
+  const body = document.getElementById("accessMgmtTableBody");
+  body.innerHTML = `<tr><td colspan="5" class="admin-mobile-loading" style="padding:10px 4px;">Loading…</td></tr>`;
+  const rows = await getAccessManagementRows();
+  if(rows === null){
+    body.innerHTML = `<tr><td colspan="5" class="admin-mobile-loading" style="padding:10px 4px;">Couldn't reach the server — check your connection and reopen this panel.</td></tr>`;
     return;
   }
-  listEl.innerHTML = list.map(m => `
-    <div class="admin-mobile-row">
-      <span class="mono">${m}${m === ADMIN_MOBILE ? '<span class="admin-tag">ADMIN</span>' : ''}</span>
-      ${m === ADMIN_MOBILE ? '' : `<button class="rm-x" data-mobile="${m}" title="Remove"><i class="bi bi-x-lg"></i></button>`}
-    </div>
+  if(!rows.length){
+    body.innerHTML = `<tr><td colspan="5" class="admin-mobile-loading" style="padding:10px 4px;">No numbers yet — add one above.</td></tr>`;
+    return;
+  }
+  body.innerHTML = rows.map(r => `
+    <tr data-mobile="${r.mobile}" style="border-top:1px solid var(--border-med);">
+      <td style="padding:7px 4px;" class="mono">${r.mobile}${r.is_admin ? ' <span class="admin-tag">ADMIN</span>' : ''}</td>
+      <td style="padding:7px 4px; text-align:center;"><input type="checkbox" class="access-chk" data-field="login" ${r.login ? "checked" : ""} ${r.is_admin ? "disabled" : ""}></td>
+      <td style="padding:7px 4px; text-align:center;"><input type="checkbox" class="access-chk" data-field="rotation" ${r.rotation ? "checked" : ""} ${r.is_admin ? "disabled" : ""}></td>
+      <td style="padding:7px 4px; text-align:center;"><input type="checkbox" class="access-chk" data-field="notifications" ${r.notifications ? "checked" : ""} ${r.is_admin ? "disabled" : ""}></td>
+      <td style="padding:7px 4px; text-align:right;">${r.is_admin ? "" : `<button class="rm-x" title="Remove all access"><i class="bi bi-trash3"></i></button>`}</td>
+    </tr>
   `).join("");
 
-  document.querySelectorAll("#notifAccessMobileList .rm-x").forEach(btn => {
-    btn.addEventListener("click", async function(){
+  body.querySelectorAll("tr").forEach(row => {
+    const mobile = row.dataset.mobile;
+    row.querySelectorAll(".access-chk").forEach(chk => {
+      chk.addEventListener("change", async function(){
+        this.disabled = true;
+        try {
+          const patch = {}; patch[this.dataset.field] = this.checked;
+          const data = await setAccessManagement(mobile, patch);
+          if(!data.success){
+            showAccessMgmtMsg(data.error === "unauthorized" ? "Admin PIN check failed — try logging out and back in." : "Couldn't update access. Try again.");
+          }
+          renderAccessManagementTable();
+        } catch(e){
+          showAccessMgmtMsg("Couldn't reach the server. Try again.");
+          renderAccessManagementTable();
+        }
+      });
+    });
+    const rmBtn = row.querySelector(".rm-x");
+    if(rmBtn) rmBtn.addEventListener("click", async function(){
       this.disabled = true;
       try {
-        const res = await fetch(getBackendUrl() + "/notif-access/" + encodeURIComponent(this.dataset.mobile), { method: "DELETE", headers: adminHeaders() });
+        const res = await fetch(getBackendUrl() + "/access-management/" + encodeURIComponent(mobile), { method: "DELETE", headers: adminHeaders() });
         const data = await res.json();
-        if(!data.success){ showNotifAccessMsg("Couldn't remove that number. Try again."); return; }
-        renderNotifAccessList();
+        if(!data.success){ showAccessMgmtMsg("Couldn't remove that number. Try again."); return; }
+        renderAccessManagementTable();
       } catch(e){
-        showNotifAccessMsg("Couldn't reach the server. Try again.");
+        showAccessMgmtMsg("Couldn't reach the server. Try again.");
       }
     });
   });
 }
 
-function showNotifAccessMsg(text){
-  const el = document.getElementById("notifAccessMsg");
-  el.textContent = text;
-  el.style.display = "block";
-  setTimeout(() => { el.style.display = "none"; }, 2500);
-}
-
-document.getElementById("notifAccessAddBtn").addEventListener("click", async function(){
-  const input = document.getElementById("notifAccessNewMobile");
+document.getElementById("accessMgmtAddBtn").addEventListener("click", async function(){
+  const input = document.getElementById("accessMgmtNewMobile");
   const mobile = input.value.trim();
   if(!/^[0-9]{10}$/.test(mobile)){
-    showNotifAccessMsg("Enter a valid 10-digit mobile number.");
+    showAccessMgmtMsg("Enter a valid 10-digit mobile number.");
     return;
   }
   const btn = this;
   btn.disabled = true;
   try {
-    const res = await fetch(getBackendUrl() + "/notif-access", {
-      method: "POST",
-      headers: adminHeaders(),
-      body: JSON.stringify({ mobile })
-    });
-    const data = await res.json();
+    // New numbers start with Login only — admin ticks Rotation/Notifications afterward as needed.
+    const data = await setAccessManagement(mobile, { login: true, rotation: false, notifications: false });
     if(!data.success){
-      showNotifAccessMsg(data.error === "unauthorized" ? "Admin PIN check failed — try logging out and back in." : data.error === "invalid_mobile" ? "Enter a valid 10-digit mobile number." : "Couldn't add that number. Try again.");
+      showAccessMgmtMsg(data.error === "unauthorized" ? "Admin PIN check failed — try logging out and back in." : data.error === "invalid_mobile" ? "Enter a valid 10-digit mobile number." : "Couldn't add that number. Try again.");
       return;
     }
     input.value = "";
-    renderNotifAccessList();
+    renderAccessManagementTable();
   } catch(e){
-    showNotifAccessMsg("Couldn't reach the server. Check your connection and try again.");
-  } finally {
-    btn.disabled = false;
-  }
-});
-
-document.getElementById("adminAddBtn").addEventListener("click", async function(){
-  const input = document.getElementById("adminNewMobile");
-  const mobile = input.value.trim();
-  if(!/^[0-9]{10}$/.test(mobile)){
-    showAdminMsg("Enter a valid 10-digit mobile number.");
-    return;
-  }
-  const btn = this;
-  btn.disabled = true;
-  try {
-    const res = await fetch(getBackendUrl() + "/allowed-mobiles", {
-      method: "POST",
-      headers: adminHeaders(),
-      body: JSON.stringify({ mobile })
-    });
-    const data = await res.json();
-    if(!data.success){
-      showAdminMsg(data.error === "unauthorized" ? "Admin PIN check failed — try logging out and back in." : data.error === "invalid_mobile" ? "Enter a valid 10-digit mobile number." : "Couldn't add that number. Try again.");
-      return;
-    }
-    input.value = "";
-    renderAdminList();
-  } catch(e){
-    showAdminMsg("Couldn't reach the server. Check your connection and try again.");
+    showAccessMgmtMsg("Couldn't reach the server. Check your connection and try again.");
   } finally {
     btn.disabled = false;
   }
