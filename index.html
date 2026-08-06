@@ -4115,16 +4115,45 @@ const ALL_BANK_SYMBOLS = new Set([...PSU_BANK_SYMBOLS, ...PRIVATE_BANK_SYMBOLS])
 const REALTY_SYMBOLS = new Set(["DLF","LODHA","PHOENIXLTD","OBEROIRLTY","PRESTIGE","GODREJPROP","BRIGADE","ANANTRAJ","SOBHA"]);
 const CONSUMER_DURABLES_SYMBOLS = new Set(["TITAN","DIXON","HAVELLS","VOLTAS","KALYANKJIL","BLUESTARCO","AMBER","CROMPTON","KAJARIACER","CENTURYPLY","WHIRLPOOL","VGUARD","BATAINDIA","CERA","PGEL"]);
 
+// --- Added: 6 more sectors, matching Sector Rotation's proven universe.
+// Tickers verified via web search for uncertain/smaller-cap names (all
+// the smaller defence names, PCBL/Coforge/PB Fintech's post-rebrand
+// tickers, Max Healthcare, Sumitomo Chemical India); the rest
+// cross-referenced against SYMBOL_SECTOR_MAP's already-confirmed tickers.
+// Scoring logic (sectorIndicatorScore) is completely untouched — this
+// only adds more sectors' worth of matched stocks feeding into it.
+const INDIA_DEFENCE_SYMBOLS = new Set(["BEL","HAL","SOLARINDS","MAZDOCK","BHARATFORG","BDL","COCHINSHIP","GRSE","MTARTECH","DATAPATTNS","BEML","ASTRAMICRO","AXISCADES","PARAS","ZENTEC"]);
+const CHEMICALS_SYMBOLS = new Set(["PIDILITIND","SOLARINDS","SRF","COROMANDEL","LINDEINDIA","GUJFLUORO","UPL","PIIND","NAVINFLUOR","HSCL","SUMICHEM","DEEPAKNTR","ATUL","BAYERCROP","CHAMBLFERT","AARTIIND","TATACHEM","EIDPARRY","PCBL","GNFC"]);
+const MIDCAP_SELECT_SYMBOLS = new Set(["INDHOTEL","PERSISTENT","VOLTAS","FEDERALBNK","CUMMINSIND","MAXHEALTH","COFORGE","YESBANK","BANKBARODA","ASHOKLEY","SUZLON","UNIONBANK","FORTIS","PRESTIGE","POLICYBZR"]);
+const MNC_SYMBOLS = new Set(["NESTLEIND","ABB","HINDUNILVR","SIEMENS","BRITANNIA","COLPAL","MARUTI","BOSCHLTD","CUMMINSIND","GLAXO","VOLTAS","MCDOWELL-N","HONAUT","3MINDIA","LINDEINDIA","WHIRLPOOL","PGHH","CASTROLIND","SANOFI","BAYERCROP"]);
+const PSE_SYMBOLS = new Set(["NTPC","POWERGRID","ONGC","COALINDIA","IOC","PFC","RECLTD","GAIL","BEL","HAL","BPCL","NHPC","SJVN","NMDC","CONCOR"]);
+const SERVICES_SECTOR_SYMBOLS = new Set(["HDFCBANK","ICICIBANK","BHARTIARTL","SBIN","TCS","KOTAKBANK","INFY","AXISBANK","BAJFINANCE","HCLTECH","ADANIPORTS","WIPRO","INDUSINDBK","TECHM","INDIGO"]);
+
 function realIndicesForRow(r){
   const matches = [];
+  // Original 5 checks — EXACT original short-circuit behavior preserved
+  // below, zero change for any stock that matches one of these.
   if(PSU_BANK_SYMBOLS.has(r.sym)) matches.push("Nifty PSU Bank");
   if(PRIVATE_BANK_SYMBOLS.has(r.sym)) matches.push("Nifty Private Bank");
   if(ALL_BANK_SYMBOLS.has(r.sym)) matches.push("Nifty Bank");
   if(REALTY_SYMBOLS.has(r.sym)) matches.push("Nifty Realty");
   if(CONSUMER_DURABLES_SYMBOLS.has(r.sym)) matches.push("Nifty Consumer Durables");
   if(matches.length) return matches;
+
+  // 6 new sectors — NOT subsets of a single generic category (unlike the
+  // 5 above), so the generic fallback is always ALSO merged in rather
+  // than excluded — otherwise a stock like TCS would lose its original
+  // "Nifty IT" match the moment it also matched "Nifty Services Sector"
+  // (confirmed happening during testing before this fix).
+  if(INDIA_DEFENCE_SYMBOLS.has(r.sym)) matches.push("Nifty India Defence");
+  if(CHEMICALS_SYMBOLS.has(r.sym)) matches.push("Nifty Chemicals");
+  if(MIDCAP_SELECT_SYMBOLS.has(r.sym)) matches.push("Nifty Midcap Select");
+  if(MNC_SYMBOLS.has(r.sym)) matches.push("Nifty MNC");
+  if(PSE_SYMBOLS.has(r.sym)) matches.push("Nifty PSE");
+  if(SERVICES_SECTOR_SYMBOLS.has(r.sym)) matches.push("Nifty Services Sector");
   const mapped = SECTOR_TO_REAL_INDEX[r.sector];
-  return mapped ? [mapped] : [];
+  if(mapped && !matches.includes(mapped)) matches.push(mapped);
+  return matches;
 }
 // Which of our internal sector tag(s) feed the Explore button's filter for
 // a given real index — the inverse of the map above, plus the bank split.
@@ -4134,13 +4163,37 @@ function internalSectorFilterFor(realIndexName){
   }
   if(realIndexName === "Nifty Realty") return "Construction"; // these stocks are tagged Construction internally, no dedicated Realty tag yet
   if(realIndexName === "Nifty Consumer Durables") return "Consumer Goods"; // same idea — tagged Consumer Goods internally
+  // Chemicals already exists as its own generic category — used here for
+  // Explore's broader browse only. Deliberately NOT added to
+  // SECTOR_TO_REAL_INDEX above, since that map also feeds the technical
+  // score, and the generic "Chemicals" tag covers more stocks than the
+  // real 20-stock Nifty Chemicals index — CHEMICALS_SYMBOLS (the precise
+  // 20) already handles the scoring match correctly.
+  if(realIndexName === "Nifty Chemicals") return "Chemicals";
+  // India Defence stocks (BEL, HAL, BEML, Bharat Forge, etc.) are mostly
+  // tagged Industrial Manufacturing internally — broader than the real
+  // index, same tradeoff as the Bank/Realty cases above.
+  if(realIndexName === "Nifty India Defence") return "Industrial Manufacturing";
+  // PSE is dominated by Energy PSUs (NTPC, ONGC, Coal India, IOC, GAIL,
+  // BPCL, NHPC, SJVN) — Energy is the closest broader fit.
+  if(realIndexName === "Nifty PSE") return "Energy";
+  // Services Sector is a genuine mix (9 banks + 5 IT + 1 aviation) —
+  // Financial Services is the larger half, so used as the approximation,
+  // same reasoning as the Bank cases.
+  if(realIndexName === "Nifty Services Sector") return "Financial Services";
+  // Midcap Select and MNC deliberately have NO fallback here — their
+  // constituent lists span too many unrelated categories (hotels, IT,
+  // banks, auto, healthcare, FMCG, industrial, pharma all mixed
+  // together) for any single broader category to be a meaningful
+  // approximation. Explore intentionally shows "—" for these two rather
+  // than open a misleadingly narrow or irrelevant stock list.
   const entry = Object.entries(SECTOR_TO_REAL_INDEX).find(([, real]) => real === realIndexName);
   return entry ? entry[0] : null;
 }
 // Matches internalSectorFilterFor's special cases exactly — these are the
 // indices whose Explore button opens a broader internal category than the
 // real index itself (Explorer can't isolate the exact subset yet).
-const BROADER_FILTER_INDICES = new Set(["Nifty PSU Bank", "Nifty Private Bank", "Nifty Bank", "Nifty Realty", "Nifty Consumer Durables"]);
+const BROADER_FILTER_INDICES = new Set(["Nifty PSU Bank", "Nifty Private Bank", "Nifty Bank", "Nifty Realty", "Nifty Consumer Durables", "Nifty India Defence", "Nifty PSE", "Nifty Services Sector", "Nifty Chemicals"]);
 let sectorIdxRealData = { sector: [], broader: [] };
 
 const _sectorNotifSeenCount = { ORB: {}, DRB: {} };
