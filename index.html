@@ -3273,7 +3273,7 @@ document.getElementById("adminPinChangeBtn").addEventListener("click", async fun
 });
 
 /* ---------------- Admin: add stocks to a sector (from the Trade Explorer) ---------------- */
-const ADMIN_STOCK_SECTORS = ["Automobile", "Cement & Cement Products", "Chemicals", "Construction", "Consumer Goods", "Energy", "Fertilisers & Pesticides", "Financial Services", "Healthcare Services", "IT", "Industrial Manufacturing", "Media & Entertainment", "Metals", "Paper", "Pharma", "Services", "Telecom", "Textiles"];
+const ADMIN_STOCK_SECTORS = ["Automobile", "Cement & Cement Products", "Chemicals", "Construction", "Consumer Goods", "Energy", "Fertilisers & Pesticides", "Financial Services", "Healthcare Services", "IT", "Industrial Manufacturing", "Media & Entertainment", "Metals", "Oil & Gas", "Paper", "Pharma", "Services", "Telecom", "Textiles"];
 document.getElementById("explorerNewStockSector").innerHTML = ADMIN_STOCK_SECTORS.map(s => `<option value="${s}">${s}</option>`).join("");
 
 function showExplorerAddStockMsg(text, isError){
@@ -4192,7 +4192,7 @@ function getExpiryLabel(ix){
   return parts.join(' · ');
 }
 
-const SECTORS = ["Automobile", "Cement & Cement Products", "Chemicals", "Construction", "Consumer Goods", "Energy", "Fertilisers & Pesticides", "Financial Services", "Healthcare Services", "IT", "Industrial Manufacturing", "Media & Entertainment", "Metals", "Other", "Paper", "Pharma", "Services", "Telecom", "Textiles"];
+const SECTORS = ["Automobile", "Cement & Cement Products", "Chemicals", "Construction", "Consumer Goods", "Energy", "Fertilisers & Pesticides", "Financial Services", "Healthcare Services", "IT", "Industrial Manufacturing", "Media & Entertainment", "Metals", "Oil & Gas", "Other", "Paper", "Pharma", "Services", "Telecom", "Textiles"];
 
 let orbRows = [];
 let drbRows = [];
