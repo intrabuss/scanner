@@ -2151,6 +2151,18 @@ html.hide-etf #etfSwingSection{ display:none !important; }
     </div>
     <div id="sectorDrbSwitchMsg" style="font-size:11.5px; display:none; margin-top:6px;"></div>
 
+    <div class="toggle-row">
+      <div>
+        <div class="toggle-row-title">Sector ORB Notifications</div>
+        <div class="toggle-row-sub">Separate from both switches above — this controls whether a Sector ORB break (e.g. "Nifty FMCG sector broke its ORB low") gets logged into Notification Management at all. Turning it off doesn't affect ORB detection or the Sector Indices badges — it just keeps these out of the notification bell/list.</div>
+      </div>
+      <label class="switch">
+        <input type="checkbox" id="sectorOrbNotifSwitchToggle" checked>
+        <span class="switch-slider"></span>
+      </label>
+    </div>
+    <div id="sectorOrbNotifSwitchMsg" style="font-size:11.5px; display:none; margin-top:6px;"></div>
+
     <div class="settings-divider"></div>
     </div>
 
@@ -4313,7 +4325,7 @@ function checkSectorBreakNotifications(sectorData){
     const drbLog = entry.drb_break_log || [];
 
     const prevOrbCount = _sectorNotifSeenCount.ORB[name] || 0;
-    if(!isBaseline && orbLog.length > prevOrbCount){
+    if(!isBaseline && sectorOrbNotifEnabled && orbLog.length > prevOrbCount){
       const latest = orbLog[orbLog.length - 1];
       addNotification({
         category: "SECTOR_ORB", symbol: name, dir: latest.dir, time: latest.time,
@@ -7196,6 +7208,53 @@ document.getElementById("sectorDrbSwitchToggle").addEventListener("change", asyn
 });
 
 
+
+/* ---------------- Sector ORB Notifications Switch ---------------- */
+let sectorOrbNotifEnabled = true; // safe default until the real value loads
+async function fetchAndApplySectorOrbNotifSwitch(){
+  const base = getBackendUrl();
+  if(!base) return;
+  try {
+    const res = await fetch(base + "/sector-orb-notif-switch");
+    if(!res.ok) throw new Error("HTTP " + res.status);
+    const data = await res.json();
+    if(typeof data.enabled === "boolean") sectorOrbNotifEnabled = data.enabled;
+  } catch(err){
+    // keep whatever we last knew
+  }
+  document.getElementById("sectorOrbNotifSwitchToggle").checked = sectorOrbNotifEnabled;
+}
+fetchAndApplySectorOrbNotifSwitch();
+setInterval(throttleWhenHidden(fetchAndApplySectorOrbNotifSwitch, 90000), 20000);
+
+document.getElementById("sectorOrbNotifSwitchToggle").addEventListener("change", async function(){
+  const msg = document.getElementById("sectorOrbNotifSwitchMsg");
+  const newVal = this.checked;
+  this.disabled = true;
+  try {
+    const res = await fetch(getBackendUrl() + "/sector-orb-notif-switch", {
+      method: "POST", headers: adminHeaders(), body: JSON.stringify({ enabled: newVal })
+    });
+    const data = await res.json();
+    if(!data.success){
+      this.checked = !newVal; // revert on failure
+      msg.textContent = data.error === "unauthorized" ? "Admin PIN check failed." : "Couldn't save. Try again.";
+      msg.style.color = "var(--bear)";
+    } else {
+      sectorOrbNotifEnabled = newVal;
+      msg.textContent = "Saved.";
+      msg.style.color = "var(--bull)";
+    }
+  } catch(err){
+    this.checked = !newVal;
+    msg.textContent = "Couldn't reach the server.";
+    msg.style.color = "var(--bear)";
+  } finally {
+    this.disabled = false;
+    msg.style.display = "block";
+    setTimeout(() => { msg.style.display = "none"; }, 2500);
+  }
+});
 
 /* ---------------- Refresh button ---------------- */
 document.getElementById("contactAdminClose").addEventListener("click", function(){
