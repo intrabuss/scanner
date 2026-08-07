@@ -5874,6 +5874,8 @@ async function fetchAndRenderRotation(){
         ? "This number doesn't have access to the Sector Rotation Dashboard. Contact your admin."
         : data.error === "not_logged_in"
         ? "Not logged in to Upstox yet today — sector rotation needs a live session and has no cached data to fall back on."
+        : data.error === "compute_failed"
+        ? "Live sector data came back malformed on the last check — retrying automatically."
         : "Couldn't load sector rotation data.";
       emptyEl.style.display = "block";
       document.getElementById("rotationBody").innerHTML = "";
