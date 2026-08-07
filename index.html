@@ -79,8 +79,6 @@ html,body{
   font-size:14px;
   -webkit-font-smoothing:antialiased;
   transition:background .15s ease, color .15s ease;
-  overflow-x:hidden; /* hard safety net: page itself must never scroll sideways */
-  max-width:100vw;
 }
 
 ::selection{ background:var(--brand-dim); color:var(--text-primary); }
@@ -100,11 +98,11 @@ img, svg{ max-width:100%; }
 /* ============ LAYOUT ============ */
 .app-shell{
   display:grid;
-  grid-template-columns:68px minmax(0, 1fr);
+  grid-template-columns:68px 1fr;
   min-height:100vh;
 }
 @media (max-width: 767.98px){
-  .app-shell{ grid-template-columns:minmax(0, 1fr); }
+  .app-shell{ grid-template-columns:1fr; }
 }
 
 /* ============ SIDEBAR ============ */
@@ -184,7 +182,6 @@ img, svg{ max-width:100%; }
   padding:20px 26px 90px;
   max-width:1500px;
   width:100%;
-  min-width:0;
   margin:0 auto;
 }
 @media (max-width: 767.98px){
@@ -445,8 +442,6 @@ html[data-theme="light"] .avatar{ background:linear-gradient(160deg,#E3E7EE,#F3F
   grid-template-columns:repeat(6, 1fr);
   gap:12px;
 }
-.idx-grid > *, .breadth-stats-grid > *, .rotation-summary-grid > *,
-.rotation-leadership-row > *, .fii-dii-grid > *{ min-width:0; }
 @media (max-width: 1199.98px){ .idx-grid{ grid-template-columns:repeat(3, 1fr); } }
 
 /* Market Breadth (Advance/Decline) */
@@ -2279,27 +2274,13 @@ html.hide-etf #etfSwingSection{ display:none !important; }
 
       <div class="settings-divider"></div>
 
-      <div class="modal-section-lbl">Access Management <span style="color:var(--text-muted); font-weight:500; text-transform:none; letter-spacing:0;">(admin only)</span></div>
-      <div class="section-sub" style="font-size:11.5px; color:var(--text-muted); margin-bottom:8px;">Grant a mobile number access to Login, Sector Rotation, and Notifications independently. Rotation and Notifications each require Login to be on — turning either of them on switches Login on automatically.</div>
-      <div style="display:flex; gap:8px; margin-bottom:10px;">
-        <input type="tel" id="accessMgmtNewMobile" inputmode="numeric" maxlength="10" placeholder="Add 10-digit mobile number" style="flex:1; background:var(--bg-raised); border:1px solid var(--border-med); border-radius:var(--radius-sm); padding:9px 10px; color:var(--text-primary); font-size:13px;">
-        <button class="icon-btn" id="accessMgmtAddBtn" title="Add number"><i class="bi bi-plus-lg"></i></button>
+      <div class="modal-section-lbl">Manage Access <span style="color:var(--text-muted); font-weight:500; text-transform:none; letter-spacing:0;">(admin only)</span></div>
+      <div style="display:flex; gap:8px; margin-bottom:8px;">
+        <input type="tel" id="adminNewMobile" inputmode="numeric" maxlength="10" placeholder="Add 10-digit mobile number" style="flex:1; background:var(--bg-raised); border:1px solid var(--border-med); border-radius:var(--radius-sm); padding:9px 10px; color:var(--text-primary); font-size:13px;">
+        <button class="icon-btn" id="adminAddBtn" title="Add number"><i class="bi bi-plus-lg"></i></button>
       </div>
-      <div id="accessMgmtMsg" style="font-size:11.5px; color:var(--bear); margin-bottom:8px; display:none;"></div>
-      <div style="overflow-x:auto; margin-bottom:8px;">
-        <table style="width:100%; border-collapse:collapse; font-size:12.5px;">
-          <thead>
-            <tr style="color:var(--text-muted); text-align:left; font-size:11px; text-transform:uppercase;">
-              <th style="padding:6px 4px; font-weight:600;">Mobile</th>
-              <th style="padding:6px 4px; font-weight:600; text-align:center;">Login</th>
-              <th style="padding:6px 4px; font-weight:600; text-align:center;">Rotation</th>
-              <th style="padding:6px 4px; font-weight:600; text-align:center;">Notif.</th>
-              <th style="padding:6px 4px;"></th>
-            </tr>
-          </thead>
-          <tbody id="accessMgmtTableBody"></tbody>
-        </table>
-      </div>
+      <div id="adminMsg" style="font-size:11.5px; color:var(--bear); margin-bottom:8px; display:none;"></div>
+      <div id="adminMobileList" style="display:flex; flex-direction:column; gap:6px; max-height:170px; overflow-y:auto;"></div>
 
       <div class="settings-divider"></div>
 
@@ -2311,6 +2292,28 @@ html.hide-etf #etfSwingSection{ display:none !important; }
         <button class="btn-primary" id="adminPinChangeBtn" style="align-self:flex-start; padding:8px 14px; font-size:13px;">Update PIN</button>
       </div>
       <div id="adminPinMsg" style="font-size:11.5px; margin-bottom:8px; display:none;"></div>
+
+      <div class="settings-divider"></div>
+
+      <div class="modal-section-lbl">Sector Rotation Access <span style="color:var(--text-muted); font-weight:500; text-transform:none; letter-spacing:0;">(admin only) · defaults to admin-only</span></div>
+      <div class="section-sub" style="font-size:11.5px; color:var(--text-muted); margin-bottom:8px;">Separate from general login access above — a number needs to be added here too before it can open the Sector Rotation Dashboard.</div>
+      <div style="display:flex; gap:8px; margin-bottom:8px;">
+        <input type="tel" id="rotationAccessNewMobile" inputmode="numeric" maxlength="10" placeholder="Add 10-digit mobile number" style="flex:1; background:var(--bg-raised); border:1px solid var(--border-med); border-radius:var(--radius-sm); padding:9px 10px; color:var(--text-primary); font-size:13px;">
+        <button class="icon-btn" id="rotationAccessAddBtn" title="Add number"><i class="bi bi-plus-lg"></i></button>
+      </div>
+      <div id="rotationAccessMsg" style="font-size:11.5px; color:var(--bear); margin-bottom:8px; display:none;"></div>
+      <div id="rotationAccessMobileList" style="display:flex; flex-direction:column; gap:6px; max-height:170px; overflow-y:auto;"></div>
+
+      <div class="settings-divider"></div>
+
+      <div class="modal-section-lbl">Notifications Access <span style="color:var(--text-muted); font-weight:500; text-transform:none; letter-spacing:0;">(admin only) · defaults to admin-only</span></div>
+      <div class="section-sub" style="font-size:11.5px; color:var(--text-muted); margin-bottom:8px;">Separate from general login access above — a number needs to be added here too before the notification bell shows up for them.</div>
+      <div style="display:flex; gap:8px; margin-bottom:8px;">
+        <input type="tel" id="notifAccessNewMobile" inputmode="numeric" maxlength="10" placeholder="Add 10-digit mobile number" style="flex:1; background:var(--bg-raised); border:1px solid var(--border-med); border-radius:var(--radius-sm); padding:9px 10px; color:var(--text-primary); font-size:13px;">
+        <button class="icon-btn" id="notifAccessAddBtn" title="Add number"><i class="bi bi-plus-lg"></i></button>
+      </div>
+      <div id="notifAccessMsg" style="font-size:11.5px; color:var(--bear); margin-bottom:8px; display:none;"></div>
+      <div id="notifAccessMobileList" style="display:flex; flex-direction:column; gap:6px; max-height:170px; overflow-y:auto;"></div>
 
       <div class="settings-divider"></div>
 
@@ -2326,7 +2329,6 @@ html.hide-etf #etfSwingSection{ display:none !important; }
       <label style="display:flex; align-items:center; gap:7px; font-size:12px; color:var(--text-secondary); margin-bottom:10px;">
         <input type="checkbox" id="backtestQuickTest" checked> Quick Test — 20 stocks only (~30 sec, not the full universe)
       </label>
-      <div id="adminMsg" style="font-size:11.5px; color:var(--bear); margin-bottom:8px; display:none;"></div>
       <button class="btn-primary" id="backtestRunBtn"><i class="bi bi-play-circle"></i> Run Backtest</button>
     </div>
   </div>
@@ -2990,8 +2992,10 @@ function showApp(session){
   document.getElementById("emailAlertsWrap").style.display = isAdmin ? "block" : "none";
   document.getElementById("explorerAlertTestBtn").style.display = isAdmin ? "" : "none";
   document.getElementById("emailAlertsNonAdminMsg").style.display = isAdmin ? "none" : "block";
+  if(isAdmin) renderAdminList();
   if(isAdmin) refreshScanModeUI(); // pull the real configured stock counts (e.g. 424 / 4,515) from /health right away — admin-only section
-  if(isAdmin) renderAccessManagementTable();
+  if(isAdmin) renderRotationAccessList();
+  if(isAdmin) renderNotifAccessList();
 
   // Sector Rotation Dashboard button — hidden by default (see the HTML),
   // only shown once we've confirmed this mobile number has rotation
@@ -3076,130 +3080,202 @@ document.getElementById("upstoxLoginBannerBtn").addEventListener("click", functi
 });
 setInterval(throttleWhenHidden(refreshUpstoxLoginBanner, 90000), 20000); // catches a login done from Settings, another tab, or the daily routine finishing on its own
 
-/* ---------------- Admin: unified Access Management table ---------------- */
+/* ---------------- Admin: manage allowed mobile numbers ---------------- */
+async function renderAdminList(){
+  const listEl = document.getElementById("adminMobileList");
+  listEl.innerHTML = `<div class="admin-mobile-loading">Loading…</div>`;
+  const list = await getAllowedMobiles();
+  if(list === null){
+    listEl.innerHTML = `<div class="admin-mobile-loading">Couldn't reach the server — check your connection and reopen this panel.</div>`;
+    return;
+  }
+  listEl.innerHTML = list.map(m => `
+    <div class="admin-mobile-row">
+      <span class="mono">${m}${m === ADMIN_MOBILE ? '<span class="admin-tag">ADMIN</span>' : ''}</span>
+      ${m === ADMIN_MOBILE ? '' : `<button class="rm-x" data-mobile="${m}" title="Remove"><i class="bi bi-x-lg"></i></button>`}
+    </div>
+  `).join("");
+
+  document.querySelectorAll("#adminMobileList .rm-x").forEach(btn => {
+    btn.addEventListener("click", async function(){
+      this.disabled = true;
+      try {
+        const res = await fetch(getBackendUrl() + "/allowed-mobiles/" + encodeURIComponent(this.dataset.mobile), { method: "DELETE", headers: adminHeaders() });
+        const data = await res.json();
+        if(!data.success){ showAdminMsg("Couldn't remove that number. Try again."); return; }
+        renderAdminList();
+      } catch(e){
+        showAdminMsg("Couldn't reach the server. Try again.");
+      }
+    });
+  });
+}
+
 function showAdminMsg(text){
-  // Used by the Backtest section below — kept generic/reusable, same
-  // #adminMsg element and pattern as before the access lists were
-  // consolidated into the Access Management table.
   const el = document.getElementById("adminMsg");
   el.textContent = text;
   el.style.display = "block";
   setTimeout(() => { el.style.display = "none"; }, 2500);
 }
 
-async function getAccessManagementRows(){
-  try {
-    const res = await fetch(getBackendUrl() + "/access-management", { headers: adminHeaders() });
-    if(!res.ok) throw new Error("HTTP " + res.status);
-    const data = await res.json();
-    if(data.success && Array.isArray(data.rows)) return data.rows;
-  } catch(e){
-    console.warn("Couldn't reach backend for access-management list:", e);
-  }
-  return null;
-}
-
-function showAccessMgmtMsg(text){
-  const el = document.getElementById("accessMgmtMsg");
-  el.textContent = text;
-  el.style.display = "block";
-  setTimeout(() => { el.style.display = "none"; }, 2500);
-}
-
-async function setAccessManagement(mobile, patch){
-  // patch is a partial {login, rotation, notifications} — merged onto the
-  // row's CURRENT state so ticking one checkbox doesn't clobber the others.
-  const rows = await getAccessManagementRows();
-  const existing = (rows || []).find(r => r.mobile === mobile) || { login: false, rotation: false, notifications: false };
-  const body = {
-    mobile,
-    login: patch.login !== undefined ? patch.login : existing.login,
-    rotation: patch.rotation !== undefined ? patch.rotation : existing.rotation,
-    notifications: patch.notifications !== undefined ? patch.notifications : existing.notifications,
-  };
-  const res = await fetch(getBackendUrl() + "/access-management", {
-    method: "POST",
-    headers: adminHeaders(),
-    body: JSON.stringify(body)
-  });
-  return await res.json();
-}
-
-async function renderAccessManagementTable(){
-  const body = document.getElementById("accessMgmtTableBody");
-  body.innerHTML = `<tr><td colspan="5" class="admin-mobile-loading" style="padding:10px 4px;">Loading…</td></tr>`;
-  const rows = await getAccessManagementRows();
-  if(rows === null){
-    body.innerHTML = `<tr><td colspan="5" class="admin-mobile-loading" style="padding:10px 4px;">Couldn't reach the server — check your connection and reopen this panel.</td></tr>`;
+/* ---------------- Admin: manage Sector Rotation access ---------------- */
+async function renderRotationAccessList(){
+  const listEl = document.getElementById("rotationAccessMobileList");
+  listEl.innerHTML = `<div class="admin-mobile-loading">Loading…</div>`;
+  const list = await getRotationAccessMobiles();
+  if(list === null){
+    listEl.innerHTML = `<div class="admin-mobile-loading">Couldn't reach the server — check your connection and reopen this panel.</div>`;
     return;
   }
-  if(!rows.length){
-    body.innerHTML = `<tr><td colspan="5" class="admin-mobile-loading" style="padding:10px 4px;">No numbers yet — add one above.</td></tr>`;
-    return;
-  }
-  body.innerHTML = rows.map(r => `
-    <tr data-mobile="${r.mobile}" style="border-top:1px solid var(--border-med);">
-      <td style="padding:7px 4px;" class="mono">${r.mobile}${r.is_admin ? ' <span class="admin-tag">ADMIN</span>' : ''}</td>
-      <td style="padding:7px 4px; text-align:center;"><input type="checkbox" class="access-chk" data-field="login" ${r.login ? "checked" : ""} ${r.is_admin ? "disabled" : ""}></td>
-      <td style="padding:7px 4px; text-align:center;"><input type="checkbox" class="access-chk" data-field="rotation" ${r.rotation ? "checked" : ""} ${r.is_admin ? "disabled" : ""}></td>
-      <td style="padding:7px 4px; text-align:center;"><input type="checkbox" class="access-chk" data-field="notifications" ${r.notifications ? "checked" : ""} ${r.is_admin ? "disabled" : ""}></td>
-      <td style="padding:7px 4px; text-align:right;">${r.is_admin ? "" : `<button class="rm-x" title="Remove all access"><i class="bi bi-trash3"></i></button>`}</td>
-    </tr>
+  listEl.innerHTML = list.map(m => `
+    <div class="admin-mobile-row">
+      <span class="mono">${m}${m === ADMIN_MOBILE ? '<span class="admin-tag">ADMIN</span>' : ''}</span>
+      ${m === ADMIN_MOBILE ? '' : `<button class="rm-x" data-mobile="${m}" title="Remove"><i class="bi bi-x-lg"></i></button>`}
+    </div>
   `).join("");
 
-  body.querySelectorAll("tr").forEach(row => {
-    const mobile = row.dataset.mobile;
-    row.querySelectorAll(".access-chk").forEach(chk => {
-      chk.addEventListener("change", async function(){
-        this.disabled = true;
-        try {
-          const patch = {}; patch[this.dataset.field] = this.checked;
-          const data = await setAccessManagement(mobile, patch);
-          if(!data.success){
-            showAccessMgmtMsg(data.error === "unauthorized" ? "Admin PIN check failed — try logging out and back in." : "Couldn't update access. Try again.");
-          }
-          renderAccessManagementTable();
-        } catch(e){
-          showAccessMgmtMsg("Couldn't reach the server. Try again.");
-          renderAccessManagementTable();
-        }
-      });
-    });
-    const rmBtn = row.querySelector(".rm-x");
-    if(rmBtn) rmBtn.addEventListener("click", async function(){
+  document.querySelectorAll("#rotationAccessMobileList .rm-x").forEach(btn => {
+    btn.addEventListener("click", async function(){
       this.disabled = true;
       try {
-        const res = await fetch(getBackendUrl() + "/access-management/" + encodeURIComponent(mobile), { method: "DELETE", headers: adminHeaders() });
+        const res = await fetch(getBackendUrl() + "/rotation-access/" + encodeURIComponent(this.dataset.mobile), { method: "DELETE", headers: adminHeaders() });
         const data = await res.json();
-        if(!data.success){ showAccessMgmtMsg("Couldn't remove that number. Try again."); return; }
-        renderAccessManagementTable();
+        if(!data.success){ showRotationAccessMsg("Couldn't remove that number. Try again."); return; }
+        renderRotationAccessList();
       } catch(e){
-        showAccessMgmtMsg("Couldn't reach the server. Try again.");
+        showRotationAccessMsg("Couldn't reach the server. Try again.");
       }
     });
   });
 }
 
-document.getElementById("accessMgmtAddBtn").addEventListener("click", async function(){
-  const input = document.getElementById("accessMgmtNewMobile");
+function showRotationAccessMsg(text){
+  const el = document.getElementById("rotationAccessMsg");
+  el.textContent = text;
+  el.style.display = "block";
+  setTimeout(() => { el.style.display = "none"; }, 2500);
+}
+
+document.getElementById("rotationAccessAddBtn").addEventListener("click", async function(){
+  const input = document.getElementById("rotationAccessNewMobile");
   const mobile = input.value.trim();
   if(!/^[0-9]{10}$/.test(mobile)){
-    showAccessMgmtMsg("Enter a valid 10-digit mobile number.");
+    showRotationAccessMsg("Enter a valid 10-digit mobile number.");
     return;
   }
   const btn = this;
   btn.disabled = true;
   try {
-    // New numbers start with Login only — admin ticks Rotation/Notifications afterward as needed.
-    const data = await setAccessManagement(mobile, { login: true, rotation: false, notifications: false });
+    const res = await fetch(getBackendUrl() + "/rotation-access", {
+      method: "POST",
+      headers: adminHeaders(),
+      body: JSON.stringify({ mobile })
+    });
+    const data = await res.json();
     if(!data.success){
-      showAccessMgmtMsg(data.error === "unauthorized" ? "Admin PIN check failed — try logging out and back in." : data.error === "invalid_mobile" ? "Enter a valid 10-digit mobile number." : "Couldn't add that number. Try again.");
+      showRotationAccessMsg(data.error === "unauthorized" ? "Admin PIN check failed — try logging out and back in." : data.error === "invalid_mobile" ? "Enter a valid 10-digit mobile number." : "Couldn't add that number. Try again.");
       return;
     }
     input.value = "";
-    renderAccessManagementTable();
+    renderRotationAccessList();
   } catch(e){
-    showAccessMgmtMsg("Couldn't reach the server. Check your connection and try again.");
+    showRotationAccessMsg("Couldn't reach the server. Check your connection and try again.");
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+/* ---------------- Admin: manage Notifications access ---------------- */
+async function renderNotifAccessList(){
+  const listEl = document.getElementById("notifAccessMobileList");
+  listEl.innerHTML = `<div class="admin-mobile-loading">Loading…</div>`;
+  const list = await getNotifAccessMobiles();
+  if(list === null){
+    listEl.innerHTML = `<div class="admin-mobile-loading">Couldn't reach the server — check your connection and reopen this panel.</div>`;
+    return;
+  }
+  listEl.innerHTML = list.map(m => `
+    <div class="admin-mobile-row">
+      <span class="mono">${m}${m === ADMIN_MOBILE ? '<span class="admin-tag">ADMIN</span>' : ''}</span>
+      ${m === ADMIN_MOBILE ? '' : `<button class="rm-x" data-mobile="${m}" title="Remove"><i class="bi bi-x-lg"></i></button>`}
+    </div>
+  `).join("");
+
+  document.querySelectorAll("#notifAccessMobileList .rm-x").forEach(btn => {
+    btn.addEventListener("click", async function(){
+      this.disabled = true;
+      try {
+        const res = await fetch(getBackendUrl() + "/notif-access/" + encodeURIComponent(this.dataset.mobile), { method: "DELETE", headers: adminHeaders() });
+        const data = await res.json();
+        if(!data.success){ showNotifAccessMsg("Couldn't remove that number. Try again."); return; }
+        renderNotifAccessList();
+      } catch(e){
+        showNotifAccessMsg("Couldn't reach the server. Try again.");
+      }
+    });
+  });
+}
+
+function showNotifAccessMsg(text){
+  const el = document.getElementById("notifAccessMsg");
+  el.textContent = text;
+  el.style.display = "block";
+  setTimeout(() => { el.style.display = "none"; }, 2500);
+}
+
+document.getElementById("notifAccessAddBtn").addEventListener("click", async function(){
+  const input = document.getElementById("notifAccessNewMobile");
+  const mobile = input.value.trim();
+  if(!/^[0-9]{10}$/.test(mobile)){
+    showNotifAccessMsg("Enter a valid 10-digit mobile number.");
+    return;
+  }
+  const btn = this;
+  btn.disabled = true;
+  try {
+    const res = await fetch(getBackendUrl() + "/notif-access", {
+      method: "POST",
+      headers: adminHeaders(),
+      body: JSON.stringify({ mobile })
+    });
+    const data = await res.json();
+    if(!data.success){
+      showNotifAccessMsg(data.error === "unauthorized" ? "Admin PIN check failed — try logging out and back in." : data.error === "invalid_mobile" ? "Enter a valid 10-digit mobile number." : "Couldn't add that number. Try again.");
+      return;
+    }
+    input.value = "";
+    renderNotifAccessList();
+  } catch(e){
+    showNotifAccessMsg("Couldn't reach the server. Check your connection and try again.");
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+document.getElementById("adminAddBtn").addEventListener("click", async function(){
+  const input = document.getElementById("adminNewMobile");
+  const mobile = input.value.trim();
+  if(!/^[0-9]{10}$/.test(mobile)){
+    showAdminMsg("Enter a valid 10-digit mobile number.");
+    return;
+  }
+  const btn = this;
+  btn.disabled = true;
+  try {
+    const res = await fetch(getBackendUrl() + "/allowed-mobiles", {
+      method: "POST",
+      headers: adminHeaders(),
+      body: JSON.stringify({ mobile })
+    });
+    const data = await res.json();
+    if(!data.success){
+      showAdminMsg(data.error === "unauthorized" ? "Admin PIN check failed — try logging out and back in." : data.error === "invalid_mobile" ? "Enter a valid 10-digit mobile number." : "Couldn't add that number. Try again.");
+      return;
+    }
+    input.value = "";
+    renderAdminList();
+  } catch(e){
+    showAdminMsg("Couldn't reach the server. Check your connection and try again.");
   } finally {
     btn.disabled = false;
   }
@@ -3273,7 +3349,7 @@ document.getElementById("adminPinChangeBtn").addEventListener("click", async fun
 });
 
 /* ---------------- Admin: add stocks to a sector (from the Trade Explorer) ---------------- */
-const ADMIN_STOCK_SECTORS = ["Automobile", "Cement & Cement Products", "Chemicals", "Construction", "Consumer Goods", "Energy", "Fertilisers & Pesticides", "Financial Services", "Healthcare Services", "IT", "Industrial Manufacturing", "Media & Entertainment", "Metals", "Oil & Gas", "Paper", "Pharma", "Services", "Telecom", "Textiles"];
+const ADMIN_STOCK_SECTORS = ["Automobile", "Cement & Cement Products", "Chemicals", "Construction", "Consumer Goods", "Energy", "Fertilisers & Pesticides", "Financial Services", "Healthcare Services", "IT", "Industrial Manufacturing", "Media & Entertainment", "Metals", "Paper", "Pharma", "Services", "Telecom", "Textiles"];
 document.getElementById("explorerNewStockSector").innerHTML = ADMIN_STOCK_SECTORS.map(s => `<option value="${s}">${s}</option>`).join("");
 
 function showExplorerAddStockMsg(text, isError){
@@ -4192,10 +4268,34 @@ function getExpiryLabel(ix){
   return parts.join(' · ');
 }
 
-const SECTORS = ["Automobile", "Cement & Cement Products", "Chemicals", "Construction", "Consumer Goods", "Energy", "Fertilisers & Pesticides", "Financial Services", "Healthcare Services", "IT", "Industrial Manufacturing", "Media & Entertainment", "Metals", "Oil & Gas", "Other", "Paper", "Pharma", "Services", "Telecom", "Textiles"];
+const SECTORS = ["Automobile", "Cement & Cement Products", "Chemicals", "Construction", "Consumer Goods", "Energy", "Fertilisers & Pesticides", "Financial Services", "Healthcare Services", "IT", "Industrial Manufacturing", "Media & Entertainment", "Metals", "Other", "Paper", "Pharma", "Services", "Telecom", "Textiles"];
 
 let orbRows = [];
 let drbRows = [];
+
+// The actual configured scan universe for today (500 in Nifty 500 mode,
+// ~4,500+ in Full Market mode), from /health's daily_cache_size. Every
+// "Total Scanned"-style count on the page should show THIS, not
+// orbRows.length/drbRows.length — those only reflect how many symbols
+// have received a live tick from the WS feed so far, which lags below
+// the configured size early in the session (or whenever the feed is
+// still catching up), and were previously shown as if they were the
+// total scan count. Null until the first successful /health fetch;
+// every display below falls back to the live row count while it's null.
+let configuredScanSize = null;
+async function refreshConfiguredScanSize(){
+  const base = getBackendUrl();
+  if(!base) return;
+  try {
+    const res = await fetch(base + "/health");
+    if(!res.ok) return;
+    const data = await res.json();
+    if(typeof data.daily_cache_size === "number") configuredScanSize = data.daily_cache_size;
+  } catch(e){
+    // Leave configuredScanSize as whatever it last was — displays already
+    // fall back to the live row count if it's still null.
+  }
+}
 
 const arrow = s => s==="bull" ? "bi-arrow-up-right" : s==="bear" ? "bi-arrow-down-right" : "bi-arrow-right";
 // Arrow icon should always reflect which way the number actually moved —
@@ -4756,11 +4856,15 @@ function renderOppTable(bodyId, rows){
 // is a genuine "up"/"down" crossover (never "reversed" — that means price is
 // back inside the range right now, so it's not currently a live opportunity
 // in either direction).
-function getLatestOrbBreakOpportunities(direction, limit){
+// Optional `extraFilter(row)` is applied BEFORE the top-N cut, not after —
+// filtering after slicing could drop a qualifying candidate just because
+// it wasn't among the most-recent N breaks before the filter was applied.
+function getLatestOrbBreakOpportunities(direction, limit, extraFilter){
   return orbRows
     .filter(r => r.breakLog && r.breakLog.length > 0)
     .map(r => ({ row: r, latest: r.breakLog[r.breakLog.length - 1] }))
     .filter(x => x.latest.dir === direction)
+    .filter(x => !extraFilter || extraFilter(x.row))
     // "HH:MM" zero-padded 24h strings sort correctly as plain strings —
     // no need for a separate time-parsing step.
     .sort((a, b) => b.latest.time.localeCompare(a.latest.time))
@@ -4828,8 +4932,8 @@ function renderAll(){
   document.getElementById("orbSellCount").textContent = orbRows.filter(r => r.signal === "SELL").length;
   document.getElementById("drbBuyCount").textContent = drbRows.filter(r => r.signal === "BUY").length;
   document.getElementById("drbSellCount").textContent = drbRows.filter(r => r.signal === "SELL").length;
-  document.getElementById("orbTotalCount").textContent = `${orbRows.length.toLocaleString('en-IN')} stocks`;
-  document.getElementById("drbTotalCount").textContent = `${drbRows.length.toLocaleString('en-IN')} stocks`;
+  document.getElementById("orbTotalCount").textContent = `${(configuredScanSize ?? orbRows.length).toLocaleString('en-IN')} stocks`;
+  document.getElementById("drbTotalCount").textContent = `${(configuredScanSize ?? drbRows.length).toLocaleString('en-IN')} stocks`;
 
   // if the explorer modal is currently open, refresh its data reference and re-render it too
   if(document.getElementById("explorerOverlay").classList.contains("show") && currentExplorerStrategy){
@@ -5306,7 +5410,7 @@ function queueOrbAlert(strategy, symbol, price, dir, qty, time, rovl){
   if(!orbAlertQueueRunning) processOrbAlertQueue();
   addNotification({
     category: strategy, symbol, dir, time,
-    message: `${symbol} broke ${strategy} ${dir === "up" ? "high" : "low"} at ₹${price}`,
+    message: `${symbol} broke ${strategy} ${dir === "up" ? "high" : "low"} at ₹${price} · Qty ${qty.toLocaleString('en-IN')}`,
   });
 }
 function processOrbAlertQueue(){
@@ -5327,7 +5431,7 @@ function queueRvolAlert(strategy, symbol, price, dir, qty, time, rovl){
   const entry = { strategy, symbol, price, dir, qty, time, rovl, channelLabel };
   addNotification({
     category: "ORB", symbol, dir, time,
-    message: `${symbol} entered Top 10 ${dir === "up" ? "Long" : "Short"} — ORB break at ₹${price}`,
+    message: `${symbol} entered Top 10 ${dir === "up" ? "Long" : "Short"} — ORB break at ₹${price} · Qty ${qty.toLocaleString('en-IN')}`,
   });
   if(strategy === "LONG"){
     rvolLongAlertQueue.push(entry);
@@ -5413,14 +5517,23 @@ function checkForNewBreaksAndAlert(strategy, rows){
   }
 }
 
+// Both conditions are required for a Long/Short Opportunities alert to fire:
+//  1. Confirmed 3-min ORB break — a stock's latest break_log entry is a
+//     genuine up/down crossover, confirmed by an actual closed 3-min candle
+//     (see check_orb_candle_breaks() server-side), not just a live tick.
+//  2. ROVL confirmation — same "hot" threshold used everywhere else in the
+//     app (ROVL > LS_ALERT_ROVL_MIN, see the rovl-tag "hot" class and the
+//     "Breakouts with ROVL > 1.2" stat labels) so the alert only fires on
+//     breaks with genuine relative volume behind them.
+// The Long/Short Opportunities TABLE itself is unaffected — it still shows
+// every confirmed ORB break regardless of ROVL; this filter only gates
+// whether a break triggers a push/toast alert.
+const LS_ALERT_ROVL_MIN = 1.2;
+const rovlConfirmed = r => r.rovl > LS_ALERT_ROVL_MIN;
+
 function checkTopLongShortAndAlert(allOrbRows){
-  // ROVL-based alerting removed from this module entirely, per explicit
-  // request. Uses the exact same criteria as the Long/Short table itself
-  // — a stock needs an actual, current confirmed ORB break to be a
-  // candidate — and getLatestOrbBreakOpportunities() already sorts by
-  // most recent break first.
-  const longCandidates = getLatestOrbBreakOpportunities("up", LS_ALERT_TOP_N);
-  const shortCandidates = getLatestOrbBreakOpportunities("down", LS_ALERT_TOP_N);
+  const longCandidates = getLatestOrbBreakOpportunities("up", LS_ALERT_TOP_N, rovlConfirmed);
+  const shortCandidates = getLatestOrbBreakOpportunities("down", LS_ALERT_TOP_N, rovlConfirmed);
 
   const newLongSet = new Set(longCandidates.map(r => r.sym));
   const newShortSet = new Set(shortCandidates.map(r => r.sym));
@@ -5606,12 +5719,17 @@ function renderExplorer(){
   // search/quiet-floor so they read as a stable "how big is this slice" figure).
   const statScope = sector === "all" ? explorerData : explorerData.filter(r => r.sector === sector);
   const statBreakouts = statScope.filter(r => r.signal !== "WATCH");
-  document.getElementById("statTotal").textContent = statScope.length.toLocaleString("en-IN");
+  // "all" is the true total-scan-universe figure, so it uses the configured
+  // scan size (falls back to the live row count until /health has loaded).
+  // A sector filter is a genuine subset of live rows with no separate
+  // "configured" number to compare against, so that case is left as-is.
+  const statTotalDisplay = sector === "all" ? (configuredScanSize ?? statScope.length) : statScope.length;
+  document.getElementById("statTotal").textContent = statTotalDisplay.toLocaleString("en-IN");
   document.getElementById("statBreakouts").textContent = statBreakouts.length.toLocaleString("en-IN");
   document.getElementById("statHotRovl").textContent = statBreakouts.filter(r => r.rovl > 1.2).length.toLocaleString("en-IN");
   const sortLabel = { latestBreakTime: "most recent break", chg: "% change" }[explorerSort.key] || explorerSort.key;
   document.getElementById("explorerSub").textContent = sector === "all"
-    ? `${explorerData.length} symbols across ${SECTORS.length} sectors · sorted by ${sortLabel} · flat stocks (<0.5% move) hidden`
+    ? `${statTotalDisplay.toLocaleString("en-IN")} symbols across ${SECTORS.length} sectors · sorted by ${sortLabel} · flat stocks (<0.5% move) hidden`
     : `${statScope.length} symbols in ${sector} · sorted by ${sortLabel} · flat stocks (<0.5% move) hidden`;
 
   document.getElementById("explorerBody").innerHTML = rows.map(r => `
@@ -5874,8 +5992,6 @@ async function fetchAndRenderRotation(){
         ? "This number doesn't have access to the Sector Rotation Dashboard. Contact your admin."
         : data.error === "not_logged_in"
         ? "Not logged in to Upstox yet today — sector rotation needs a live session and has no cached data to fall back on."
-        : data.error === "compute_failed"
-        ? "Live sector data came back malformed on the last check — retrying automatically."
         : "Couldn't load sector rotation data.";
       emptyEl.style.display = "block";
       document.getElementById("rotationBody").innerHTML = "";
@@ -6777,6 +6893,12 @@ const BACKEND_URL_KEY = "ib_backend_url";
 const DEFAULT_BACKEND_URL = "https://143-110-248-250.nip.io";
 fetchSectorIndexData();
 setInterval(throttleWhenHidden(fetchSectorIndexData, 120000), 20000);
+
+// Rarely changes intra-day (only when the universe is rebuilt or scan
+// mode is switched), so a slower cadence than the 3s live-data poll is
+// enough — same pattern as fetchSectorIndexData above.
+refreshConfiguredScanSize();
+setInterval(throttleWhenHidden(refreshConfiguredScanSize, 120000), 30000);
 
 function renderMarketNews(articles){
   const track = document.getElementById("marketNewsTrack");
