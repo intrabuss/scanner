@@ -637,6 +637,7 @@ html[data-theme="light"] .avatar{ background:linear-gradient(160deg,#E3E7EE,#F3F
 .row-action-icon.copied{ color:var(--bull); opacity:1; }
 .row-action-icon.pin-btn.pinned{ color:var(--brand); opacity:1; }
 .row-action-icon.size-btn:hover{ color:var(--bull); }
+.row-action-icon.delete-btn:hover{ color:var(--bear); }
 tr.pinned-row{ background:var(--brand-dim); }
 .cell-sub{ color:var(--text-secondary); }
 
@@ -1432,6 +1433,19 @@ tr.pinned-row{ background:var(--brand-dim); }
 }
 .explorer-add-stock-row select{ width:auto; min-width:160px; }
 .explorer-add-stock-row #explorerAddStockMsg{ font-size:12px; font-weight:600; }
+.explorer-bulk-import-row{
+  display:flex; flex-direction:column; gap:8px; padding:14px 20px;
+  border-bottom:1px solid var(--border-soft); background:var(--bg-raised);
+}
+.explorer-bulk-import-hint{ font-size:11.5px; color:var(--text-muted); }
+.explorer-bulk-import-hint code{ background:var(--bg-surface); border-radius:4px; padding:1px 5px; color:var(--text-secondary); }
+.explorer-bulk-import-row textarea{
+  background:var(--bg-surface); border:1px solid var(--border-med); border-radius:var(--radius-sm);
+  padding:10px; color:var(--text-primary); font-size:12.5px; font-family:var(--font-data);
+  resize:vertical; width:100%;
+}
+.explorer-bulk-import-actions{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+#explorerBulkImportMsg{ font-size:12px; font-weight:600; white-space:pre-line; }
 .explorer-search{
   flex:1; min-width:180px; background:var(--bg-raised); border:1px solid var(--border-med);
   border-radius:var(--radius-sm); padding:9px 12px; color:var(--text-primary); font-size:13px;
@@ -2397,12 +2411,30 @@ html.hide-etf #etfSwingSection{ display:none !important; }
       <button type="button" class="admin-add-stock-toggle" id="explorerAddStockToggle" style="display:none;" title="Add a stock to this scan (admin only)">
         <i class="bi bi-plus-lg"></i> Add Stock
       </button>
+      <button type="button" class="admin-add-stock-toggle" id="explorerBulkImportToggle" style="display:none; margin-left:0;" title="Bulk import stocks (admin only)">
+        <i class="bi bi-upload"></i> Bulk Import
+      </button>
+      <button type="button" class="icon-btn" id="explorerExportBtn" title="Export CSV (all sectors, total market)" style="width:34px; height:34px;">
+        <i class="bi bi-download"></i>
+      </button>
     </div>
     <div class="explorer-add-stock-row" id="explorerAddStockRow" style="display:none;">
       <input type="text" id="explorerNewStockSymbol" maxlength="20" placeholder="Symbol e.g. TCS" style="text-transform:uppercase;">
       <select id="explorerNewStockSector" class="explorer-select"></select>
       <button class="btn-primary" id="explorerAddStockSubmit">Add</button>
       <span id="explorerAddStockMsg"></span>
+    </div>
+    <div class="explorer-bulk-import-row" id="explorerBulkImportRow" style="display:none;">
+      <div class="explorer-bulk-import-hint">
+        One stock per line, format <code>SYMBOL,SECTOR</code> — e.g. <code>TCS,IT</code>. Paste directly from a spreadsheet column. Max 500 lines per import.
+      </div>
+      <textarea id="explorerBulkImportText" rows="6" placeholder="TCS,IT&#10;RELIANCE,Oil &amp; Gas&#10;MARUTI,Automobile"></textarea>
+      <div class="explorer-bulk-import-actions">
+        <input type="file" id="explorerBulkImportFile" accept=".csv,.txt" style="display:none;">
+        <button class="btn-view" id="explorerBulkImportFileBtn" type="button" style="padding:8px 12px; font-size:12.5px;"><i class="bi bi-file-earmark-arrow-up"></i> Load from CSV file</button>
+        <button class="btn-primary" id="explorerBulkImportSubmit" type="button">Import</button>
+      </div>
+      <div id="explorerBulkImportMsg"></div>
     </div>
     <div class="explorer-alert-row">
       <button type="button" class="alert-toggle-btn" id="explorerAlertToggle">
@@ -3363,6 +3395,7 @@ document.getElementById("explorerAddStockToggle").addEventListener("click", func
   const opening = row.style.display === "none";
   row.style.display = opening ? "flex" : "none";
   if(opening){
+    document.getElementById("explorerBulkImportRow").style.display = "none";
     // Pre-fill with whatever sector is currently being viewed, since
     // that's almost always why an admin is adding a stock right now —
     // they're looking at a sector and noticed one's missing.
@@ -3403,6 +3436,100 @@ document.getElementById("explorerAddStockSubmit").addEventListener("click", asyn
     showExplorerAddStockMsg(data.note || "Added.", false);
   } catch(e){
     showExplorerAddStockMsg("Couldn't reach the server. Check your connection and try again.", true);
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+/* ---------------- Admin: bulk import stocks (from the Trade Explorer) ---------------- */
+function showExplorerBulkImportMsg(text, isError){
+  const el = document.getElementById("explorerBulkImportMsg");
+  el.textContent = text;
+  el.style.color = isError === false ? "var(--bull)" : "var(--bear)";
+}
+
+document.getElementById("explorerBulkImportToggle").addEventListener("click", function(){
+  const row = document.getElementById("explorerBulkImportRow");
+  row.style.display = row.style.display === "none" ? "flex" : "none";
+  // Keep the two admin panels mutually exclusive so they don't stack up
+  // and crowd the toolbar.
+  if(row.style.display !== "none") document.getElementById("explorerAddStockRow").style.display = "none";
+});
+
+document.getElementById("explorerBulkImportFileBtn").addEventListener("click", function(){
+  document.getElementById("explorerBulkImportFile").click();
+});
+
+document.getElementById("explorerBulkImportFile").addEventListener("change", function(){
+  const file = this.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e){
+    document.getElementById("explorerBulkImportText").value = e.target.result.trim();
+  };
+  reader.onerror = function(){
+    showExplorerBulkImportMsg("Couldn't read that file.", true);
+  };
+  reader.readAsText(file);
+  this.value = ""; // allow re-selecting the same file later
+});
+
+// Parses "SYMBOL,SECTOR" per line into {symbol, sector} objects. Tolerates
+// a header row (skipped if it doesn't look like SYMBOL,SECTOR data),
+// blank lines, extra whitespace, and quoted CSV cells.
+function parseBulkImportText(text){
+  const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+  const stocks = [];
+  for(const line of lines){
+    const parts = line.split(",").map(p => p.trim().replace(/^"|"$/g, ""));
+    if(parts.length < 2) continue;
+    const symbol = parts[0].toUpperCase();
+    const sector = parts[1];
+    if(symbol === "SYMBOL" || symbol === "STOCK") continue; // skip an obvious header row
+    if(!symbol || !sector) continue;
+    stocks.push({ symbol, sector });
+  }
+  return stocks;
+}
+
+document.getElementById("explorerBulkImportSubmit").addEventListener("click", async function(){
+  const text = document.getElementById("explorerBulkImportText").value;
+  const stocks = parseBulkImportText(text);
+  if(!stocks.length){
+    showExplorerBulkImportMsg("Paste at least one line as SYMBOL,SECTOR first.", true);
+    return;
+  }
+  if(stocks.length > 500){
+    showExplorerBulkImportMsg(`${stocks.length} lines — max 500 per import. Split into smaller batches.`, true);
+    return;
+  }
+  const btn = this;
+  btn.disabled = true;
+  showExplorerBulkImportMsg(`Importing ${stocks.length} stocks…`, false);
+  try {
+    const res = await fetch(getBackendUrl() + "/admin/bulk-add-stocks", {
+      method: "POST",
+      headers: adminHeaders(),
+      body: JSON.stringify({ stocks })
+    });
+    const data = await res.json();
+    if(!data.success){
+      const msg = data.error === "unauthorized" ? "Admin PIN check failed — try logging out and back in."
+        : data.error === "too_many" ? data.message
+        : "Couldn't import — try again.";
+      showExplorerBulkImportMsg(msg, true);
+      return;
+    }
+    const failedRows = (data.results || []).filter(r => !r.success);
+    let summary = `${data.added} added, ${data.failed} failed.`;
+    if(failedRows.length){
+      const preview = failedRows.slice(0, 8).map(r => `${r.symbol}: ${r.error}`).join("\n");
+      summary += `\n\nFailed rows:\n${preview}` + (failedRows.length > 8 ? `\n…and ${failedRows.length - 8} more` : "");
+    }
+    showExplorerBulkImportMsg(summary + (data.note ? `\n\n${data.note}` : ""), failedRows.length > 0 && data.added === 0);
+    if(data.added > 0) document.getElementById("explorerBulkImportText").value = "";
+  } catch(e){
+    showExplorerBulkImportMsg("Couldn't reach the server. Check your connection and try again.", true);
   } finally {
     btn.disabled = false;
   }
@@ -4273,30 +4400,6 @@ const SECTORS = ["Automobile", "Cement & Cement Products", "Chemicals", "Constru
 let orbRows = [];
 let drbRows = [];
 
-// The actual configured scan universe for today (500 in Nifty 500 mode,
-// ~4,500+ in Full Market mode), from /health's daily_cache_size. Every
-// "Total Scanned"-style count on the page should show THIS, not
-// orbRows.length/drbRows.length — those only reflect how many symbols
-// have received a live tick from the WS feed so far, which lags below
-// the configured size early in the session (or whenever the feed is
-// still catching up), and were previously shown as if they were the
-// total scan count. Null until the first successful /health fetch;
-// every display below falls back to the live row count while it's null.
-let configuredScanSize = null;
-async function refreshConfiguredScanSize(){
-  const base = getBackendUrl();
-  if(!base) return;
-  try {
-    const res = await fetch(base + "/health");
-    if(!res.ok) return;
-    const data = await res.json();
-    if(typeof data.daily_cache_size === "number") configuredScanSize = data.daily_cache_size;
-  } catch(e){
-    // Leave configuredScanSize as whatever it last was — displays already
-    // fall back to the live row count if it's still null.
-  }
-}
-
 const arrow = s => s==="bull" ? "bi-arrow-up-right" : s==="bear" ? "bi-arrow-down-right" : "bi-arrow-right";
 // Arrow icon should always reflect which way the number actually moved —
 // separate from arrow(status) above, since India VIX's status is
@@ -4856,15 +4959,11 @@ function renderOppTable(bodyId, rows){
 // is a genuine "up"/"down" crossover (never "reversed" — that means price is
 // back inside the range right now, so it's not currently a live opportunity
 // in either direction).
-// Optional `extraFilter(row)` is applied BEFORE the top-N cut, not after —
-// filtering after slicing could drop a qualifying candidate just because
-// it wasn't among the most-recent N breaks before the filter was applied.
-function getLatestOrbBreakOpportunities(direction, limit, extraFilter){
+function getLatestOrbBreakOpportunities(direction, limit){
   return orbRows
     .filter(r => r.breakLog && r.breakLog.length > 0)
     .map(r => ({ row: r, latest: r.breakLog[r.breakLog.length - 1] }))
     .filter(x => x.latest.dir === direction)
-    .filter(x => !extraFilter || extraFilter(x.row))
     // "HH:MM" zero-padded 24h strings sort correctly as plain strings —
     // no need for a separate time-parsing step.
     .sort((a, b) => b.latest.time.localeCompare(a.latest.time))
@@ -4932,8 +5031,8 @@ function renderAll(){
   document.getElementById("orbSellCount").textContent = orbRows.filter(r => r.signal === "SELL").length;
   document.getElementById("drbBuyCount").textContent = drbRows.filter(r => r.signal === "BUY").length;
   document.getElementById("drbSellCount").textContent = drbRows.filter(r => r.signal === "SELL").length;
-  document.getElementById("orbTotalCount").textContent = `${(configuredScanSize ?? orbRows.length).toLocaleString('en-IN')} stocks`;
-  document.getElementById("drbTotalCount").textContent = `${(configuredScanSize ?? drbRows.length).toLocaleString('en-IN')} stocks`;
+  document.getElementById("orbTotalCount").textContent = `${orbRows.length.toLocaleString('en-IN')} stocks`;
+  document.getElementById("drbTotalCount").textContent = `${drbRows.length.toLocaleString('en-IN')} stocks`;
 
   // if the explorer modal is currently open, refresh its data reference and re-render it too
   if(document.getElementById("explorerOverlay").classList.contains("show") && currentExplorerStrategy){
@@ -5402,6 +5501,35 @@ document.getElementById("notifExportBtn").addEventListener("click", function(){
   URL.revokeObjectURL(url);
 });
 
+// Explorer export — deliberately exports explorerData (the full,
+// unfiltered set for whichever strategy modal is open, every sector
+// included) rather than the currently-filtered `rows` in renderExplorer(),
+// so one click always gives the complete sector-by-sector + total-market
+// picture regardless of whatever sector/signal/search filter is active
+// on screen at the time.
+document.getElementById("explorerExportBtn").addEventListener("click", function(){
+  if(!explorerData || !explorerData.length){
+    alert("Nothing to export yet — wait for the scan to load.");
+    return;
+  }
+  const rows = [["Symbol", "Company", "Sector", "% Chg", "ROVL", "Price", "Qty", "Volume", "Signal", "Latest Break Time", "Latest Break Direction"]];
+  explorerData.forEach(r => {
+    const log = Array.isArray(r.breakLog) && r.breakLog.length ? r.breakLog[r.breakLog.length - 1] : null;
+    rows.push([
+      r.sym, r.name, r.sector, r.chg.toFixed(2), r.rovl, r.price, r.qty, r.volume,
+      r.signal || "", log ? log.time : "", log ? log.dir : ""
+    ]);
+  });
+  const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(",")).join("\n");
+  const blob = new Blob([csv], { type: "text/csv" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `intrabuss-${currentExplorerStrategy.toLowerCase()}-all-sectors-${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+});
+
 updateNotifBadge();
 
 function queueOrbAlert(strategy, symbol, price, dir, qty, time, rovl){
@@ -5410,7 +5538,7 @@ function queueOrbAlert(strategy, symbol, price, dir, qty, time, rovl){
   if(!orbAlertQueueRunning) processOrbAlertQueue();
   addNotification({
     category: strategy, symbol, dir, time,
-    message: `${symbol} broke ${strategy} ${dir === "up" ? "high" : "low"} at ₹${price} · Qty ${qty.toLocaleString('en-IN')}`,
+    message: `${symbol} broke ${strategy} ${dir === "up" ? "high" : "low"} at ₹${price}`,
   });
 }
 function processOrbAlertQueue(){
@@ -5431,7 +5559,7 @@ function queueRvolAlert(strategy, symbol, price, dir, qty, time, rovl){
   const entry = { strategy, symbol, price, dir, qty, time, rovl, channelLabel };
   addNotification({
     category: "ORB", symbol, dir, time,
-    message: `${symbol} entered Top 10 ${dir === "up" ? "Long" : "Short"} — ORB break at ₹${price} · Qty ${qty.toLocaleString('en-IN')}`,
+    message: `${symbol} entered Top 10 ${dir === "up" ? "Long" : "Short"} — ORB break at ₹${price}`,
   });
   if(strategy === "LONG"){
     rvolLongAlertQueue.push(entry);
@@ -5517,23 +5645,14 @@ function checkForNewBreaksAndAlert(strategy, rows){
   }
 }
 
-// Both conditions are required for a Long/Short Opportunities alert to fire:
-//  1. Confirmed 3-min ORB break — a stock's latest break_log entry is a
-//     genuine up/down crossover, confirmed by an actual closed 3-min candle
-//     (see check_orb_candle_breaks() server-side), not just a live tick.
-//  2. ROVL confirmation — same "hot" threshold used everywhere else in the
-//     app (ROVL > LS_ALERT_ROVL_MIN, see the rovl-tag "hot" class and the
-//     "Breakouts with ROVL > 1.2" stat labels) so the alert only fires on
-//     breaks with genuine relative volume behind them.
-// The Long/Short Opportunities TABLE itself is unaffected — it still shows
-// every confirmed ORB break regardless of ROVL; this filter only gates
-// whether a break triggers a push/toast alert.
-const LS_ALERT_ROVL_MIN = 1.2;
-const rovlConfirmed = r => r.rovl > LS_ALERT_ROVL_MIN;
-
 function checkTopLongShortAndAlert(allOrbRows){
-  const longCandidates = getLatestOrbBreakOpportunities("up", LS_ALERT_TOP_N, rovlConfirmed);
-  const shortCandidates = getLatestOrbBreakOpportunities("down", LS_ALERT_TOP_N, rovlConfirmed);
+  // ROVL-based alerting removed from this module entirely, per explicit
+  // request. Uses the exact same criteria as the Long/Short table itself
+  // — a stock needs an actual, current confirmed ORB break to be a
+  // candidate — and getLatestOrbBreakOpportunities() already sorts by
+  // most recent break first.
+  const longCandidates = getLatestOrbBreakOpportunities("up", LS_ALERT_TOP_N);
+  const shortCandidates = getLatestOrbBreakOpportunities("down", LS_ALERT_TOP_N);
 
   const newLongSet = new Set(longCandidates.map(r => r.sym));
   const newShortSet = new Set(shortCandidates.map(r => r.sym));
@@ -5719,17 +5838,12 @@ function renderExplorer(){
   // search/quiet-floor so they read as a stable "how big is this slice" figure).
   const statScope = sector === "all" ? explorerData : explorerData.filter(r => r.sector === sector);
   const statBreakouts = statScope.filter(r => r.signal !== "WATCH");
-  // "all" is the true total-scan-universe figure, so it uses the configured
-  // scan size (falls back to the live row count until /health has loaded).
-  // A sector filter is a genuine subset of live rows with no separate
-  // "configured" number to compare against, so that case is left as-is.
-  const statTotalDisplay = sector === "all" ? (configuredScanSize ?? statScope.length) : statScope.length;
-  document.getElementById("statTotal").textContent = statTotalDisplay.toLocaleString("en-IN");
+  document.getElementById("statTotal").textContent = statScope.length.toLocaleString("en-IN");
   document.getElementById("statBreakouts").textContent = statBreakouts.length.toLocaleString("en-IN");
   document.getElementById("statHotRovl").textContent = statBreakouts.filter(r => r.rovl > 1.2).length.toLocaleString("en-IN");
   const sortLabel = { latestBreakTime: "most recent break", chg: "% change" }[explorerSort.key] || explorerSort.key;
   document.getElementById("explorerSub").textContent = sector === "all"
-    ? `${statTotalDisplay.toLocaleString("en-IN")} symbols across ${SECTORS.length} sectors · sorted by ${sortLabel} · flat stocks (<0.5% move) hidden`
+    ? `${explorerData.length} symbols across ${SECTORS.length} sectors · sorted by ${sortLabel} · flat stocks (<0.5% move) hidden`
     : `${statScope.length} symbols in ${sector} · sorted by ${sortLabel} · flat stocks (<0.5% move) hidden`;
 
   document.getElementById("explorerBody").innerHTML = rows.map(r => `
@@ -5813,7 +5927,9 @@ function openExplorer(strategy, initialSignal, initialSector, realIndexName, rea
   updateExplorerAlertToggleUI();
 
   document.getElementById("explorerAddStockToggle").style.display = currentUserIsAdmin ? "inline-flex" : "none";
+  document.getElementById("explorerBulkImportToggle").style.display = currentUserIsAdmin ? "inline-flex" : "none";
   document.getElementById("explorerAddStockRow").style.display = "none";
+  document.getElementById("explorerBulkImportRow").style.display = "none";
 
   const validSector = initialSector && SECTORS.includes(initialSector) ? initialSector : "all";
 
@@ -6802,12 +6918,43 @@ function sizeThisTrade(sym, price, evt){
 }
 window.sizeThisTrade = sizeThisTrade;
 
+// Admin-only: pulls a stock out of the tracked universe entirely (not just
+// this view) — same admin-PIN-gated pattern as add-stock. Confirms first
+// since this is destructive-ish (symbol stops being scanned anywhere until
+// an admin re-adds/un-excludes it).
+async function deleteStock(sym, evt){
+  if(evt) evt.stopPropagation();
+  if(!confirm(`Remove ${sym} from the tracked universe? It'll stop appearing in all scans until an admin re-adds it.`)) return;
+  try {
+    const res = await fetch(getBackendUrl() + "/admin/exclude-stock", {
+      method: "POST",
+      headers: adminHeaders(),
+      body: JSON.stringify({ symbol: sym })
+    });
+    const data = await res.json();
+    if(!data.success){
+      alert(data.error === "unauthorized" ? "Admin PIN check failed — try logging out and back in." : `Couldn't remove ${sym}. Try again.`);
+      return;
+    }
+    // Drop it from the in-memory row lists immediately so it disappears
+    // from every open view without waiting for the next poll.
+    explorerData = explorerData.filter(r => r.sym !== sym);
+    if(typeof orbRows !== "undefined") orbRows = orbRows.filter(r => r.sym !== sym);
+    if(typeof drbRows !== "undefined") drbRows = drbRows.filter(r => r.sym !== sym);
+    if(typeof renderExplorer === "function" && explorerOverlayIsOpen()) renderExplorer();
+  } catch(e){
+    alert("Couldn't reach the server. Check your connection and try again.");
+  }
+}
+window.deleteStock = deleteStock;
+
 function rowActionIconsHtml(sym, price){
   const pinned = pinnedSymbols.has(sym);
   return `<span class="row-action-icons">` +
     `<i class="bi bi-clipboard row-action-icon" onclick="copySymbol('${sym}', event)" title="Copy symbol"></i>` +
     `<i class="bi bi-pin-angle-fill row-action-icon pin-btn${pinned ? ' pinned' : ''}" onclick="togglePinSymbol('${sym}', event)" title="${pinned ? 'Unpin' : 'Pin to top'}"></i>` +
     `<i class="bi bi-calculator row-action-icon size-btn" onclick="sizeThisTrade('${sym}', ${price != null ? price : 'null'}, event)" title="Size this trade"></i>` +
+    (currentUserIsAdmin ? `<i class="bi bi-trash3 row-action-icon delete-btn" onclick="deleteStock('${sym}', event)" title="Remove from universe (admin only)"></i>` : ``) +
     `</span>`;
 }
 function copyIconHtml(sym){
@@ -6893,12 +7040,6 @@ const BACKEND_URL_KEY = "ib_backend_url";
 const DEFAULT_BACKEND_URL = "https://143-110-248-250.nip.io";
 fetchSectorIndexData();
 setInterval(throttleWhenHidden(fetchSectorIndexData, 120000), 20000);
-
-// Rarely changes intra-day (only when the universe is rebuilt or scan
-// mode is switched), so a slower cadence than the 3s live-data poll is
-// enough — same pattern as fetchSectorIndexData above.
-refreshConfiguredScanSize();
-setInterval(throttleWhenHidden(refreshConfiguredScanSize, 120000), 30000);
 
 function renderMarketNews(articles){
   const track = document.getElementById("marketNewsTrack");
