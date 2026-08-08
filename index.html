@@ -2266,6 +2266,32 @@ html.hide-etf #etfSwingSection{ display:none !important; }
         <input type="time" id="emailScheduleTime" value="09:00">
       </div>
       <div id="emailScheduleMsg" style="font-size:11.5px; display:none; margin-top:8px;"></div>
+
+      <div class="settings-divider" style="margin:14px 0;"></div>
+
+      <div style="font-size:11.5px; color:var(--text-muted); margin-bottom:10px;">Send today's full Closing Bell market wrap (breadth, sectors, FII/DII, global cues, top movers) on demand.</div>
+      <div style="display:flex; gap:8px;">
+        <button class="btn-etf-refresh" id="emailMarketWrapSendBtn"><i class="bi bi-envelope"></i> Send Market Wrap Now</button>
+      </div>
+      <div id="emailMarketWrapMsg" style="font-size:11.5px; display:none; margin-top:8px;"></div>
+
+      <div class="settings-divider" style="margin:14px 0;"></div>
+
+      <div class="toggle-row">
+        <div>
+          <div class="toggle-row-title">Auto-send daily</div>
+          <div class="toggle-row-sub">Sends the Closing Bell market wrap automatically every day at the time below.</div>
+        </div>
+        <label class="switch">
+          <input type="checkbox" id="marketWrapScheduleToggle">
+          <span class="switch-slider"></span>
+        </label>
+      </div>
+      <div class="form-field" style="margin-top:10px;">
+        <label for="marketWrapScheduleTime">Send time</label>
+        <input type="time" id="marketWrapScheduleTime" value="20:00">
+      </div>
+      <div id="marketWrapScheduleMsg" style="font-size:11.5px; display:none; margin-top:8px;"></div>
     </div>
     <div id="emailAlertsNonAdminMsg" style="font-size:11.5px; color:var(--text-muted); display:none;">Contact your admin to configure email alerts.</div>
 
@@ -7601,6 +7627,7 @@ async function loadEmailSchedule(){
   }
 }
 document.getElementById("settingsBtn")?.addEventListener("click", loadEmailSchedule);
+document.getElementById("settingsBtn")?.addEventListener("click", loadMarketWrapSchedule);
 
 async function saveEmailSchedule(){
   const base = getBackendUrl();
@@ -7629,6 +7656,76 @@ async function saveEmailSchedule(){
 }
 document.getElementById("emailScheduleToggle").addEventListener("change", saveEmailSchedule);
 document.getElementById("emailScheduleTime").addEventListener("change", saveEmailSchedule);
+
+/* ---------------- Daily Market Wrap: manual send + auto-send schedule ----------------
+   Same shape as the ETF Buy List block above, wired to its own backend
+   endpoints (/market-wrap-schedule, /email/market-wrap) — a separate
+   report with its own on/off + time, independent of the ETF email. */
+document.getElementById("emailMarketWrapSendBtn").addEventListener("click", async function(){
+  const base = getBackendUrl();
+  const msg = document.getElementById("emailMarketWrapMsg");
+  const btn = this;
+  if(!base){ msg.textContent = "Set your Live Data Source first."; msg.style.color = "var(--bear)"; msg.style.display = "block"; return; }
+  btn.disabled = true;
+  btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Sending…';
+  try {
+    const res = await fetch(base + "/email/market-wrap", { method: "POST", headers: adminHeaders() });
+    const data = await res.json();
+    msg.textContent = data.success ? data.message : (data.error === "unauthorized" ? "Admin PIN check failed — try logging out and back in." : data.message || "Send failed.");
+    msg.style.color = data.success ? "var(--bull)" : "var(--bear)";
+    msg.style.display = "block";
+  } catch(err){
+    msg.textContent = "Couldn't reach the server to send this.";
+    msg.style.color = "var(--bear)";
+    msg.style.display = "block";
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="bi bi-envelope"></i> Send Market Wrap Now';
+  }
+});
+
+async function loadMarketWrapSchedule(){
+  const base = getBackendUrl();
+  if(!base) return;
+  try {
+    const res = await fetch(base + "/market-wrap-schedule");
+    if(!res.ok) return;
+    const data = await res.json();
+    document.getElementById("marketWrapScheduleToggle").checked = !!data.enabled;
+    if(data.time) document.getElementById("marketWrapScheduleTime").value = data.time;
+  } catch(err){
+    // settings panel just won't prefill the schedule until reachable
+  }
+}
+
+async function saveMarketWrapSchedule(){
+  const base = getBackendUrl();
+  const msg = document.getElementById("marketWrapScheduleMsg");
+  const enabled = document.getElementById("marketWrapScheduleToggle").checked;
+  const scheduleTime = document.getElementById("marketWrapScheduleTime").value || "20:00";
+  if(!base){ msg.textContent = "Set your Live Data Source first."; msg.style.color = "var(--bear)"; msg.style.display = "block"; return; }
+  try {
+    const res = await fetch(base + "/market-wrap-schedule", {
+      method: "POST", headers: adminHeaders(), body: JSON.stringify({ enabled, time: scheduleTime })
+    });
+    const data = await res.json();
+    if(!data.success){
+      msg.textContent = data.error === "unauthorized" ? "Admin PIN check failed — try logging out and back in." : data.error === "invalid_time" ? "Enter a valid time." : "Couldn't save that.";
+      msg.style.color = "var(--bear)";
+    } else {
+      msg.textContent = data.enabled ? `Auto-send is ON — daily at ${data.time}.` : "Auto-send is OFF.";
+      msg.style.color = "var(--bull)";
+    }
+    msg.style.display = "block";
+  } catch(err){
+    msg.textContent = "Couldn't reach the server to save this.";
+    msg.style.color = "var(--bear)";
+    msg.style.display = "block";
+  }
+}
+document.getElementById("marketWrapScheduleToggle").addEventListener("change", saveMarketWrapSchedule);
+document.getElementById("marketWrapScheduleTime").addEventListener("change", saveMarketWrapSchedule);
+
 
 
 /* ---------------- Strategy Focus ----------------
