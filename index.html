@@ -187,6 +187,13 @@ img, svg{ max-width:100%; }
 @media (max-width: 767.98px){
   .main{ padding:16px 14px 96px; }
 }
+@media (min-width: 768px) and (max-width: 1024px){
+  /* Tablet — explicit tuning per the responsive requirements table.
+     Previously this range inherited desktop padding verbatim; tightened
+     here so tablet users get proportionally more usable width instead
+     of the same fixed side-margins as a 1920px monitor. */
+  .main{ padding:18px 18px 90px; }
+}
 @media (min-width: 1920px){
   /* Genuinely large monitors (2K/4K) — a modest increase from the 1500px
      cap, not full edge-to-edge, which would stretch tables/charts into
@@ -443,6 +450,13 @@ html[data-theme="light"] .avatar{ background:linear-gradient(160deg,#E3E7EE,#F3F
   gap:12px;
 }
 @media (max-width: 1199.98px){ .idx-grid{ grid-template-columns:repeat(3, 1fr); } }
+@media (min-width: 1200px) and (max-width: 1280px){
+  /* Small Laptop upper range — per the responsive requirements table.
+     Without this, 6 index cards squeezed into as little as 1200px,
+     right at the edge of feeling cramped before the full desktop
+     layout has real room to breathe. */
+  .idx-grid{ grid-template-columns:repeat(4, 1fr); }
+}
 
 /* Market Breadth (Advance/Decline) */
 .breadth-sentiment-badge{
