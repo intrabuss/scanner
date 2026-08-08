@@ -2553,7 +2553,7 @@ html.hide-etf #etfSwingSection{ display:none !important; }
         <i class="bi bi-bell"></i>
         <span id="lsAlertToggleLbl">Top 10 Alerts: Off</span>
       </button>
-      <span class="alert-toggle-hint">Alerts when a stock has a fresh, confirmed ORB break (up to the 10 most recent) — Long or Short, covers both directions.</span>
+      <span class="alert-toggle-hint">Alerts when a stock has a fresh, confirmed ORB break with rovl (up to the 10 most recent) — Long or Short, covers both directions.</span>
     </div>
     <div class="explorer-body table-scroll">
       <table class="data-grid" id="lsTable">
@@ -4756,7 +4756,7 @@ const ROTATION_NAME_TO_REAL_INDEX = {
 // Opportunities by ACTUAL current sector strength instead of the static
 // Sector Trend computation. 45s cache so opening the Long/Short modal
 // repeatedly doesn't hammer /sector-rotation on every click.
-let _rotationLeadershipCache = { top3: null, bottom3: null, fetchedAt: 0 };
+let _rotationLeadershipCache = { top3: null, bottom3: null, top3Names: null, bottom3Names: null, fetchedAt: 0 };
 const ROTATION_LEADERSHIP_CACHE_MS = 45000;
 
 async function getRotationLeadershipRealIndices(){
@@ -4780,6 +4780,11 @@ async function getRotationLeadershipRealIndices(){
     _rotationLeadershipCache = {
       top3: toRealIndices(data.leadership.top3),
       bottom3: toRealIndices(data.leadership.bottom3),
+      // Real sector NAMES (not just the matching Set) — kept separately so
+      // the UI can show "Pharma, IT, Auto" instead of a generic "(Top 3)"
+      // label, without changing how the Set itself is used for filtering.
+      top3Names: data.leadership.top3.map(s => ROTATION_NAME_TO_REAL_INDEX[s.name]).filter(Boolean),
+      bottom3Names: data.leadership.bottom3.map(s => ROTATION_NAME_TO_REAL_INDEX[s.name]).filter(Boolean),
       fetchedAt: now,
     };
     return _rotationLeadershipCache;
@@ -5852,7 +5857,7 @@ function updateLsAlertToggleUI(){
   document.getElementById("lsAlertToggle").classList.toggle("on", on);
   document.getElementById("lsAlertToggleLbl").textContent = `${dirLabel} Alerts: ${on ? "On" : "Off"}`;
   const hint = document.querySelector("#lsOverlay .alert-toggle-hint");
-  if(hint) hint.textContent = `Alerts when a stock has a fresh, confirmed ORB break (up to the 10 most recent) — ${dirLabel} only. ${dirLabel === "Long" ? "Short" : "Long"} alerts are a separate switch, toggled from the ${dirLabel === "Long" ? "Short" : "Long"} Opportunities view.`;
+  if(hint) hint.textContent = `Alerts when a stock has a fresh, confirmed ORB break with rovl (up to the 10 most recent) — ${dirLabel} only. ${dirLabel === "Long" ? "Short" : "Long"} alerts are a separate switch, toggled from the ${dirLabel === "Long" ? "Short" : "Long"} Opportunities view.`;
 }
 
 document.getElementById("lsAlertToggle").addEventListener("click", function(){
@@ -6358,7 +6363,12 @@ async function openLongShort(direction){
   let sectorMatchLabel, sectorMatch;
   if(leadership){
     const targetSet = direction === "long" ? leadership.top3 : leadership.bottom3;
-    sectorMatchLabel = direction === "long" ? "In Strong Sectors (Top 3)" : "In Weak Sectors (Bottom 3)";
+    const targetNames = direction === "long" ? leadership.top3Names : leadership.bottom3Names;
+    // Show the actual sector names (e.g. "Pharma, IT, Auto") instead of a
+    // generic "(Top 3)" — the count alone didn't tell you WHICH sectors,
+    // and that's the actually useful part of this stat.
+    const namesLabel = (targetNames && targetNames.length) ? targetNames.join(", ") : (direction === "long" ? "Top 3" : "Bottom 3");
+    sectorMatchLabel = direction === "long" ? `In Strong Sectors (${namesLabel})` : `In Weak Sectors (${namesLabel})`;
     sectorMatch = allInDirection.filter(r => realIndicesForRow(r).some(idx => targetSet.has(idx)));
   } else {
     const targetStrength = direction === "long" ? "strong" : "weak";
