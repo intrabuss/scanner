@@ -637,7 +637,8 @@ html[data-theme="light"] .avatar{ background:linear-gradient(160deg,#E3E7EE,#F3F
 .row-action-icon.copied{ color:var(--bull); opacity:1; }
 .row-action-icon.pin-btn.pinned{ color:var(--brand); opacity:1; }
 .row-action-icon.size-btn:hover{ color:var(--bull); }
-.row-action-icon.delete-btn:hover{ color:var(--bear); }
+.row-action-icon.delete-btn{ color:var(--bear); opacity:.8; font-size:13px; }
+.row-action-icon.delete-btn:hover{ opacity:1; }
 tr.pinned-row{ background:var(--brand-dim); }
 .cell-sub{ color:var(--text-secondary); }
 
@@ -2414,7 +2415,7 @@ html.hide-etf #etfSwingSection{ display:none !important; }
       <button type="button" class="admin-add-stock-toggle" id="explorerBulkImportToggle" style="display:none; margin-left:0;" title="Bulk import stocks (admin only)">
         <i class="bi bi-upload"></i> Bulk Import
       </button>
-      <button type="button" class="icon-btn" id="explorerExportBtn" title="Export CSV (all sectors, total market)" style="width:34px; height:34px;">
+      <button type="button" class="icon-btn" id="explorerExportBtn" title="Export CSV (current sector filter, with totals)" style="width:34px; height:34px;">
         <i class="bi bi-download"></i>
       </button>
     </div>
@@ -5501,31 +5502,54 @@ document.getElementById("notifExportBtn").addEventListener("click", function(){
   URL.revokeObjectURL(url);
 });
 
-// Explorer export — deliberately exports explorerData (the full,
-// unfiltered set for whichever strategy modal is open, every sector
-// included) rather than the currently-filtered `rows` in renderExplorer(),
-// so one click always gives the complete sector-by-sector + total-market
-// picture regardless of whatever sector/signal/search filter is active
-// on screen at the time.
+// Explorer export — respects whatever sector/signal/search filter is
+// currently active on screen (same rules as renderExplorer()), so the CSV
+// always matches what you're looking at. Appends a per-sector total row
+// plus a grand total so the file is self-contained.
 document.getElementById("explorerExportBtn").addEventListener("click", function(){
   if(!explorerData || !explorerData.length){
     alert("Nothing to export yet — wait for the scan to load.");
     return;
   }
+  const sector = explorerSectorFilter.value;
+  const search = document.getElementById("explorerSearch").value.trim().toUpperCase();
+
+  const filtered = explorerData.filter(r => {
+    if(explorerSignal !== "all" && r.signal !== explorerSignal) return false;
+    if(sector !== "all" && r.sector !== sector) return false;
+    if(search && !r.sym.includes(search) && !r.name.toUpperCase().includes(search)) return false;
+    return true;
+  });
+
+  if(!filtered.length){
+    alert("No rows match the current filter — nothing to export.");
+    return;
+  }
+
   const rows = [["Symbol", "Company", "Sector", "% Chg", "ROVL", "Price", "Qty", "Volume", "Signal", "Latest Break Time", "Latest Break Direction"]];
-  explorerData.forEach(r => {
+  filtered.forEach(r => {
     const log = Array.isArray(r.breakLog) && r.breakLog.length ? r.breakLog[r.breakLog.length - 1] : null;
     rows.push([
       r.sym, r.name, r.sector, r.chg.toFixed(2), r.rovl, r.price, r.qty, r.volume,
       r.signal || "", log ? log.time : "", log ? log.dir : ""
     ]);
   });
+
+  // Sector totals — one row per sector present in the export, plus a
+  // grand total for the current filter.
+  rows.push([]);
+  const bySector = {};
+  filtered.forEach(r => { bySector[r.sector] = (bySector[r.sector] || 0) + 1; });
+  Object.keys(bySector).sort().forEach(s => rows.push([`Total — ${s}`, bySector[s]]));
+  rows.push([`Total — ${sector === "all" ? "All Sectors" : sector}`, filtered.length]);
+
   const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(",")).join("\n");
   const blob = new Blob([csv], { type: "text/csv" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `intrabuss-${currentExplorerStrategy.toLowerCase()}-all-sectors-${new Date().toISOString().slice(0,10)}.csv`;
+  const sectorLabel = sector === "all" ? "all-sectors" : sector.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+  a.download = `intrabuss-${currentExplorerStrategy.toLowerCase()}-${sectorLabel}-${new Date().toISOString().slice(0,10)}.csv`;
   a.click();
   URL.revokeObjectURL(url);
 });
