@@ -2513,7 +2513,7 @@ html.hide-etf #etfSwingSection{ display:none !important; }
       </div>
       <div class="explorer-stat accent">
         <div class="explorer-stat-num mono" id="lsStatStrongSector">0</div>
-        <div class="explorer-stat-lbl">In Strong Sectors</div>
+        <div class="explorer-stat-lbl" id="lsStatStrongSectorLbl">In Strong Sectors</div>
       </div>
     </div>
     <div class="explorer-toolbar">
@@ -4703,6 +4703,62 @@ function realIndicesForRow(r){
   if(mapped && !matches.includes(mapped)) matches.push(mapped);
   return matches;
 }
+
+// Maps Sector Rotation Dashboard's own display names (ROTATION_SECTOR_KEYS
+// on the backend — e.g. "AUTO", "PRIVATE BANK") to the real-index display
+// names used everywhere else on this page (realIndicesForRow, sector
+// tables) — e.g. "Nifty Auto", "Nifty Private Bank". Both sides share the
+// identical underlying NSE_INDEX key on the backend, this just bridges the
+// two different display-name spellings. "NIFTY", "MIDCAP SELECT" and "MNC"
+// are intentionally left out — they don't have a stock-level sector
+// mapping on this page to match against.
+const ROTATION_NAME_TO_REAL_INDEX = {
+  "AUTO": "Nifty Auto", "BANK": "Nifty Bank", "PRIVATE BANK": "Nifty Private Bank",
+  "PSU BANK": "Nifty PSU Bank", "FINANCIAL SERVICES": "Nifty Financial Services",
+  "FMCG": "Nifty FMCG", "IT": "Nifty IT", "MEDIA": "Nifty Media", "METAL": "Nifty Metal",
+  "PHARMA": "Nifty Pharma", "REALTY": "Nifty Realty", "OIL & GAS": "Nifty Oil & Gas",
+  "ENERGY": "Nifty Energy", "HEALTHCARE": "Nifty Healthcare Index",
+  "CONSUMER DURABLES": "Nifty Consumer Durables", "INFRA": "Nifty Construction",
+  "CHEMICALS": "Nifty Chemicals", "INDIA DEFENCE": "Nifty India Defence",
+  "PSE": "Nifty PSE", "SERVICES": "Nifty Services Sector",
+};
+
+// Live top-3/bottom-3 from the Sector Rotation Dashboard, translated into
+// real-index names and cached briefly — used to classify Long/Short
+// Opportunities by ACTUAL current sector strength instead of the static
+// Sector Trend computation. 45s cache so opening the Long/Short modal
+// repeatedly doesn't hammer /sector-rotation on every click.
+let _rotationLeadershipCache = { top3: null, bottom3: null, fetchedAt: 0 };
+const ROTATION_LEADERSHIP_CACHE_MS = 45000;
+
+async function getRotationLeadershipRealIndices(){
+  const now = Date.now();
+  if(_rotationLeadershipCache.top3 && (now - _rotationLeadershipCache.fetchedAt) < ROTATION_LEADERSHIP_CACHE_MS){
+    return _rotationLeadershipCache;
+  }
+  try {
+    const session = getSession();
+    const mobile = (session && session.mobile) || "";
+    const res = await fetch(getBackendUrl() + "/sector-rotation?mobile=" + encodeURIComponent(mobile));
+    const data = await res.json();
+    if(!data.leadership || !data.leadership.top3){
+      // No access, not logged in, or no data yet — caller falls back to
+      // the Sector Trend classification instead of breaking for these users.
+      return null;
+    }
+    const toRealIndices = (list) => new Set(
+      list.map(s => ROTATION_NAME_TO_REAL_INDEX[s.name]).filter(Boolean)
+    );
+    _rotationLeadershipCache = {
+      top3: toRealIndices(data.leadership.top3),
+      bottom3: toRealIndices(data.leadership.bottom3),
+      fetchedAt: now,
+    };
+    return _rotationLeadershipCache;
+  } catch(err){
+    return null;
+  }
+}
 // Which of our internal sector tag(s) feed the Explore button's filter for
 // a given real index — the inverse of the map above, plus the bank split.
 function internalSectorFilterFor(realIndexName){
@@ -4783,13 +4839,17 @@ async function fetchSectorIndexData(){
       fetch(base + "/sector-indices"),
       fetch(base + "/broader-indices"),
     ]);
+    if(!sectorRes.ok) console.warn("[sector-indices] backend returned HTTP", sectorRes.status);
+    if(!broaderRes.ok) console.warn("[broader-indices] backend returned HTTP", broaderRes.status);
     sectorIdxRealData.sector = sectorRes.ok ? await sectorRes.json() : [];
     sectorIdxRealData.broader = broaderRes.ok ? await broaderRes.json() : [];
     if(sectorIdxRealData.sector.length) checkSectorBreakNotifications(sectorIdxRealData.sector);
     renderSectorTrend();
   } catch(err){
-    // Silent — keeps showing last known values, same pattern as the
-    // rest of the dashboard's secondary pollers.
+    // Keeps showing last known values, same pattern as the rest of the
+    // dashboard's secondary pollers — but log it so a real failure isn't
+    // completely invisible during debugging.
+    console.warn("[sector-indices] fetch failed:", err);
   }
 }
 
@@ -6048,6 +6108,12 @@ function renderLongShort(){
 
   rows.sort((a,b) => {
     const k = lsSort.key;
+    if(k === "latestBreakTime" && a.latestBreakTime === b.latestBreakTime){
+      // Same break time (common — the ORB sweep checks every 3 min, so
+      // several stocks often break in the same tick): fall back to ROVL,
+      // strongest volume-confirmed move first, regardless of sort direction.
+      return b.rovl - a.rovl;
+    }
     if(typeof a[k] === "string") return a[k].localeCompare(b[k]) * lsSort.dir;
     return (a[k] - b[k]) * lsSort.dir;
   });
@@ -6132,6 +6198,8 @@ async function fetchAndRenderRotation(){
         ? "This number doesn't have access to the Sector Rotation Dashboard. Contact your admin."
         : data.error === "not_logged_in"
         ? "Not logged in to Upstox yet today — sector rotation needs a live session and has no cached data to fall back on."
+        : data.error === "market_closed"
+        ? "Market's closed and there's no cached sector rotation data yet — it'll show Friday's close once the server has captured at least one live read."
         : "Couldn't load sector rotation data.";
       emptyEl.style.display = "block";
       document.getElementById("rotationBody").innerHTML = "";
@@ -6239,11 +6307,10 @@ document.querySelectorAll("#topMoversOverlay [data-universe]").forEach(btn => {
   });
 });
 
-function openLongShort(direction){
+async function openLongShort(direction){
   lsDirection = direction;
-  // Most recent break first, for both directions — this replaces the old
-  // %-change-based default now that Long/Short is defined by actual ORB
-  // breakouts, not raw price movement.
+  // Most recent break first, with ROVL as the tiebreak among stocks that
+  // broke at the same 3-min sweep — see renderLongShort()'s comparator.
   lsSort = { key: "latestBreakTime", dir: -1 };
   document.getElementById("lsSearch").value = "";
   lsSectorFilter.value = "all";
@@ -6253,13 +6320,30 @@ function openLongShort(direction){
 
   const allInDirection = orbRows.filter(r => r.breakLog && r.breakLog.length && r.breakLog[r.breakLog.length - 1].dir === (direction === "long" ? "up" : "down"));
   const hotRovl = allInDirection.filter(r => r.rovl > 1.2);
-  const strongSector = allInDirection.filter(r => sectorStrengthMap[r.sector] === "strong");
+
+  // Long → stocks in currently STRONG sectors (top 3, live from Sector
+  // Rotation). Short → stocks in currently WEAK sectors (bottom 3) —
+  // shorting weakness, not strength. Falls back to the Sector Trend
+  // computed classification if this mobile has no Sector Rotation access
+  // or there's no live session yet, so it never just breaks for those users.
+  const leadership = await getRotationLeadershipRealIndices();
+  let sectorMatchLabel, sectorMatch;
+  if(leadership){
+    const targetSet = direction === "long" ? leadership.top3 : leadership.bottom3;
+    sectorMatchLabel = direction === "long" ? "In Strong Sectors (Top 3)" : "In Weak Sectors (Bottom 3)";
+    sectorMatch = allInDirection.filter(r => realIndicesForRow(r).some(idx => targetSet.has(idx)));
+  } else {
+    const targetStrength = direction === "long" ? "strong" : "weak";
+    sectorMatchLabel = direction === "long" ? "In Strong Sectors" : "In Weak Sectors";
+    sectorMatch = allInDirection.filter(r => sectorStrengthMap[r.sector] === targetStrength);
+  }
 
   document.getElementById("lsStatTotal").textContent = allInDirection.length.toLocaleString("en-IN");
   document.getElementById("lsStatHotRovl").textContent = hotRovl.length.toLocaleString("en-IN");
-  document.getElementById("lsStatStrongSector").textContent = strongSector.length.toLocaleString("en-IN");
+  document.getElementById("lsStatStrongSector").textContent = sectorMatch.length.toLocaleString("en-IN");
+  document.getElementById("lsStatStrongSectorLbl").textContent = sectorMatchLabel;
 
-  document.getElementById("lsSub").textContent = `Sorted by most recent ORB break · only stocks with a confirmed ${lsDirection === "long" ? "up" : "down"} break shown`;
+  document.getElementById("lsSub").textContent = `Sorted by most recent ORB break (ROVL tiebreak) · only stocks with a confirmed ${lsDirection === "long" ? "up" : "down"} break shown`;
 
   updateLsAlertToggleUI();
   renderLongShort();
