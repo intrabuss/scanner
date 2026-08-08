@@ -2184,6 +2184,20 @@ html.hide-etf #etfSwingSection{ display:none !important; }
     </div>
     <div id="sectorDrbSwitchMsg" style="font-size:11.5px; display:none; margin-top:6px;"></div>
 
+    <div class="settings-divider"></div>
+
+    <div class="toggle-row">
+      <div>
+        <div class="toggle-row-title">Stock Delete Button</div>
+        <div class="toggle-row-sub">Shows/hides the trash icon on every row (admin only). Turn off to prevent accidental removals during a live session — admin status itself isn't affected.</div>
+      </div>
+      <label class="switch">
+        <input type="checkbox" id="stockDeleteSwitchToggle" checked>
+        <span class="switch-slider"></span>
+      </label>
+    </div>
+    <div id="stockDeleteSwitchMsg" style="font-size:11.5px; display:none; margin-top:6px;"></div>
+
     <div class="toggle-row">
       <div>
         <div class="toggle-row-title">Sector ORB Notifications</div>
@@ -7041,7 +7055,9 @@ async function deleteStock(sym, evt){
     });
     const data = await res.json();
     if(!data.success){
-      alert(data.error === "unauthorized" ? "Admin PIN check failed — try logging out and back in." : `Couldn't remove ${sym}. Try again.`);
+      alert(data.error === "unauthorized" ? "Admin PIN check failed — try logging out and back in."
+        : data.error === "delete_switch_off" ? "Stock deletion is currently turned off in Settings."
+        : `Couldn't remove ${sym}. Try again.`);
       return;
     }
     // Drop it from the in-memory row lists immediately so it disappears
@@ -7062,7 +7078,7 @@ function rowActionIconsHtml(sym, price){
     `<i class="bi bi-clipboard row-action-icon" onclick="copySymbol('${sym}', event)" title="Copy symbol"></i>` +
     `<i class="bi bi-pin-angle-fill row-action-icon pin-btn${pinned ? ' pinned' : ''}" onclick="togglePinSymbol('${sym}', event)" title="${pinned ? 'Unpin' : 'Pin to top'}"></i>` +
     `<i class="bi bi-calculator row-action-icon size-btn" onclick="sizeThisTrade('${sym}', ${price != null ? price : 'null'}, event)" title="Size this trade"></i>` +
-    (currentUserIsAdmin ? `<i class="bi bi-trash3 row-action-icon delete-btn" onclick="deleteStock('${sym}', event)" title="Remove from universe (admin only)"></i>` : ``) +
+    ((currentUserIsAdmin && stockDeleteEnabled) ? `<i class="bi bi-trash3 row-action-icon delete-btn" onclick="deleteStock('${sym}', event)" title="Remove from universe (admin only)"></i>` : ``) +
     `</span>`;
 }
 function copyIconHtml(sym){
@@ -7821,7 +7837,68 @@ document.getElementById("sectorDrbSwitchToggle").addEventListener("change", asyn
   }
 });
 
+/* ---------------- Stock Delete Switch ---------------- */
+// Controls whether the trash icon renders at all on any row (still
+// admin-only on top of this — see rowActionIconsHtml). Starting true is
+// the safe default until the first fetch below resolves, same reasoning
+// as sectorOrbEnabled/sectorDrbEnabled above — avoids a flash-of-hidden
+// button if the real setting also happens to be on (the common case).
+let stockDeleteEnabled = true;
+function _rerenderRowsForDeleteSwitch(){
+  // Re-render whatever's currently on screen that could contain the
+  // trash icon — same "re-render so the change shows immediately"
+  // reasoning as the sector switches above, spread across the several
+  // tables that use rowActionIconsHtml.
+  if(typeof renderAll === "function") renderAll();
+  if(typeof renderExplorer === "function" && typeof explorerOverlayIsOpen === "function" && explorerOverlayIsOpen()) renderExplorer();
+  if(typeof renderLongShort === "function") renderLongShort();
+}
+async function fetchAndApplyStockDeleteSwitch(){
+  const base = getBackendUrl();
+  if(!base) return;
+  try {
+    const res = await fetch(base + "/stock-delete-switch");
+    if(!res.ok) throw new Error("HTTP " + res.status);
+    const data = await res.json();
+    if(typeof data.enabled === "boolean") stockDeleteEnabled = data.enabled;
+  } catch(err){
+    // keep whatever we last knew
+  }
+  document.getElementById("stockDeleteSwitchToggle").checked = stockDeleteEnabled;
+  _rerenderRowsForDeleteSwitch();
+}
+fetchAndApplyStockDeleteSwitch();
+setInterval(throttleWhenHidden(fetchAndApplyStockDeleteSwitch, 90000), 20000);
 
+document.getElementById("stockDeleteSwitchToggle").addEventListener("change", async function(){
+  const msg = document.getElementById("stockDeleteSwitchMsg");
+  const newVal = this.checked;
+  this.disabled = true;
+  try {
+    const res = await fetch(getBackendUrl() + "/stock-delete-switch", {
+      method: "POST", headers: adminHeaders(), body: JSON.stringify({ enabled: newVal })
+    });
+    const data = await res.json();
+    if(!data.success){
+      this.checked = !newVal;
+      msg.textContent = data.error === "unauthorized" ? "Admin PIN check failed." : "Couldn't save. Try again.";
+      msg.style.color = "var(--bear)";
+    } else {
+      stockDeleteEnabled = newVal;
+      msg.textContent = "Saved.";
+      msg.style.color = "var(--bull)";
+      _rerenderRowsForDeleteSwitch();
+    }
+  } catch(err){
+    this.checked = !newVal;
+    msg.textContent = "Couldn't reach the server.";
+    msg.style.color = "var(--bear)";
+  } finally {
+    this.disabled = false;
+    msg.style.display = "block";
+    setTimeout(() => { msg.style.display = "none"; }, 2500);
+  }
+});
 
 /* ---------------- Sector ORB Notifications Switch ---------------- */
 let sectorOrbNotifEnabled = true; // safe default until the real value loads
@@ -7884,7 +7961,7 @@ document.getElementById("refreshBtn").addEventListener("click", function(){
 /* =====================================================================
    BOOTSTRAP: theme + session on load
 ===================================================================== */
-applyTheme(localStorage.getItem(THEME_KEY) || "dark");
+applyTheme(localStorage.getItem(THEME_KEY) || "light");
 applyBreakLogVisible(localStorage.getItem(BREAKLOG_VISIBLE_KEY) !== "0");
 
 document.getElementById("backendUrlInput").value = getBackendUrl();
